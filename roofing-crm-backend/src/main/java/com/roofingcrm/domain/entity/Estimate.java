@@ -1,0 +1,60 @@
+package com.roofingcrm.domain.entity;
+
+import com.roofingcrm.domain.enums.EstimateStatus;
+import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+
+/**
+ * Represents an estimate/quote for a roofing job.
+ * Estimates contain line items and financial totals.
+ */
+@Entity
+@Table(name = "estimates",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_estimate_tenant_number", columnNames = {"tenant_id", "estimate_number"})
+        },
+        indexes = {
+                @Index(name = "idx_estimate_tenant_job", columnList = "tenant_id, job_id")
+        })
+@Getter
+@Setter
+@NoArgsConstructor
+public class Estimate extends TenantAuditedEntity {
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "job_id", nullable = false)
+    private Job job;
+
+    @NotBlank
+    @Column(name = "estimate_number", nullable = false)
+    private String estimateNumber;
+
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 50)
+    private EstimateStatus status;
+
+    private LocalDate validUntil;
+
+    @Column(precision = 12, scale = 2)
+    private BigDecimal subtotal;
+
+    @Column(precision = 12, scale = 2)
+    private BigDecimal tax;
+
+    @Column(precision = 12, scale = 2)
+    private BigDecimal total;
+
+    @Column(columnDefinition = "text")
+    private String notesForCustomer;
+
+    @Column(columnDefinition = "text")
+    private String internalNotes;
+}
