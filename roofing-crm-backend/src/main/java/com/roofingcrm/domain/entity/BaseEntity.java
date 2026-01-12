@@ -26,6 +26,11 @@ public abstract class BaseEntity {
     @Column(nullable = false)
     private Instant updatedAt;
 
+    @Column(nullable = false)
+    private boolean archived = false;
+
+    private Instant archivedAt;
+
     protected BaseEntity() {
     }
 

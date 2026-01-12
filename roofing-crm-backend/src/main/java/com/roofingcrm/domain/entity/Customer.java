@@ -41,7 +41,8 @@ public class Customer extends TenantAuditedEntity {
             @AttributeOverride(name = "line2", column = @Column(name = "billing_address_line2")),
             @AttributeOverride(name = "city", column = @Column(name = "billing_city")),
             @AttributeOverride(name = "state", column = @Column(name = "billing_state")),
-            @AttributeOverride(name = "zip", column = @Column(name = "billing_zip"))
+            @AttributeOverride(name = "zip", column = @Column(name = "billing_zip")),
+            @AttributeOverride(name = "countryCode", column = @Column(name = "billing_country_code"))
     })
     private Address billingAddress;
 

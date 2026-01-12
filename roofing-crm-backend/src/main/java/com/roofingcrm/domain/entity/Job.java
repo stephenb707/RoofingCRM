@@ -65,7 +65,8 @@ public class Job extends TenantAuditedEntity {
             @AttributeOverride(name = "line2", column = @Column(name = "job_property_address_line2")),
             @AttributeOverride(name = "city", column = @Column(name = "job_property_city")),
             @AttributeOverride(name = "state", column = @Column(name = "job_property_state")),
-            @AttributeOverride(name = "zip", column = @Column(name = "job_property_zip"))
+            @AttributeOverride(name = "zip", column = @Column(name = "job_property_zip")),
+            @AttributeOverride(name = "countryCode", column = @Column(name = "job_property_country_code"))
     })
     private Address propertyAddress;
 }
