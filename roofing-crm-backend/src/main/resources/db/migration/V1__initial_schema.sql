@@ -210,16 +210,20 @@ CREATE TABLE attachments (
     tenant_id UUID NOT NULL REFERENCES tenants(id),
     created_by_user_id UUID,
     updated_by_user_id UUID,
-    parent_type VARCHAR(50) NOT NULL,
-    parent_id UUID NOT NULL,
+    lead_id UUID REFERENCES leads(id),
+    job_id UUID REFERENCES jobs(id),
     file_name VARCHAR(255) NOT NULL,
     content_type VARCHAR(255) NOT NULL,
-    storage_url VARCHAR(255) NOT NULL,
+    file_size BIGINT NOT NULL,
+    storage_provider VARCHAR(50) NOT NULL,
+    storage_key VARCHAR(500),
     external_provider VARCHAR(255),
-    external_asset_id VARCHAR(255)
+    external_asset_id VARCHAR(255),
+    description TEXT
 );
 
-CREATE INDEX idx_attachment_tenant_parent ON attachments(tenant_id, parent_type, parent_id);
+CREATE INDEX idx_attachment_tenant_lead ON attachments(tenant_id, lead_id);
+CREATE INDEX idx_attachment_tenant_job ON attachments(tenant_id, job_id);
 
 -- ============================================================
 -- COMMUNICATION_LOGS
@@ -233,15 +237,17 @@ CREATE TABLE communication_logs (
     tenant_id UUID NOT NULL REFERENCES tenants(id),
     created_by_user_id UUID,
     updated_by_user_id UUID,
-    parent_type VARCHAR(50) NOT NULL,
-    parent_id UUID NOT NULL,
+    lead_id UUID REFERENCES leads(id),
+    job_id UUID REFERENCES jobs(id),
     channel VARCHAR(20) NOT NULL,
+    direction VARCHAR(20),
+    subject VARCHAR(255),
+    body TEXT,
     occurred_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    direction VARCHAR(255),
-    target VARCHAR(255),
-    content TEXT,
-    external_id VARCHAR(255)
+    external_id VARCHAR(255),
+    external_provider VARCHAR(255)
 );
 
-CREATE INDEX idx_comm_tenant_parent ON communication_logs(tenant_id, parent_type, parent_id);
+CREATE INDEX idx_comm_tenant_lead_occurred ON communication_logs(tenant_id, lead_id, occurred_at);
+CREATE INDEX idx_comm_tenant_job_occurred ON communication_logs(tenant_id, job_id, occurred_at);
 CREATE INDEX idx_comm_tenant_channel ON communication_logs(tenant_id, channel);
