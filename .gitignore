@@ -1,0 +1,7 @@
+# Maven build output
+/roofing-crm-backend/target/
+
+# Common IDE stuff (optional but recommended)
+.idea/
+.vscode/
+*.iml

@@ -1,5 +1,6 @@
 package com.roofingcrm.api.v1.customer;
 
+import com.roofingcrm.security.SecurityUtils;
 import com.roofingcrm.service.customer.CustomerService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,9 +30,9 @@ public class CustomerController {
     @PostMapping
     public ResponseEntity<CustomerDto> createCustomer(
             @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
-            @RequestHeader(value = "X-User-Id", required = false) UUID userId,
             @Valid @RequestBody CreateCustomerRequest request) {
 
+        UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
         CustomerDto created = customerService.createCustomer(tenantId, userId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
@@ -39,10 +40,10 @@ public class CustomerController {
     @PutMapping("/{id}")
     public ResponseEntity<CustomerDto> updateCustomer(
             @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
-            @RequestHeader(value = "X-User-Id", required = false) UUID userId,
             @PathVariable("id") UUID customerId,
             @Valid @RequestBody UpdateCustomerRequest request) {
 
+        UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
         CustomerDto updated = customerService.updateCustomer(tenantId, userId, customerId, request);
         return ResponseEntity.ok(updated);
     }

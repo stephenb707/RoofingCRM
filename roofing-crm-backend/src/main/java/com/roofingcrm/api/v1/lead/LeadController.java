@@ -1,6 +1,7 @@
 package com.roofingcrm.api.v1.lead;
 
 import com.roofingcrm.domain.enums.LeadStatus;
+import com.roofingcrm.security.SecurityUtils;
 import com.roofingcrm.service.lead.LeadService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,9 +31,9 @@ public class LeadController {
     @PostMapping
     public ResponseEntity<LeadDto> createLead(
             @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
-            @RequestHeader(value = "X-User-Id", required = false) UUID userId,
             @Valid @RequestBody CreateLeadRequest request) {
 
+        UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
         LeadDto created = leadService.createLead(tenantId, userId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
@@ -40,10 +41,10 @@ public class LeadController {
     @PutMapping("/{id}")
     public ResponseEntity<LeadDto> updateLead(
             @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
-            @RequestHeader(value = "X-User-Id", required = false) UUID userId,
             @PathVariable("id") UUID leadId,
             @Valid @RequestBody UpdateLeadRequest request) {
 
+        UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
         LeadDto updated = leadService.updateLead(tenantId, userId, leadId, request);
         return ResponseEntity.ok(updated);
     }
@@ -70,10 +71,10 @@ public class LeadController {
     @PostMapping("/{id}/status")
     public ResponseEntity<LeadDto> updateLeadStatus(
             @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
-            @RequestHeader(value = "X-User-Id", required = false) UUID userId,
             @PathVariable("id") UUID leadId,
             @Valid @RequestBody UpdateLeadStatusRequest request) {
 
+        UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
         LeadDto updated = leadService.updateLeadStatus(tenantId, userId, leadId, request.getStatus());
         return ResponseEntity.ok(updated);
     }

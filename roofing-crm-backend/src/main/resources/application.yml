@@ -33,3 +33,9 @@ management:
   endpoint:
     health:
       show-details: when_authorized
+
+app:
+  security:
+    jwt:
+      secret: "REPLACE_WITH_A_LONG_RANDOM_SECRET_KEY_FOR_DEV_ONLY_MIN_32_CHARS"
+      expiration-seconds: 36000

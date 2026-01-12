@@ -2,12 +2,17 @@ package com.roofingcrm.api.v1.estimate;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.roofingcrm.domain.enums.EstimateStatus;
+import com.roofingcrm.security.AuthenticatedUser;
 import com.roofingcrm.service.estimate.EstimateService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.TestingAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
@@ -25,6 +30,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(controllers = EstimateController.class)
+@AutoConfigureMockMvc(addFilters = false)
 @SuppressWarnings("null") // Hamcrest matchers have nullable return types
 class EstimateControllerTest {
 
@@ -37,10 +43,20 @@ class EstimateControllerTest {
     @MockBean
     private EstimateService estimateService;
 
+    private UUID userId;
+
+    @BeforeEach
+    void setUp() {
+        userId = UUID.randomUUID();
+        AuthenticatedUser authUser = new AuthenticatedUser(userId, "test@example.com");
+        TestingAuthenticationToken authentication = new TestingAuthenticationToken(authUser, null);
+        authentication.setAuthenticated(true);
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+    }
+
     @Test
     void createEstimate_returnsCreated() throws Exception {
         UUID tenantId = UUID.randomUUID();
-        UUID userId = UUID.randomUUID();
         UUID jobId = UUID.randomUUID();
 
         EstimateItemRequest item = new EstimateItemRequest();
@@ -73,7 +89,6 @@ class EstimateControllerTest {
 
         mockMvc.perform(post("/api/v1/jobs/{jobId}/estimates", jobId)
                         .header("X-Tenant-Id", tenantId.toString())
-                        .header("X-User-Id", userId.toString())
                         .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
                         .content(Objects.requireNonNull(objectMapper.writeValueAsString(req))))
                 .andExpect(status().isCreated())
@@ -133,7 +148,6 @@ class EstimateControllerTest {
     @Test
     void updateEstimateStatus_returnsOk() throws Exception {
         UUID tenantId = UUID.randomUUID();
-        UUID userId = UUID.randomUUID();
         UUID estimateId = UUID.randomUUID();
 
         UpdateEstimateStatusRequest req = new UpdateEstimateStatusRequest();
@@ -150,7 +164,6 @@ class EstimateControllerTest {
 
         mockMvc.perform(post("/api/v1/estimates/{id}/status", estimateId)
                         .header("X-Tenant-Id", tenantId.toString())
-                        .header("X-User-Id", userId.toString())
                         .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
                         .content(Objects.requireNonNull(objectMapper.writeValueAsString(req))))
                 .andExpect(status().isOk())

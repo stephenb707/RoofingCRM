@@ -1,6 +1,7 @@
 package com.roofingcrm.api.v1.job;
 
 import com.roofingcrm.domain.enums.JobStatus;
+import com.roofingcrm.security.SecurityUtils;
 import com.roofingcrm.service.job.JobService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,9 +31,9 @@ public class JobController {
     @PostMapping
     public ResponseEntity<JobDto> createJob(
             @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
-            @RequestHeader(value = "X-User-Id", required = false) UUID userId,
             @Valid @RequestBody CreateJobRequest request) {
 
+        UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
         JobDto created = jobService.createJob(tenantId, userId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
@@ -40,10 +41,10 @@ public class JobController {
     @PutMapping("/{id}")
     public ResponseEntity<JobDto> updateJob(
             @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
-            @RequestHeader(value = "X-User-Id", required = false) UUID userId,
             @PathVariable("id") UUID jobId,
             @Valid @RequestBody UpdateJobRequest request) {
 
+        UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
         JobDto updated = jobService.updateJob(tenantId, userId, jobId, request);
         return ResponseEntity.ok(updated);
     }
@@ -71,10 +72,10 @@ public class JobController {
     @PostMapping("/{id}/status")
     public ResponseEntity<JobDto> updateJobStatus(
             @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
-            @RequestHeader(value = "X-User-Id", required = false) UUID userId,
             @PathVariable("id") UUID jobId,
             @Valid @RequestBody UpdateJobStatusRequest request) {
 
+        UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
         JobDto updated = jobService.updateJobStatus(tenantId, userId, jobId, request.getStatus());
         return ResponseEntity.ok(updated);
     }

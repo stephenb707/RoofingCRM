@@ -1,50 +1,38 @@
 package com.roofingcrm.domain.entity;
 
-import com.roofingcrm.domain.enums.UserRole;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * Represents a user within a tenant.
- * Users have roles that determine their permissions within the system.
+ * Represents a user in the system.
+ * Users can belong to multiple tenants via TenantUserMembership.
  */
 @Entity
 @Table(name = "users",
-        uniqueConstraints = {
-                @UniqueConstraint(name = "uk_user_tenant_email", columnNames = {"tenant_id", "email"})
-        },
         indexes = {
-                @Index(name = "idx_user_tenant_role", columnList = "tenant_id, role")
+                @Index(name = "idx_user_email", columnList = "email")
         })
 @Getter
 @Setter
 @NoArgsConstructor
-public class User extends TenantAuditedEntity {
+public class User extends BaseEntity {
 
     @NotBlank
     @Email
-    @Column(nullable = false)
+    @Column(nullable = false, unique = true, length = 255)
     private String email;
 
     @NotBlank
-    @Column(nullable = false)
+    @Column(nullable = false, length = 255)
     private String passwordHash;
 
-    @NotBlank
     @Column(nullable = false)
-    private String firstName;
+    private boolean enabled = true;
 
-    @NotBlank
-    @Column(nullable = false)
-    private String lastName;
-
-    @NotNull
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 50)
-    private UserRole role;
+    @Column(length = 255)
+    private String fullName;
 }

@@ -1,6 +1,8 @@
+com\roofingcrm\service\auth\AuthServiceImplTest.class
 com\roofingcrm\api\v1\customer\CustomerControllerTest.class
 com\roofingcrm\AbstractIntegrationTest.class
 com\roofingcrm\service\job\JobServiceImplTest.class
+com\roofingcrm\api\v1\auth\AuthControllerTest.class
 com\roofingcrm\api\v1\estimate\EstimateControllerTest.class
 com\roofingcrm\service\customer\CustomerServiceImplTest.class
 com\roofingcrm\service\lead\LeadServiceImplTest.class
