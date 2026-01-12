@@ -12,13 +12,13 @@ import java.util.UUID;
 
 public interface LeadService {
 
-    LeadDto createLead(@NonNull UUID tenantId, UUID userId, CreateLeadRequest request);
+    LeadDto createLead(@NonNull UUID tenantId, @NonNull UUID userId, CreateLeadRequest request);
 
-    LeadDto updateLead(@NonNull UUID tenantId, UUID userId, UUID leadId, UpdateLeadRequest request);
+    LeadDto updateLead(@NonNull UUID tenantId, @NonNull UUID userId, UUID leadId, UpdateLeadRequest request);
 
-    LeadDto getLead(@NonNull UUID tenantId, UUID leadId);
+    LeadDto getLead(@NonNull UUID tenantId, @NonNull UUID userId, UUID leadId);
 
-    Page<LeadDto> listLeads(@NonNull UUID tenantId, LeadStatus statusFilter, Pageable pageable);
+    Page<LeadDto> listLeads(@NonNull UUID tenantId, @NonNull UUID userId, LeadStatus statusFilter, Pageable pageable);
 
-    LeadDto updateLeadStatus(@NonNull UUID tenantId, UUID userId, UUID leadId, LeadStatus newStatus);
+    LeadDto updateLeadStatus(@NonNull UUID tenantId, @NonNull UUID userId, UUID leadId, LeadStatus newStatus);
 }

@@ -94,7 +94,7 @@ class LeadControllerTest {
         dto.setStatus(LeadStatus.NEW);
         dto.setCreatedAt(Instant.now());
 
-        when(leadService.getLead(tenantId, leadId)).thenReturn(dto);
+        when(leadService.getLead(eq(tenantId), eq(userId), eq(leadId))).thenReturn(dto);
 
         mockMvc.perform(get("/api/v1/leads/{id}", leadId)
                         .header("X-Tenant-Id", tenantId.toString()))

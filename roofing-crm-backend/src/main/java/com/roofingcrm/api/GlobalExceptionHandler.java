@@ -1,6 +1,7 @@
 package com.roofingcrm.api;
 
 import com.roofingcrm.service.exception.ResourceNotFoundException;
+import com.roofingcrm.service.tenant.TenantAccessDeniedException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -26,6 +27,19 @@ public class GlobalExceptionHandler {
                 request.getRequestURI()
         );
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
+    }
+
+    @ExceptionHandler(TenantAccessDeniedException.class)
+    public ResponseEntity<ApiErrorResponse> handleTenantAccessDenied(TenantAccessDeniedException ex,
+                                                                     HttpServletRequest request) {
+        ApiErrorResponse body = new ApiErrorResponse(
+                Instant.now(),
+                HttpStatus.FORBIDDEN.value(),
+                HttpStatus.FORBIDDEN.getReasonPhrase(),
+                ex.getMessage(),
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

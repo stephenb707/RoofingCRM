@@ -100,7 +100,7 @@ class JobControllerTest {
         dto.setType(JobType.REPAIR);
         dto.setCreatedAt(Instant.now());
 
-        when(jobService.getJob(tenantId, jobId)).thenReturn(dto);
+        when(jobService.getJob(eq(tenantId), eq(userId), eq(jobId))).thenReturn(dto);
 
         mockMvc.perform(get("/api/v1/jobs/{id}", jobId)
                         .header("X-Tenant-Id", tenantId.toString()))

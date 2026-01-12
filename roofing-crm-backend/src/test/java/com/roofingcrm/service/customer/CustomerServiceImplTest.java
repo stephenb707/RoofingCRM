@@ -7,9 +7,15 @@ import com.roofingcrm.api.v1.customer.CustomerDto;
 import com.roofingcrm.api.v1.customer.UpdateCustomerRequest;
 import com.roofingcrm.domain.entity.Customer;
 import com.roofingcrm.domain.entity.Tenant;
+import com.roofingcrm.domain.entity.TenantUserMembership;
+import com.roofingcrm.domain.entity.User;
+import com.roofingcrm.domain.enums.UserRole;
 import com.roofingcrm.domain.repository.CustomerRepository;
 import com.roofingcrm.domain.repository.TenantRepository;
+import com.roofingcrm.domain.repository.TenantUserMembershipRepository;
+import com.roofingcrm.domain.repository.UserRepository;
 import com.roofingcrm.service.exception.ResourceNotFoundException;
+import com.roofingcrm.service.tenant.TenantAccessDeniedException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,13 +39,22 @@ class CustomerServiceImplTest extends AbstractIntegrationTest {
     @Autowired
     private CustomerRepository customerRepository;
 
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private TenantUserMembershipRepository membershipRepository;
+
     @NonNull
     private UUID tenantId = Objects.requireNonNull(UUID.randomUUID());
-    private UUID userId;
+    @NonNull
+    private UUID userId = Objects.requireNonNull(UUID.randomUUID());
 
     @BeforeEach
     void setUp() {
+        membershipRepository.deleteAll();
         customerRepository.deleteAll();
+        userRepository.deleteAll();
         tenantRepository.deleteAll();
 
         Tenant tenant = new Tenant();
@@ -47,8 +62,21 @@ class CustomerServiceImplTest extends AbstractIntegrationTest {
         tenant.setSlug("test-roofing");
         tenant = tenantRepository.save(tenant);
 
+        User user = new User();
+        user.setEmail("test-user@example.com");
+        user.setFullName("Test User");
+        user.setPasswordHash("irrelevant-for-this-test");
+        user.setEnabled(true);
+        user = userRepository.save(user);
+
+        TenantUserMembership membership = new TenantUserMembership();
+        membership.setTenant(tenant);
+        membership.setUser(user);
+        membership.setRole(UserRole.OWNER);
+        membershipRepository.save(membership);
+
         this.tenantId = Objects.requireNonNull(tenant.getId());
-        this.userId = UUID.randomUUID();
+        this.userId = Objects.requireNonNull(user.getId());
     }
 
     @Test
@@ -103,7 +131,7 @@ class CustomerServiceImplTest extends AbstractIntegrationTest {
         request.setPrimaryPhone("555-1234");
         CustomerDto dto = customerService.createCustomer(tenantId, userId, request);
 
-        Page<CustomerDto> page = customerService.listCustomers(tenantId, PageRequest.of(0, 10));
+        Page<CustomerDto> page = customerService.listCustomers(tenantId, userId, PageRequest.of(0, 10));
 
         assertEquals(1, page.getTotalElements());
         assertEquals(dto.getId(), page.getContent().get(0).getId());
@@ -113,7 +141,7 @@ class CustomerServiceImplTest extends AbstractIntegrationTest {
     void getCustomer_nonExisting_throwsNotFound() {
         UUID randomId = UUID.randomUUID();
         assertThrows(ResourceNotFoundException.class,
-                () -> customerService.getCustomer(tenantId, randomId));
+                () -> customerService.getCustomer(tenantId, userId, randomId));
     }
 
     @Test
@@ -138,5 +166,27 @@ class CustomerServiceImplTest extends AbstractIntegrationTest {
         assertEquals("Smith", updated.getLastName());
         assertEquals("999-9999", updated.getPrimaryPhone());
         assertEquals("jane@example.com", updated.getEmail());
+    }
+
+    @Test
+    void createCustomer_withoutTenantMembership_throwsAccessDenied() {
+        // Arrange: create a different user with no membership in tenant
+        User otherUser = new User();
+        otherUser.setEmail("other@example.com");
+        otherUser.setFullName("Other User");
+        otherUser.setPasswordHash("x");
+        otherUser.setEnabled(true);
+        otherUser = userRepository.save(otherUser);
+
+        CreateCustomerRequest request = new CreateCustomerRequest();
+        request.setFirstName("NoAccess");
+        request.setLastName("Customer");
+        request.setPrimaryPhone("000");
+
+        UUID otherUserId = Objects.requireNonNull(otherUser.getId());
+
+        // Act & Assert
+        assertThrows(TenantAccessDeniedException.class,
+                () -> customerService.createCustomer(tenantId, otherUserId, request));
     }
 }

@@ -54,7 +54,8 @@ public class JobController {
             @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
             @PathVariable("id") UUID jobId) {
 
-        JobDto dto = jobService.getJob(tenantId, jobId);
+        UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
+        JobDto dto = jobService.getJob(tenantId, userId, jobId);
         return ResponseEntity.ok(dto);
     }
 
@@ -65,7 +66,8 @@ public class JobController {
             @RequestParam(value = "customerId", required = false) UUID customerId,
             @PageableDefault(size = 20) Pageable pageable) {
 
-        Page<JobDto> page = jobService.listJobs(tenantId, status, customerId, pageable);
+        UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
+        Page<JobDto> page = jobService.listJobs(tenantId, userId, status, customerId, pageable);
         return ResponseEntity.ok(page);
     }
 

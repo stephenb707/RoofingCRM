@@ -111,7 +111,7 @@ class EstimateControllerTest {
         dto.setItems(List.of());
         dto.setCreatedAt(Instant.now());
 
-        when(estimateService.getEstimate(tenantId, estimateId)).thenReturn(dto);
+        when(estimateService.getEstimate(eq(tenantId), eq(userId), eq(estimateId))).thenReturn(dto);
 
         mockMvc.perform(get("/api/v1/estimates/{id}", estimateId)
                         .header("X-Tenant-Id", tenantId.toString()))
@@ -137,7 +137,7 @@ class EstimateControllerTest {
         dto2.setStatus(EstimateStatus.SENT);
         dto2.setItems(List.of());
 
-        when(estimateService.listEstimatesForJob(tenantId, jobId)).thenReturn(List.of(dto1, dto2));
+        when(estimateService.listEstimatesForJob(eq(tenantId), eq(userId), eq(jobId))).thenReturn(List.of(dto1, dto2));
 
         mockMvc.perform(get("/api/v1/jobs/{jobId}/estimates", jobId)
                         .header("X-Tenant-Id", tenantId.toString()))

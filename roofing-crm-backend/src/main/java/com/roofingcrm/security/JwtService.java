@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Date;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -39,7 +40,12 @@ public class JwtService {
 
         String subject = jwt.getPayload().getSubject();
         String email = jwt.getPayload().get("email", String.class);
-        UUID userId = UUID.fromString(subject);
+        
+        if (subject == null || email == null) {
+            throw new IllegalArgumentException("Invalid token: missing required claims");
+        }
+        
+        UUID userId = Objects.requireNonNull(UUID.fromString(subject));
 
         return new AuthenticatedUser(userId, email);
     }

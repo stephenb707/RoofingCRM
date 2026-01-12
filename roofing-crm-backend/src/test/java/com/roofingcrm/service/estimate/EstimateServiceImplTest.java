@@ -7,13 +7,18 @@ import com.roofingcrm.api.v1.estimate.EstimateItemRequest;
 import com.roofingcrm.domain.entity.Customer;
 import com.roofingcrm.domain.entity.Job;
 import com.roofingcrm.domain.entity.Tenant;
+import com.roofingcrm.domain.entity.TenantUserMembership;
+import com.roofingcrm.domain.entity.User;
 import com.roofingcrm.domain.enums.EstimateStatus;
 import com.roofingcrm.domain.enums.JobStatus;
 import com.roofingcrm.domain.enums.JobType;
+import com.roofingcrm.domain.enums.UserRole;
 import com.roofingcrm.domain.repository.CustomerRepository;
 import com.roofingcrm.domain.repository.EstimateRepository;
 import com.roofingcrm.domain.repository.JobRepository;
 import com.roofingcrm.domain.repository.TenantRepository;
+import com.roofingcrm.domain.repository.TenantUserMembershipRepository;
+import com.roofingcrm.domain.repository.UserRepository;
 import com.roofingcrm.domain.value.Address;
 import com.roofingcrm.service.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,25 +51,49 @@ class EstimateServiceImplTest extends AbstractIntegrationTest {
     @Autowired
     private EstimateRepository estimateRepository;
 
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private TenantUserMembershipRepository membershipRepository;
+
     @NonNull
     private UUID tenantId = Objects.requireNonNull(UUID.randomUUID());
-    private UUID userId;
+    @NonNull
+    private UUID userId = Objects.requireNonNull(UUID.randomUUID());
     private UUID jobId;
     @NonNull
     private UUID customerId = Objects.requireNonNull(UUID.randomUUID());
 
     @BeforeEach
     void setUp() {
+        membershipRepository.deleteAll();
         estimateRepository.deleteAll();
         jobRepository.deleteAll();
         customerRepository.deleteAll();
+        userRepository.deleteAll();
         tenantRepository.deleteAll();
 
         Tenant tenant = new Tenant();
         tenant.setName("Test Roofing");
         tenant.setSlug("test-roofing");
         tenant = tenantRepository.save(tenant);
+
+        User user = new User();
+        user.setEmail("test-user@example.com");
+        user.setFullName("Test User");
+        user.setPasswordHash("irrelevant-for-this-test");
+        user.setEnabled(true);
+        user = userRepository.save(user);
+
+        TenantUserMembership membership = new TenantUserMembership();
+        membership.setTenant(tenant);
+        membership.setUser(user);
+        membership.setRole(UserRole.OWNER);
+        membershipRepository.save(membership);
+
         this.tenantId = Objects.requireNonNull(tenant.getId());
+        this.userId = Objects.requireNonNull(user.getId());
 
         Customer customer = new Customer();
         customer.setTenant(tenant);
@@ -87,8 +116,6 @@ class EstimateServiceImplTest extends AbstractIntegrationTest {
         job.setPropertyAddress(address);
         job = jobRepository.save(job);
         this.jobId = Objects.requireNonNull(job.getId());
-
-        this.userId = UUID.randomUUID();
     }
 
     @Test
@@ -181,7 +208,7 @@ class EstimateServiceImplTest extends AbstractIntegrationTest {
         estimateService.createEstimateForJob(tenantId, userId, otherJob.getId(), request2);
 
         // List estimates for main job
-        List<EstimateDto> estimates = estimateService.listEstimatesForJob(tenantId, jobId);
+        List<EstimateDto> estimates = estimateService.listEstimatesForJob(tenantId, userId, jobId);
 
         assertEquals(1, estimates.size());
         assertEquals(estimate1.getId(), estimates.get(0).getId());
@@ -209,6 +236,6 @@ class EstimateServiceImplTest extends AbstractIntegrationTest {
     void getEstimate_nonExisting_throwsNotFound() {
         UUID randomId = UUID.randomUUID();
         assertThrows(ResourceNotFoundException.class,
-                () -> estimateService.getEstimate(tenantId, randomId));
+                () -> estimateService.getEstimate(tenantId, userId, randomId));
     }
 }

@@ -54,7 +54,8 @@ public class LeadController {
             @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
             @PathVariable("id") UUID leadId) {
 
-        LeadDto dto = leadService.getLead(tenantId, leadId);
+        UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
+        LeadDto dto = leadService.getLead(tenantId, userId, leadId);
         return ResponseEntity.ok(dto);
     }
 
@@ -64,7 +65,8 @@ public class LeadController {
             @RequestParam(value = "status", required = false) LeadStatus status,
             @PageableDefault(size = 20) Pageable pageable) {
 
-        Page<LeadDto> page = leadService.listLeads(tenantId, status, pageable);
+        UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
+        Page<LeadDto> page = leadService.listLeads(tenantId, userId, status, pageable);
         return ResponseEntity.ok(page);
     }
 

@@ -12,9 +12,9 @@ import com.roofingcrm.domain.enums.JobStatus;
 import com.roofingcrm.domain.repository.CustomerRepository;
 import com.roofingcrm.domain.repository.JobRepository;
 import com.roofingcrm.domain.repository.LeadRepository;
-import com.roofingcrm.domain.repository.TenantRepository;
 import com.roofingcrm.domain.value.Address;
 import com.roofingcrm.service.exception.ResourceNotFoundException;
+import com.roofingcrm.service.tenant.TenantAccessService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -28,25 +28,25 @@ import java.util.UUID;
 @Transactional
 public class JobServiceImpl implements JobService {
 
-    private final TenantRepository tenantRepository;
+    private final TenantAccessService tenantAccessService;
     private final JobRepository jobRepository;
     private final CustomerRepository customerRepository;
     private final LeadRepository leadRepository;
 
     @Autowired
-    public JobServiceImpl(TenantRepository tenantRepository,
+    public JobServiceImpl(TenantAccessService tenantAccessService,
                           JobRepository jobRepository,
                           CustomerRepository customerRepository,
                           LeadRepository leadRepository) {
-        this.tenantRepository = tenantRepository;
+        this.tenantAccessService = tenantAccessService;
         this.jobRepository = jobRepository;
         this.customerRepository = customerRepository;
         this.leadRepository = leadRepository;
     }
 
     @Override
-    public JobDto createJob(@NonNull UUID tenantId, UUID userId, CreateJobRequest request) {
-        Tenant tenant = getTenantOrThrow(tenantId);
+    public JobDto createJob(@NonNull UUID tenantId, @NonNull UUID userId, CreateJobRequest request) {
+        Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
 
         Customer customer;
         Lead lead = null;
@@ -93,8 +93,8 @@ public class JobServiceImpl implements JobService {
     }
 
     @Override
-    public JobDto updateJob(@NonNull UUID tenantId, UUID userId, UUID jobId, UpdateJobRequest request) {
-        Tenant tenant = getTenantOrThrow(tenantId);
+    public JobDto updateJob(@NonNull UUID tenantId, @NonNull UUID userId, UUID jobId, UpdateJobRequest request) {
+        Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
 
         Job job = jobRepository.findByIdAndTenantAndArchivedFalse(jobId, tenant)
                 .orElseThrow(() -> new ResourceNotFoundException("Job not found"));
@@ -136,8 +136,8 @@ public class JobServiceImpl implements JobService {
 
     @Override
     @Transactional(readOnly = true)
-    public JobDto getJob(@NonNull UUID tenantId, UUID jobId) {
-        Tenant tenant = getTenantOrThrow(tenantId);
+    public JobDto getJob(@NonNull UUID tenantId, @NonNull UUID userId, UUID jobId) {
+        Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
 
         Job job = jobRepository.findByIdAndTenantAndArchivedFalse(jobId, tenant)
                 .orElseThrow(() -> new ResourceNotFoundException("Job not found"));
@@ -147,8 +147,8 @@ public class JobServiceImpl implements JobService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<JobDto> listJobs(@NonNull UUID tenantId, JobStatus statusFilter, UUID customerIdFilter, Pageable pageable) {
-        Tenant tenant = getTenantOrThrow(tenantId);
+    public Page<JobDto> listJobs(@NonNull UUID tenantId, @NonNull UUID userId, JobStatus statusFilter, UUID customerIdFilter, Pageable pageable) {
+        Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
 
         Page<Job> page;
         if (statusFilter != null) {
@@ -163,8 +163,8 @@ public class JobServiceImpl implements JobService {
     }
 
     @Override
-    public JobDto updateJobStatus(@NonNull UUID tenantId, UUID userId, UUID jobId, JobStatus newStatus) {
-        Tenant tenant = getTenantOrThrow(tenantId);
+    public JobDto updateJobStatus(@NonNull UUID tenantId, @NonNull UUID userId, UUID jobId, JobStatus newStatus) {
+        Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
 
         Job job = jobRepository.findByIdAndTenantAndArchivedFalse(jobId, tenant)
                 .orElseThrow(() -> new ResourceNotFoundException("Job not found"));
@@ -174,11 +174,6 @@ public class JobServiceImpl implements JobService {
 
         Job saved = jobRepository.save(job);
         return toDto(saved);
-    }
-
-    private Tenant getTenantOrThrow(@NonNull UUID tenantId) {
-        return tenantRepository.findById(tenantId)
-                .orElseThrow(() -> new ResourceNotFoundException("Tenant not found"));
     }
 
     private void applyAddress(Address entity, AddressDto dto) {

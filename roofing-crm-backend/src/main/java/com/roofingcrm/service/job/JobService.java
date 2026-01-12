@@ -12,13 +12,13 @@ import java.util.UUID;
 
 public interface JobService {
 
-    JobDto createJob(@NonNull UUID tenantId, UUID userId, CreateJobRequest request);
+    JobDto createJob(@NonNull UUID tenantId, @NonNull UUID userId, CreateJobRequest request);
 
-    JobDto updateJob(@NonNull UUID tenantId, UUID userId, UUID jobId, UpdateJobRequest request);
+    JobDto updateJob(@NonNull UUID tenantId, @NonNull UUID userId, UUID jobId, UpdateJobRequest request);
 
-    JobDto getJob(@NonNull UUID tenantId, UUID jobId);
+    JobDto getJob(@NonNull UUID tenantId, @NonNull UUID userId, UUID jobId);
 
-    Page<JobDto> listJobs(@NonNull UUID tenantId, JobStatus statusFilter, UUID customerIdFilter, Pageable pageable);
+    Page<JobDto> listJobs(@NonNull UUID tenantId, @NonNull UUID userId, JobStatus statusFilter, UUID customerIdFilter, Pageable pageable);
 
-    JobDto updateJobStatus(@NonNull UUID tenantId, UUID userId, UUID jobId, JobStatus newStatus);
+    JobDto updateJobStatus(@NonNull UUID tenantId, @NonNull UUID userId, UUID jobId, JobStatus newStatus);
 }
