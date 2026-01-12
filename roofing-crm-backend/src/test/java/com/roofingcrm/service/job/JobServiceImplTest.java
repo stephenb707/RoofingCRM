@@ -7,14 +7,19 @@ import com.roofingcrm.api.v1.job.JobDto;
 import com.roofingcrm.domain.entity.Customer;
 import com.roofingcrm.domain.entity.Lead;
 import com.roofingcrm.domain.entity.Tenant;
+import com.roofingcrm.domain.entity.TenantUserMembership;
+import com.roofingcrm.domain.entity.User;
 import com.roofingcrm.domain.enums.JobStatus;
 import com.roofingcrm.domain.enums.JobType;
 import com.roofingcrm.domain.enums.LeadSource;
 import com.roofingcrm.domain.enums.LeadStatus;
+import com.roofingcrm.domain.enums.UserRole;
 import com.roofingcrm.domain.repository.CustomerRepository;
 import com.roofingcrm.domain.repository.JobRepository;
 import com.roofingcrm.domain.repository.LeadRepository;
 import com.roofingcrm.domain.repository.TenantRepository;
+import com.roofingcrm.domain.repository.TenantUserMembershipRepository;
+import com.roofingcrm.domain.repository.UserRepository;
 import com.roofingcrm.service.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -45,24 +50,48 @@ class JobServiceImplTest extends AbstractIntegrationTest {
     @Autowired
     private JobRepository jobRepository;
 
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private TenantUserMembershipRepository membershipRepository;
+
     @NonNull
     private UUID tenantId = Objects.requireNonNull(UUID.randomUUID());
-    private UUID userId;
+    @NonNull
+    private UUID userId = Objects.requireNonNull(UUID.randomUUID());
     private UUID customerId;
     private UUID leadId;
 
     @BeforeEach
     void setUp() {
+        membershipRepository.deleteAll();
         jobRepository.deleteAll();
         leadRepository.deleteAll();
         customerRepository.deleteAll();
+        userRepository.deleteAll();
         tenantRepository.deleteAll();
 
         Tenant tenant = new Tenant();
         tenant.setName("Test Roofing");
         tenant.setSlug("test-roofing");
         tenant = tenantRepository.save(tenant);
+
+        User user = new User();
+        user.setEmail("test-user@example.com");
+        user.setFullName("Test User");
+        user.setPasswordHash("irrelevant-for-this-test");
+        user.setEnabled(true);
+        user = userRepository.save(user);
+
+        TenantUserMembership membership = new TenantUserMembership();
+        membership.setTenant(tenant);
+        membership.setUser(user);
+        membership.setRole(UserRole.OWNER);
+        membershipRepository.save(membership);
+
         this.tenantId = Objects.requireNonNull(tenant.getId());
+        this.userId = Objects.requireNonNull(user.getId());
 
         Customer customer = new Customer();
         customer.setTenant(tenant);
@@ -79,8 +108,6 @@ class JobServiceImplTest extends AbstractIntegrationTest {
         lead.setSource(LeadSource.WEBSITE);
         lead = leadRepository.save(lead);
         this.leadId = Objects.requireNonNull(lead.getId());
-
-        this.userId = UUID.randomUUID();
     }
 
     private AddressDto createPropertyAddress() {
@@ -159,8 +186,8 @@ class JobServiceImplTest extends AbstractIntegrationTest {
         // Update second job to IN_PROGRESS
         jobService.updateJobStatus(tenantId, userId, job2.getId(), JobStatus.IN_PROGRESS);
 
-        Page<JobDto> scheduledJobs = jobService.listJobs(tenantId, JobStatus.SCHEDULED, null, PageRequest.of(0, 10));
-        Page<JobDto> inProgressJobs = jobService.listJobs(tenantId, JobStatus.IN_PROGRESS, null, PageRequest.of(0, 10));
+        Page<JobDto> scheduledJobs = jobService.listJobs(tenantId, userId, JobStatus.SCHEDULED, null, PageRequest.of(0, 10));
+        Page<JobDto> inProgressJobs = jobService.listJobs(tenantId, userId, JobStatus.IN_PROGRESS, null, PageRequest.of(0, 10));
 
         assertEquals(1, scheduledJobs.getTotalElements());
         assertEquals(job1.getId(), scheduledJobs.getContent().get(0).getId());
@@ -192,7 +219,7 @@ class JobServiceImplTest extends AbstractIntegrationTest {
         request2.setPropertyAddress(createPropertyAddress());
         jobService.createJob(tenantId, userId, request2);
 
-        Page<JobDto> customerJobs = jobService.listJobs(tenantId, null, customerId, PageRequest.of(0, 10));
+        Page<JobDto> customerJobs = jobService.listJobs(tenantId, userId, null, customerId, PageRequest.of(0, 10));
 
         assertEquals(1, customerJobs.getTotalElements());
         assertEquals(job1.getId(), customerJobs.getContent().get(0).getId());
@@ -217,6 +244,6 @@ class JobServiceImplTest extends AbstractIntegrationTest {
     void getJob_nonExisting_throwsNotFound() {
         UUID randomId = UUID.randomUUID();
         assertThrows(ResourceNotFoundException.class,
-                () -> jobService.getJob(tenantId, randomId));
+                () -> jobService.getJob(tenantId, userId, randomId));
     }
 }

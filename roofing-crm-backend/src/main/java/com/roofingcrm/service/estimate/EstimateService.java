@@ -11,13 +11,13 @@ import java.util.UUID;
 
 public interface EstimateService {
 
-    EstimateDto createEstimateForJob(@NonNull UUID tenantId, UUID userId, UUID jobId, CreateEstimateRequest request);
+    EstimateDto createEstimateForJob(@NonNull UUID tenantId, @NonNull UUID userId, UUID jobId, CreateEstimateRequest request);
 
-    EstimateDto updateEstimate(@NonNull UUID tenantId, UUID userId, UUID estimateId, UpdateEstimateRequest request);
+    EstimateDto updateEstimate(@NonNull UUID tenantId, @NonNull UUID userId, UUID estimateId, UpdateEstimateRequest request);
 
-    EstimateDto getEstimate(@NonNull UUID tenantId, UUID estimateId);
+    EstimateDto getEstimate(@NonNull UUID tenantId, @NonNull UUID userId, UUID estimateId);
 
-    List<EstimateDto> listEstimatesForJob(@NonNull UUID tenantId, UUID jobId);
+    List<EstimateDto> listEstimatesForJob(@NonNull UUID tenantId, @NonNull UUID userId, UUID jobId);
 
-    EstimateDto updateEstimateStatus(@NonNull UUID tenantId, UUID userId, UUID estimateId, EstimateStatus newStatus);
+    EstimateDto updateEstimateStatus(@NonNull UUID tenantId, @NonNull UUID userId, UUID estimateId, EstimateStatus newStatus);
 }

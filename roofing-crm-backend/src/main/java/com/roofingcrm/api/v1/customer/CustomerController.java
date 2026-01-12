@@ -53,7 +53,8 @@ public class CustomerController {
             @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
             @PathVariable("id") UUID customerId) {
 
-        CustomerDto dto = customerService.getCustomer(tenantId, customerId);
+        UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
+        CustomerDto dto = customerService.getCustomer(tenantId, userId, customerId);
         return ResponseEntity.ok(dto);
     }
 
@@ -62,7 +63,8 @@ public class CustomerController {
             @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
             @PageableDefault(size = 20) Pageable pageable) {
 
-        Page<CustomerDto> page = customerService.listCustomers(tenantId, pageable);
+        UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
+        Page<CustomerDto> page = customerService.listCustomers(tenantId, userId, pageable);
         return ResponseEntity.ok(page);
     }
 }

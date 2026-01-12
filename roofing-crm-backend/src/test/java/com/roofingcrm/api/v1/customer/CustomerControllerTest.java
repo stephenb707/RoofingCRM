@@ -1,15 +1,18 @@
 package com.roofingcrm.api.v1.customer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.roofingcrm.api.GlobalExceptionHandler;
 import com.roofingcrm.api.v1.common.AddressDto;
 import com.roofingcrm.security.AuthenticatedUser;
 import com.roofingcrm.service.customer.CustomerService;
+import com.roofingcrm.service.tenant.TenantAccessDeniedException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -29,6 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(controllers = CustomerController.class)
 @AutoConfigureMockMvc(addFilters = false)
+@Import(GlobalExceptionHandler.class)
 @SuppressWarnings("null") // Hamcrest matchers have nullable return types
 class CustomerControllerTest {
 
@@ -110,12 +114,32 @@ class CustomerControllerTest {
         dto.setFirstName("Jane");
         dto.setLastName("Smith");
 
-        when(customerService.getCustomer(tenantId, customerId)).thenReturn(dto);
+        when(customerService.getCustomer(eq(tenantId), eq(userId), eq(customerId))).thenReturn(dto);
 
         mockMvc.perform(get("/api/v1/customers/{id}", customerId)
                         .header("X-Tenant-Id", tenantId.toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id", is(customerId.toString())))
                 .andExpect(jsonPath("$.firstName", is("Jane")));
+    }
+
+    @Test
+    void createCustomer_whenTenantAccessDenied_returnsForbidden() throws Exception {
+        UUID tenantId = UUID.randomUUID();
+
+        CreateCustomerRequest request = new CreateCustomerRequest();
+        request.setFirstName("John");
+        request.setLastName("Doe");
+        request.setPrimaryPhone("555-1234");
+
+        // Mock service to throw TenantAccessDeniedException
+        when(customerService.createCustomer(eq(tenantId), any(), any(CreateCustomerRequest.class)))
+                .thenThrow(new TenantAccessDeniedException("User does not have access to this tenant"));
+
+        mockMvc.perform(post("/api/v1/customers")
+                        .header("X-Tenant-Id", tenantId.toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden());
     }
 }

@@ -7,10 +7,15 @@ import com.roofingcrm.api.v1.lead.LeadDto;
 import com.roofingcrm.api.v1.lead.NewLeadCustomerRequest;
 import com.roofingcrm.api.v1.lead.UpdateLeadStatusRequest;
 import com.roofingcrm.domain.entity.Tenant;
+import com.roofingcrm.domain.entity.TenantUserMembership;
+import com.roofingcrm.domain.entity.User;
 import com.roofingcrm.domain.enums.LeadStatus;
+import com.roofingcrm.domain.enums.UserRole;
 import com.roofingcrm.domain.repository.CustomerRepository;
 import com.roofingcrm.domain.repository.LeadRepository;
 import com.roofingcrm.domain.repository.TenantRepository;
+import com.roofingcrm.domain.repository.TenantUserMembershipRepository;
+import com.roofingcrm.domain.repository.UserRepository;
 import com.roofingcrm.service.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,14 +43,23 @@ class LeadServiceImplTest extends AbstractIntegrationTest {
     @Autowired
     private CustomerRepository customerRepository;
 
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private TenantUserMembershipRepository membershipRepository;
+
     @NonNull
     private UUID tenantId = Objects.requireNonNull(UUID.randomUUID());
-    private UUID userId;
+    @NonNull
+    private UUID userId = Objects.requireNonNull(UUID.randomUUID());
 
     @BeforeEach
     void setUp() {
+        membershipRepository.deleteAll();
         leadRepository.deleteAll();
         customerRepository.deleteAll();
+        userRepository.deleteAll();
         tenantRepository.deleteAll();
 
         Tenant tenant = new Tenant();
@@ -53,8 +67,21 @@ class LeadServiceImplTest extends AbstractIntegrationTest {
         tenant.setSlug("test-roofing");
         tenant = tenantRepository.save(tenant);
 
+        User user = new User();
+        user.setEmail("test-user@example.com");
+        user.setFullName("Test User");
+        user.setPasswordHash("irrelevant-for-this-test");
+        user.setEnabled(true);
+        user = userRepository.save(user);
+
+        TenantUserMembership membership = new TenantUserMembership();
+        membership.setTenant(tenant);
+        membership.setUser(user);
+        membership.setRole(UserRole.OWNER);
+        membershipRepository.save(membership);
+
         this.tenantId = Objects.requireNonNull(tenant.getId());
-        this.userId = UUID.randomUUID();
+        this.userId = Objects.requireNonNull(user.getId());
     }
 
     private AddressDto createPropertyAddress() {
@@ -110,8 +137,8 @@ class LeadServiceImplTest extends AbstractIntegrationTest {
         // Update second lead to WON
         leadService.updateLeadStatus(tenantId, userId, lead2.getId(), LeadStatus.WON);
 
-        Page<LeadDto> newLeads = leadService.listLeads(tenantId, LeadStatus.NEW, PageRequest.of(0, 10));
-        Page<LeadDto> wonLeads = leadService.listLeads(tenantId, LeadStatus.WON, PageRequest.of(0, 10));
+        Page<LeadDto> newLeads = leadService.listLeads(tenantId, userId, LeadStatus.NEW, PageRequest.of(0, 10));
+        Page<LeadDto> wonLeads = leadService.listLeads(tenantId, userId, LeadStatus.WON, PageRequest.of(0, 10));
 
         assertEquals(1, newLeads.getTotalElements());
         assertEquals(lead1.getId(), newLeads.getContent().get(0).getId());
@@ -124,7 +151,7 @@ class LeadServiceImplTest extends AbstractIntegrationTest {
     void getLead_nonExisting_throwsNotFound() {
         UUID randomId = UUID.randomUUID();
         assertThrows(ResourceNotFoundException.class,
-                () -> leadService.getLead(tenantId, randomId));
+                () -> leadService.getLead(tenantId, userId, randomId));
     }
 
     @Test

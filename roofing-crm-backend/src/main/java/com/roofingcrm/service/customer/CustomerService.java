@@ -11,11 +11,11 @@ import java.util.UUID;
 
 public interface CustomerService {
 
-    CustomerDto createCustomer(@NonNull UUID tenantId, UUID userId, CreateCustomerRequest request);
+    CustomerDto createCustomer(@NonNull UUID tenantId, @NonNull UUID userId, CreateCustomerRequest request);
 
-    CustomerDto updateCustomer(@NonNull UUID tenantId, UUID userId, UUID customerId, UpdateCustomerRequest request);
+    CustomerDto updateCustomer(@NonNull UUID tenantId, @NonNull UUID userId, UUID customerId, UpdateCustomerRequest request);
 
-    CustomerDto getCustomer(@NonNull UUID tenantId, UUID customerId);
+    CustomerDto getCustomer(@NonNull UUID tenantId, @NonNull UUID userId, UUID customerId);
 
-    Page<CustomerDto> listCustomers(@NonNull UUID tenantId, Pageable pageable);
+    Page<CustomerDto> listCustomers(@NonNull UUID tenantId, @NonNull UUID userId, Pageable pageable);
 }

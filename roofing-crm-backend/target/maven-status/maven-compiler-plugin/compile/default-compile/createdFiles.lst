@@ -15,6 +15,8 @@ com\roofingcrm\api\v1\job\UpdateJobStatusRequest.class
 com\roofingcrm\config\SecurityConfig.class
 com\roofingcrm\domain\repository\JobRepository.class
 com\roofingcrm\domain\entity\EstimateItem.class
+com\roofingcrm\service\tenant\TenantAccessService.class
+com\roofingcrm\service\tenant\TenantAccessDeniedException.class
 com\roofingcrm\service\estimate\EstimateService.class
 com\roofingcrm\domain\entity\TenantAuditedEntity.class
 com\roofingcrm\service\auth\AuthServiceImpl.class
@@ -24,6 +26,7 @@ com\roofingcrm\api\v1\lead\UpdateLeadRequest.class
 com\roofingcrm\service\estimate\EstimateServiceImpl.class
 com\roofingcrm\api\v1\lead\UpdateLeadStatusRequest.class
 com\roofingcrm\api\v1\estimate\EstimateDto.class
+com\roofingcrm\service\tenant\TenantAccessServiceImpl.class
 com\roofingcrm\api\v1\estimate\EstimateItemDto.class
 com\roofingcrm\domain\entity\Tenant.class
 com\roofingcrm\api\v1\customer\UpdateCustomerRequest.class

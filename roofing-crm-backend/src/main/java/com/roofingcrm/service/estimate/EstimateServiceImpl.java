@@ -12,8 +12,8 @@ import com.roofingcrm.domain.entity.Tenant;
 import com.roofingcrm.domain.enums.EstimateStatus;
 import com.roofingcrm.domain.repository.EstimateRepository;
 import com.roofingcrm.domain.repository.JobRepository;
-import com.roofingcrm.domain.repository.TenantRepository;
 import com.roofingcrm.service.exception.ResourceNotFoundException;
+import com.roofingcrm.service.tenant.TenantAccessService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
@@ -29,7 +29,7 @@ import java.util.concurrent.atomic.AtomicLong;
 @Transactional
 public class EstimateServiceImpl implements EstimateService {
 
-    private final TenantRepository tenantRepository;
+    private final TenantAccessService tenantAccessService;
     private final JobRepository jobRepository;
     private final EstimateRepository estimateRepository;
 
@@ -37,17 +37,17 @@ public class EstimateServiceImpl implements EstimateService {
     private static final AtomicLong estimateCounter = new AtomicLong(System.currentTimeMillis());
 
     @Autowired
-    public EstimateServiceImpl(TenantRepository tenantRepository,
+    public EstimateServiceImpl(TenantAccessService tenantAccessService,
                                JobRepository jobRepository,
                                EstimateRepository estimateRepository) {
-        this.tenantRepository = tenantRepository;
+        this.tenantAccessService = tenantAccessService;
         this.jobRepository = jobRepository;
         this.estimateRepository = estimateRepository;
     }
 
     @Override
-    public EstimateDto createEstimateForJob(@NonNull UUID tenantId, UUID userId, UUID jobId, CreateEstimateRequest request) {
-        Tenant tenant = getTenantOrThrow(tenantId);
+    public EstimateDto createEstimateForJob(@NonNull UUID tenantId, @NonNull UUID userId, UUID jobId, CreateEstimateRequest request) {
+        Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
 
         Job job = jobRepository.findByIdAndTenantAndArchivedFalse(jobId, tenant)
                 .orElseThrow(() -> new ResourceNotFoundException("Job not found"));
@@ -85,8 +85,8 @@ public class EstimateServiceImpl implements EstimateService {
     }
 
     @Override
-    public EstimateDto updateEstimate(@NonNull UUID tenantId, UUID userId, UUID estimateId, UpdateEstimateRequest request) {
-        Tenant tenant = getTenantOrThrow(tenantId);
+    public EstimateDto updateEstimate(@NonNull UUID tenantId, @NonNull UUID userId, UUID estimateId, UpdateEstimateRequest request) {
+        Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
 
         Estimate estimate = estimateRepository.findByIdAndTenantAndArchivedFalse(estimateId, tenant)
                 .orElseThrow(() -> new ResourceNotFoundException("Estimate not found"));
@@ -133,8 +133,8 @@ public class EstimateServiceImpl implements EstimateService {
 
     @Override
     @Transactional(readOnly = true)
-    public EstimateDto getEstimate(@NonNull UUID tenantId, UUID estimateId) {
-        Tenant tenant = getTenantOrThrow(tenantId);
+    public EstimateDto getEstimate(@NonNull UUID tenantId, @NonNull UUID userId, UUID estimateId) {
+        Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
 
         Estimate estimate = estimateRepository.findByIdAndTenantAndArchivedFalse(estimateId, tenant)
                 .orElseThrow(() -> new ResourceNotFoundException("Estimate not found"));
@@ -144,8 +144,8 @@ public class EstimateServiceImpl implements EstimateService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<EstimateDto> listEstimatesForJob(@NonNull UUID tenantId, UUID jobId) {
-        Tenant tenant = getTenantOrThrow(tenantId);
+    public List<EstimateDto> listEstimatesForJob(@NonNull UUID tenantId, @NonNull UUID userId, UUID jobId) {
+        Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
 
         Job job = jobRepository.findByIdAndTenantAndArchivedFalse(jobId, tenant)
                 .orElseThrow(() -> new ResourceNotFoundException("Job not found"));
@@ -155,8 +155,8 @@ public class EstimateServiceImpl implements EstimateService {
     }
 
     @Override
-    public EstimateDto updateEstimateStatus(@NonNull UUID tenantId, UUID userId, UUID estimateId, EstimateStatus newStatus) {
-        Tenant tenant = getTenantOrThrow(tenantId);
+    public EstimateDto updateEstimateStatus(@NonNull UUID tenantId, @NonNull UUID userId, UUID estimateId, EstimateStatus newStatus) {
+        Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
 
         Estimate estimate = estimateRepository.findByIdAndTenantAndArchivedFalse(estimateId, tenant)
                 .orElseThrow(() -> new ResourceNotFoundException("Estimate not found"));
@@ -166,11 +166,6 @@ public class EstimateServiceImpl implements EstimateService {
 
         Estimate saved = estimateRepository.save(estimate);
         return toDto(saved);
-    }
-
-    private Tenant getTenantOrThrow(@NonNull UUID tenantId) {
-        return tenantRepository.findById(tenantId)
-                .orElseThrow(() -> new ResourceNotFoundException("Tenant not found"));
     }
 
     private EstimateItem toItem(Tenant tenant, UUID userId, Estimate estimate, EstimateItemRequest req) {

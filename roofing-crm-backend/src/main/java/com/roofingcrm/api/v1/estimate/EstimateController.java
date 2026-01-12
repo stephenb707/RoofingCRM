@@ -40,7 +40,8 @@ public class EstimateController {
             @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
             @PathVariable("jobId") UUID jobId) {
 
-        List<EstimateDto> estimates = estimateService.listEstimatesForJob(tenantId, jobId);
+        UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
+        List<EstimateDto> estimates = estimateService.listEstimatesForJob(tenantId, userId, jobId);
         return ResponseEntity.ok(estimates);
     }
 
@@ -49,7 +50,8 @@ public class EstimateController {
             @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
             @PathVariable("id") UUID estimateId) {
 
-        EstimateDto dto = estimateService.getEstimate(tenantId, estimateId);
+        UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
+        EstimateDto dto = estimateService.getEstimate(tenantId, userId, estimateId);
         return ResponseEntity.ok(dto);
     }
 

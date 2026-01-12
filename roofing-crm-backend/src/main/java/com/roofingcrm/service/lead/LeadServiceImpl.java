@@ -12,9 +12,9 @@ import com.roofingcrm.domain.enums.LeadSource;
 import com.roofingcrm.domain.enums.LeadStatus;
 import com.roofingcrm.domain.repository.CustomerRepository;
 import com.roofingcrm.domain.repository.LeadRepository;
-import com.roofingcrm.domain.repository.TenantRepository;
 import com.roofingcrm.domain.value.Address;
 import com.roofingcrm.service.exception.ResourceNotFoundException;
+import com.roofingcrm.service.tenant.TenantAccessService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.lang.NonNull;
 import org.springframework.data.domain.Page;
@@ -28,22 +28,22 @@ import java.util.UUID;
 @Transactional
 public class LeadServiceImpl implements LeadService {
 
-    private final TenantRepository tenantRepository;
+    private final TenantAccessService tenantAccessService;
     private final LeadRepository leadRepository;
     private final CustomerRepository customerRepository;
 
     @Autowired
-    public LeadServiceImpl(TenantRepository tenantRepository,
+    public LeadServiceImpl(TenantAccessService tenantAccessService,
                            LeadRepository leadRepository,
                            CustomerRepository customerRepository) {
-        this.tenantRepository = tenantRepository;
+        this.tenantAccessService = tenantAccessService;
         this.leadRepository = leadRepository;
         this.customerRepository = customerRepository;
     }
 
     @Override
-    public LeadDto createLead(@NonNull UUID tenantId, UUID userId, CreateLeadRequest request) {
-        Tenant tenant = getTenantOrThrow(tenantId);
+    public LeadDto createLead(@NonNull UUID tenantId, @NonNull UUID userId, CreateLeadRequest request) {
+        Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
 
         Customer customer = resolveCustomerForLead(tenant, userId, request);
 
@@ -67,8 +67,8 @@ public class LeadServiceImpl implements LeadService {
     }
 
     @Override
-    public LeadDto updateLead(@NonNull UUID tenantId, UUID userId, UUID leadId, UpdateLeadRequest request) {
-        Tenant tenant = getTenantOrThrow(tenantId);
+    public LeadDto updateLead(@NonNull UUID tenantId, @NonNull UUID userId, UUID leadId, UpdateLeadRequest request) {
+        Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
 
         Lead lead = leadRepository.findByIdAndTenantAndArchivedFalse(leadId, tenant)
                 .orElseThrow(() -> new ResourceNotFoundException("Lead not found"));
@@ -100,8 +100,8 @@ public class LeadServiceImpl implements LeadService {
 
     @Override
     @Transactional(readOnly = true)
-    public LeadDto getLead(@NonNull UUID tenantId, UUID leadId) {
-        Tenant tenant = getTenantOrThrow(tenantId);
+    public LeadDto getLead(@NonNull UUID tenantId, @NonNull UUID userId, UUID leadId) {
+        Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
 
         Lead lead = leadRepository.findByIdAndTenantAndArchivedFalse(leadId, tenant)
                 .orElseThrow(() -> new ResourceNotFoundException("Lead not found"));
@@ -111,8 +111,8 @@ public class LeadServiceImpl implements LeadService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<LeadDto> listLeads(@NonNull UUID tenantId, LeadStatus statusFilter, Pageable pageable) {
-        Tenant tenant = getTenantOrThrow(tenantId);
+    public Page<LeadDto> listLeads(@NonNull UUID tenantId, @NonNull UUID userId, LeadStatus statusFilter, Pageable pageable) {
+        Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
 
         Page<Lead> page;
         if (statusFilter != null) {
@@ -125,8 +125,8 @@ public class LeadServiceImpl implements LeadService {
     }
 
     @Override
-    public LeadDto updateLeadStatus(@NonNull UUID tenantId, UUID userId, UUID leadId, LeadStatus newStatus) {
-        Tenant tenant = getTenantOrThrow(tenantId);
+    public LeadDto updateLeadStatus(@NonNull UUID tenantId, @NonNull UUID userId, UUID leadId, LeadStatus newStatus) {
+        Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
 
         Lead lead = leadRepository.findByIdAndTenantAndArchivedFalse(leadId, tenant)
                 .orElseThrow(() -> new ResourceNotFoundException("Lead not found"));
@@ -136,11 +136,6 @@ public class LeadServiceImpl implements LeadService {
 
         Lead saved = leadRepository.save(lead);
         return toDto(saved);
-    }
-
-    private Tenant getTenantOrThrow(@NonNull UUID tenantId) {
-        return tenantRepository.findById(tenantId)
-                .orElseThrow(() -> new ResourceNotFoundException("Tenant not found"));
     }
 
     private Customer resolveCustomerForLead(Tenant tenant, UUID userId, CreateLeadRequest request) {

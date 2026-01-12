@@ -7,9 +7,9 @@ import com.roofingcrm.api.v1.customer.UpdateCustomerRequest;
 import com.roofingcrm.domain.entity.Customer;
 import com.roofingcrm.domain.entity.Tenant;
 import com.roofingcrm.domain.repository.CustomerRepository;
-import com.roofingcrm.domain.repository.TenantRepository;
 import com.roofingcrm.domain.value.Address;
 import com.roofingcrm.service.exception.ResourceNotFoundException;
+import com.roofingcrm.service.tenant.TenantAccessService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.lang.NonNull;
 import org.springframework.data.domain.Page;
@@ -23,19 +23,19 @@ import java.util.UUID;
 @Transactional
 public class CustomerServiceImpl implements CustomerService {
 
-    private final TenantRepository tenantRepository;
+    private final TenantAccessService tenantAccessService;
     private final CustomerRepository customerRepository;
 
     @Autowired
-    public CustomerServiceImpl(TenantRepository tenantRepository,
+    public CustomerServiceImpl(TenantAccessService tenantAccessService,
                                CustomerRepository customerRepository) {
-        this.tenantRepository = tenantRepository;
+        this.tenantAccessService = tenantAccessService;
         this.customerRepository = customerRepository;
     }
 
     @Override
-    public CustomerDto createCustomer(@NonNull UUID tenantId, UUID userId, CreateCustomerRequest request) {
-        Tenant tenant = getTenantOrThrow(tenantId);
+    public CustomerDto createCustomer(@NonNull UUID tenantId, @NonNull UUID userId, CreateCustomerRequest request) {
+        Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
 
         Customer customer = new Customer();
         customer.setTenant(tenant);
@@ -51,8 +51,8 @@ public class CustomerServiceImpl implements CustomerService {
     }
 
     @Override
-    public CustomerDto updateCustomer(@NonNull UUID tenantId, UUID userId, UUID customerId, UpdateCustomerRequest request) {
-        Tenant tenant = getTenantOrThrow(tenantId);
+    public CustomerDto updateCustomer(@NonNull UUID tenantId, @NonNull UUID userId, UUID customerId, UpdateCustomerRequest request) {
+        Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
 
         Customer customer = customerRepository.findByIdAndTenantAndArchivedFalse(customerId, tenant)
                 .orElseThrow(() -> new ResourceNotFoundException("Customer not found"));
@@ -69,8 +69,8 @@ public class CustomerServiceImpl implements CustomerService {
 
     @Override
     @Transactional(readOnly = true)
-    public CustomerDto getCustomer(@NonNull UUID tenantId, UUID customerId) {
-        Tenant tenant = getTenantOrThrow(tenantId);
+    public CustomerDto getCustomer(@NonNull UUID tenantId, @NonNull UUID userId, UUID customerId) {
+        Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
 
         Customer customer = customerRepository.findByIdAndTenantAndArchivedFalse(customerId, tenant)
                 .orElseThrow(() -> new ResourceNotFoundException("Customer not found"));
@@ -80,15 +80,10 @@ public class CustomerServiceImpl implements CustomerService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<CustomerDto> listCustomers(@NonNull UUID tenantId, Pageable pageable) {
-        Tenant tenant = getTenantOrThrow(tenantId);
+    public Page<CustomerDto> listCustomers(@NonNull UUID tenantId, @NonNull UUID userId, Pageable pageable) {
+        Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
         return customerRepository.findByTenantAndArchivedFalse(tenant, pageable)
                 .map(this::toDto);
-    }
-
-    private Tenant getTenantOrThrow(@NonNull UUID tenantId) {
-        return tenantRepository.findById(tenantId)
-                .orElseThrow(() -> new ResourceNotFoundException("Tenant not found"));
     }
 
     private void applyCustomerData(Customer customer,

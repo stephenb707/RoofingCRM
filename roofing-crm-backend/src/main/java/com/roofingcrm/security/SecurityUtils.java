@@ -1,5 +1,6 @@
 package com.roofingcrm.security;
 
+import org.springframework.lang.NonNull;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 
@@ -18,6 +19,7 @@ public final class SecurityUtils {
         return (AuthenticatedUser) auth.getPrincipal();
     }
 
+    @NonNull
     public static UUID getCurrentUserIdOrThrow() {
         AuthenticatedUser user = getCurrentUser();
         if (user == null) {
