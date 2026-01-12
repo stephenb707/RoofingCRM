@@ -5,18 +5,16 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import java.util.UUID;
-
 /**
- * Represents a file attachment associated with various parent entities
- * (leads, jobs, estimates, etc.). Supports both internal storage and
- * external providers like CompanyCam.
+ * Represents a file attachment associated with leads or jobs.
+ * Supports both local storage and external providers like S3.
  */
 @Entity
 @Table(
     name = "attachments",
     indexes = {
-        @Index(name = "idx_attachment_tenant_parent", columnList = "tenant_id, parentType, parentId")
+        @Index(name = "idx_attachment_tenant_lead", columnList = "tenant_id, lead_id"),
+        @Index(name = "idx_attachment_tenant_job", columnList = "tenant_id, job_id")
     }
 )
 @Getter
@@ -24,11 +22,13 @@ import java.util.UUID;
 @NoArgsConstructor
 public class Attachment extends TenantAuditedEntity {
 
-    @Column(nullable = false, length = 50)
-    private String parentType; // e.g. "LEAD", "JOB", "ESTIMATE"
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "lead_id")
+    private Lead lead;
 
-    @Column(nullable = false)
-    private UUID parentId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "job_id")
+    private Job job;
 
     @Column(nullable = false)
     private String fileName;
@@ -37,9 +37,16 @@ public class Attachment extends TenantAuditedEntity {
     private String contentType;
 
     @Column(nullable = false)
-    private String storageUrl; // e.g. S3 URL or GCS URL
+    private Long fileSize;
+
+    @Column(nullable = false, length = 50)
+    private String storageProvider;   // e.g. "LOCAL", "S3"
+
+    private String storageKey;        // path or external key
 
     // Optional link to an external provider (e.g., CompanyCam)
     private String externalProvider;   // e.g. "COMPANYCAM"
     private String externalAssetId;    // asset ID in external system
+
+    private String description;        // optional description/label
 }
