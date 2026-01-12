@@ -11,6 +11,7 @@ import com.roofingcrm.domain.repository.TenantRepository;
 import com.roofingcrm.domain.value.Address;
 import com.roofingcrm.service.exception.ResourceNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.lang.NonNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -33,7 +34,7 @@ public class CustomerServiceImpl implements CustomerService {
     }
 
     @Override
-    public CustomerDto createCustomer(UUID tenantId, UUID userId, CreateCustomerRequest request) {
+    public CustomerDto createCustomer(@NonNull UUID tenantId, UUID userId, CreateCustomerRequest request) {
         Tenant tenant = getTenantOrThrow(tenantId);
 
         Customer customer = new Customer();
@@ -50,7 +51,7 @@ public class CustomerServiceImpl implements CustomerService {
     }
 
     @Override
-    public CustomerDto updateCustomer(UUID tenantId, UUID userId, UUID customerId, UpdateCustomerRequest request) {
+    public CustomerDto updateCustomer(@NonNull UUID tenantId, UUID userId, UUID customerId, UpdateCustomerRequest request) {
         Tenant tenant = getTenantOrThrow(tenantId);
 
         Customer customer = customerRepository.findByIdAndTenantAndArchivedFalse(customerId, tenant)
@@ -68,7 +69,7 @@ public class CustomerServiceImpl implements CustomerService {
 
     @Override
     @Transactional(readOnly = true)
-    public CustomerDto getCustomer(UUID tenantId, UUID customerId) {
+    public CustomerDto getCustomer(@NonNull UUID tenantId, UUID customerId) {
         Tenant tenant = getTenantOrThrow(tenantId);
 
         Customer customer = customerRepository.findByIdAndTenantAndArchivedFalse(customerId, tenant)
@@ -79,13 +80,13 @@ public class CustomerServiceImpl implements CustomerService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<CustomerDto> listCustomers(UUID tenantId, Pageable pageable) {
+    public Page<CustomerDto> listCustomers(@NonNull UUID tenantId, Pageable pageable) {
         Tenant tenant = getTenantOrThrow(tenantId);
         return customerRepository.findByTenantAndArchivedFalse(tenant, pageable)
                 .map(this::toDto);
     }
 
-    private Tenant getTenantOrThrow(UUID tenantId) {
+    private Tenant getTenantOrThrow(@NonNull UUID tenantId) {
         return tenantRepository.findById(tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Tenant not found"));
     }

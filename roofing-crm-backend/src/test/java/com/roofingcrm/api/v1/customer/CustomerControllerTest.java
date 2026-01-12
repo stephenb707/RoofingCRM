@@ -11,6 +11,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
+import java.util.Objects;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.is;
@@ -22,6 +23,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(controllers = CustomerController.class)
+@SuppressWarnings("null") // Hamcrest matchers have nullable return types
 class CustomerControllerTest {
 
     @Autowired
@@ -60,8 +62,8 @@ class CustomerControllerTest {
         mockMvc.perform(post("/api/v1/customers")
                         .header("X-Tenant-Id", tenantId.toString())
                         .header("X-User-Id", userId.toString())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+                        .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                        .content(Objects.requireNonNull(objectMapper.writeValueAsString(request))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.firstName", is("John")))
                 .andExpect(jsonPath("$.lastName", is("Doe")));
@@ -78,8 +80,8 @@ class CustomerControllerTest {
 
         mockMvc.perform(post("/api/v1/customers")
                         .header("X-Tenant-Id", tenantId.toString())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+                        .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                        .content(Objects.requireNonNull(objectMapper.writeValueAsString(request))))
                 .andExpect(status().isBadRequest());
     }
 

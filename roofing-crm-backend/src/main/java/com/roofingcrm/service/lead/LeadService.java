@@ -6,18 +6,19 @@ import com.roofingcrm.api.v1.lead.UpdateLeadRequest;
 import com.roofingcrm.domain.enums.LeadStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.lang.NonNull;
 
 import java.util.UUID;
 
 public interface LeadService {
 
-    LeadDto createLead(UUID tenantId, UUID userId, CreateLeadRequest request);
+    LeadDto createLead(@NonNull UUID tenantId, UUID userId, CreateLeadRequest request);
 
-    LeadDto updateLead(UUID tenantId, UUID userId, UUID leadId, UpdateLeadRequest request);
+    LeadDto updateLead(@NonNull UUID tenantId, UUID userId, UUID leadId, UpdateLeadRequest request);
 
-    LeadDto getLead(UUID tenantId, UUID leadId);
+    LeadDto getLead(@NonNull UUID tenantId, UUID leadId);
 
-    Page<LeadDto> listLeads(UUID tenantId, LeadStatus statusFilter, Pageable pageable);
+    Page<LeadDto> listLeads(@NonNull UUID tenantId, LeadStatus statusFilter, Pageable pageable);
 
-    LeadDto updateLeadStatus(UUID tenantId, UUID userId, UUID leadId, LeadStatus newStatus);
+    LeadDto updateLeadStatus(@NonNull UUID tenantId, UUID userId, UUID leadId, LeadStatus newStatus);
 }

@@ -17,7 +17,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.lang.NonNull;
 
+import java.util.Objects;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -36,7 +38,8 @@ class LeadServiceImplTest extends AbstractIntegrationTest {
     @Autowired
     private CustomerRepository customerRepository;
 
-    private UUID tenantId;
+    @NonNull
+    private UUID tenantId = Objects.requireNonNull(UUID.randomUUID());
     private UUID userId;
 
     @BeforeEach
@@ -50,7 +53,7 @@ class LeadServiceImplTest extends AbstractIntegrationTest {
         tenant.setSlug("test-roofing");
         tenant = tenantRepository.save(tenant);
 
-        this.tenantId = tenant.getId();
+        this.tenantId = Objects.requireNonNull(tenant.getId());
         this.userId = UUID.randomUUID();
     }
 

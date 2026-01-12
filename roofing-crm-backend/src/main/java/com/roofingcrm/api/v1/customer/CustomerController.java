@@ -8,6 +8,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.lang.NonNull;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -27,7 +28,7 @@ public class CustomerController {
 
     @PostMapping
     public ResponseEntity<CustomerDto> createCustomer(
-            @RequestHeader("X-Tenant-Id") UUID tenantId,
+            @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
             @RequestHeader(value = "X-User-Id", required = false) UUID userId,
             @Valid @RequestBody CreateCustomerRequest request) {
 
@@ -37,7 +38,7 @@ public class CustomerController {
 
     @PutMapping("/{id}")
     public ResponseEntity<CustomerDto> updateCustomer(
-            @RequestHeader("X-Tenant-Id") UUID tenantId,
+            @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
             @RequestHeader(value = "X-User-Id", required = false) UUID userId,
             @PathVariable("id") UUID customerId,
             @Valid @RequestBody UpdateCustomerRequest request) {
@@ -48,7 +49,7 @@ public class CustomerController {
 
     @GetMapping("/{id}")
     public ResponseEntity<CustomerDto> getCustomer(
-            @RequestHeader("X-Tenant-Id") UUID tenantId,
+            @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
             @PathVariable("id") UUID customerId) {
 
         CustomerDto dto = customerService.getCustomer(tenantId, customerId);
@@ -57,7 +58,7 @@ public class CustomerController {
 
     @GetMapping
     public ResponseEntity<Page<CustomerDto>> listCustomers(
-            @RequestHeader("X-Tenant-Id") UUID tenantId,
+            @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
             @PageableDefault(size = 20) Pageable pageable) {
 
         Page<CustomerDto> page = customerService.listCustomers(tenantId, pageable);

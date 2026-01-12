@@ -9,6 +9,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.lang.NonNull;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -28,7 +29,7 @@ public class LeadController {
 
     @PostMapping
     public ResponseEntity<LeadDto> createLead(
-            @RequestHeader("X-Tenant-Id") UUID tenantId,
+            @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
             @RequestHeader(value = "X-User-Id", required = false) UUID userId,
             @Valid @RequestBody CreateLeadRequest request) {
 
@@ -38,7 +39,7 @@ public class LeadController {
 
     @PutMapping("/{id}")
     public ResponseEntity<LeadDto> updateLead(
-            @RequestHeader("X-Tenant-Id") UUID tenantId,
+            @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
             @RequestHeader(value = "X-User-Id", required = false) UUID userId,
             @PathVariable("id") UUID leadId,
             @Valid @RequestBody UpdateLeadRequest request) {
@@ -49,7 +50,7 @@ public class LeadController {
 
     @GetMapping("/{id}")
     public ResponseEntity<LeadDto> getLead(
-            @RequestHeader("X-Tenant-Id") UUID tenantId,
+            @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
             @PathVariable("id") UUID leadId) {
 
         LeadDto dto = leadService.getLead(tenantId, leadId);
@@ -58,7 +59,7 @@ public class LeadController {
 
     @GetMapping
     public ResponseEntity<Page<LeadDto>> listLeads(
-            @RequestHeader("X-Tenant-Id") UUID tenantId,
+            @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
             @RequestParam(value = "status", required = false) LeadStatus status,
             @PageableDefault(size = 20) Pageable pageable) {
 
@@ -68,7 +69,7 @@ public class LeadController {
 
     @PostMapping("/{id}/status")
     public ResponseEntity<LeadDto> updateLeadStatus(
-            @RequestHeader("X-Tenant-Id") UUID tenantId,
+            @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
             @RequestHeader(value = "X-User-Id", required = false) UUID userId,
             @PathVariable("id") UUID leadId,
             @Valid @RequestBody UpdateLeadStatusRequest request) {
