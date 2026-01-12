@@ -1,0 +1,5 @@
+com\roofingcrm\service\customer\CustomerServiceImplTest.class
+com\roofingcrm\api\v1\customer\CustomerControllerTest.class
+com\roofingcrm\service\lead\LeadServiceImplTest.class
+com\roofingcrm\AbstractIntegrationTest.class
+com\roofingcrm\api\v1\lead\LeadControllerTest.class
