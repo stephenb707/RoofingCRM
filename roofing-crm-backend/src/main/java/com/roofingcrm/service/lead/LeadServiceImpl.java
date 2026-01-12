@@ -16,6 +16,7 @@ import com.roofingcrm.domain.repository.TenantRepository;
 import com.roofingcrm.domain.value.Address;
 import com.roofingcrm.service.exception.ResourceNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.lang.NonNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -41,7 +42,7 @@ public class LeadServiceImpl implements LeadService {
     }
 
     @Override
-    public LeadDto createLead(UUID tenantId, UUID userId, CreateLeadRequest request) {
+    public LeadDto createLead(@NonNull UUID tenantId, UUID userId, CreateLeadRequest request) {
         Tenant tenant = getTenantOrThrow(tenantId);
 
         Customer customer = resolveCustomerForLead(tenant, userId, request);
@@ -66,7 +67,7 @@ public class LeadServiceImpl implements LeadService {
     }
 
     @Override
-    public LeadDto updateLead(UUID tenantId, UUID userId, UUID leadId, UpdateLeadRequest request) {
+    public LeadDto updateLead(@NonNull UUID tenantId, UUID userId, UUID leadId, UpdateLeadRequest request) {
         Tenant tenant = getTenantOrThrow(tenantId);
 
         Lead lead = leadRepository.findByIdAndTenantAndArchivedFalse(leadId, tenant)
@@ -99,7 +100,7 @@ public class LeadServiceImpl implements LeadService {
 
     @Override
     @Transactional(readOnly = true)
-    public LeadDto getLead(UUID tenantId, UUID leadId) {
+    public LeadDto getLead(@NonNull UUID tenantId, UUID leadId) {
         Tenant tenant = getTenantOrThrow(tenantId);
 
         Lead lead = leadRepository.findByIdAndTenantAndArchivedFalse(leadId, tenant)
@@ -110,7 +111,7 @@ public class LeadServiceImpl implements LeadService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<LeadDto> listLeads(UUID tenantId, LeadStatus statusFilter, Pageable pageable) {
+    public Page<LeadDto> listLeads(@NonNull UUID tenantId, LeadStatus statusFilter, Pageable pageable) {
         Tenant tenant = getTenantOrThrow(tenantId);
 
         Page<Lead> page;
@@ -124,7 +125,7 @@ public class LeadServiceImpl implements LeadService {
     }
 
     @Override
-    public LeadDto updateLeadStatus(UUID tenantId, UUID userId, UUID leadId, LeadStatus newStatus) {
+    public LeadDto updateLeadStatus(@NonNull UUID tenantId, UUID userId, UUID leadId, LeadStatus newStatus) {
         Tenant tenant = getTenantOrThrow(tenantId);
 
         Lead lead = leadRepository.findByIdAndTenantAndArchivedFalse(leadId, tenant)
@@ -137,7 +138,7 @@ public class LeadServiceImpl implements LeadService {
         return toDto(saved);
     }
 
-    private Tenant getTenantOrThrow(UUID tenantId) {
+    private Tenant getTenantOrThrow(@NonNull UUID tenantId) {
         return tenantRepository.findById(tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Tenant not found"));
     }

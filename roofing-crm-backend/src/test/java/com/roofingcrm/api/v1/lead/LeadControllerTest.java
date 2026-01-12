@@ -12,6 +12,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
+import java.util.Objects;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.is;
@@ -23,6 +24,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(controllers = LeadController.class)
+@SuppressWarnings("null") // Hamcrest matchers have nullable return types
 class LeadControllerTest {
 
     @Autowired
@@ -61,8 +63,8 @@ class LeadControllerTest {
         mockMvc.perform(post("/api/v1/leads")
                         .header("X-Tenant-Id", tenantId.toString())
                         .header("X-User-Id", userId.toString())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(req)))
+                        .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                        .content(Objects.requireNonNull(objectMapper.writeValueAsString(req))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status", is("NEW")));
     }
