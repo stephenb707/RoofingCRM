@@ -148,6 +148,8 @@ CREATE TABLE estimates (
     job_id UUID NOT NULL REFERENCES jobs(id),
     estimate_number VARCHAR(255) NOT NULL,
     status VARCHAR(50) NOT NULL,
+    title VARCHAR(255),
+    issue_date DATE,
     valid_until DATE,
     subtotal NUMERIC(12, 2),
     tax NUMERIC(12, 2),
@@ -172,10 +174,12 @@ CREATE TABLE estimate_items (
     created_by_user_id UUID,
     updated_by_user_id UUID,
     estimate_id UUID NOT NULL REFERENCES estimates(id),
-    description VARCHAR(255) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    description VARCHAR(255),
     quantity NUMERIC(10, 2) NOT NULL,
     unit_price NUMERIC(12, 2) NOT NULL,
     line_total NUMERIC(12, 2) NOT NULL,
+    unit VARCHAR(50),
     sort_order INTEGER
 );
 
