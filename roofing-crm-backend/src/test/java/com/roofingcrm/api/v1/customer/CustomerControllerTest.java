@@ -2,12 +2,17 @@ package com.roofingcrm.api.v1.customer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.roofingcrm.api.v1.common.AddressDto;
+import com.roofingcrm.security.AuthenticatedUser;
 import com.roofingcrm.service.customer.CustomerService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.TestingAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
@@ -23,6 +28,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(controllers = CustomerController.class)
+@AutoConfigureMockMvc(addFilters = false)
 @SuppressWarnings("null") // Hamcrest matchers have nullable return types
 class CustomerControllerTest {
 
@@ -35,10 +41,20 @@ class CustomerControllerTest {
     @MockBean
     private CustomerService customerService;
 
+    private UUID userId;
+
+    @BeforeEach
+    void setUp() {
+        userId = UUID.randomUUID();
+        AuthenticatedUser authUser = new AuthenticatedUser(userId, "test@example.com");
+        TestingAuthenticationToken authentication = new TestingAuthenticationToken(authUser, null);
+        authentication.setAuthenticated(true);
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+    }
+
     @Test
     void createCustomer_returnsCreated() throws Exception {
         UUID tenantId = UUID.randomUUID();
-        UUID userId = UUID.randomUUID();
 
         CreateCustomerRequest request = new CreateCustomerRequest();
         request.setFirstName("John");
@@ -61,7 +77,6 @@ class CustomerControllerTest {
 
         mockMvc.perform(post("/api/v1/customers")
                         .header("X-Tenant-Id", tenantId.toString())
-                        .header("X-User-Id", userId.toString())
                         .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
                         .content(Objects.requireNonNull(objectMapper.writeValueAsString(request))))
                 .andExpect(status().isCreated())

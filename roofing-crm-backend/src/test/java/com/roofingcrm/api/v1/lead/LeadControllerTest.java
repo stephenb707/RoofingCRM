@@ -3,12 +3,17 @@ package com.roofingcrm.api.v1.lead;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.roofingcrm.api.v1.common.AddressDto;
 import com.roofingcrm.domain.enums.LeadStatus;
+import com.roofingcrm.security.AuthenticatedUser;
 import com.roofingcrm.service.lead.LeadService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.TestingAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
@@ -24,6 +29,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(controllers = LeadController.class)
+@AutoConfigureMockMvc(addFilters = false)
 @SuppressWarnings("null") // Hamcrest matchers have nullable return types
 class LeadControllerTest {
 
@@ -36,10 +42,20 @@ class LeadControllerTest {
     @MockBean
     private LeadService leadService;
 
+    private UUID userId;
+
+    @BeforeEach
+    void setUp() {
+        userId = UUID.randomUUID();
+        AuthenticatedUser authUser = new AuthenticatedUser(userId, "test@example.com");
+        TestingAuthenticationToken authentication = new TestingAuthenticationToken(authUser, null);
+        authentication.setAuthenticated(true);
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+    }
+
     @Test
     void createLead_returnsCreated() throws Exception {
         UUID tenantId = UUID.randomUUID();
-        UUID userId = UUID.randomUUID();
 
         CreateLeadRequest req = new CreateLeadRequest();
         NewLeadCustomerRequest newCustomer = new NewLeadCustomerRequest();
@@ -62,7 +78,6 @@ class LeadControllerTest {
 
         mockMvc.perform(post("/api/v1/leads")
                         .header("X-Tenant-Id", tenantId.toString())
-                        .header("X-User-Id", userId.toString())
                         .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
                         .content(Objects.requireNonNull(objectMapper.writeValueAsString(req))))
                 .andExpect(status().isCreated())

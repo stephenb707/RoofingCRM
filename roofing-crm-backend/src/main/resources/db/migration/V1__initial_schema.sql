@@ -30,18 +30,31 @@ CREATE TABLE users (
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
     archived BOOLEAN NOT NULL DEFAULT FALSE,
     archived_at TIMESTAMP WITH TIME ZONE,
-    tenant_id UUID NOT NULL REFERENCES tenants(id),
-    created_by_user_id UUID,
-    updated_by_user_id UUID,
-    email VARCHAR(255) NOT NULL,
+    email VARCHAR(255) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
-    first_name VARCHAR(255) NOT NULL,
-    last_name VARCHAR(255) NOT NULL,
-    role VARCHAR(50) NOT NULL,
-    CONSTRAINT uk_user_tenant_email UNIQUE (tenant_id, email)
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    full_name VARCHAR(255)
 );
 
-CREATE INDEX idx_user_tenant_role ON users(tenant_id, role);
+CREATE INDEX idx_user_email ON users(email);
+
+-- ============================================================
+-- TENANT_USER_MEMBERSHIPS
+-- ============================================================
+CREATE TABLE tenant_user_memberships (
+    id UUID PRIMARY KEY,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    archived BOOLEAN NOT NULL DEFAULT FALSE,
+    archived_at TIMESTAMP WITH TIME ZONE,
+    tenant_id UUID NOT NULL REFERENCES tenants(id),
+    user_id UUID NOT NULL REFERENCES users(id),
+    role VARCHAR(50) NOT NULL,
+    CONSTRAINT uk_tenant_user UNIQUE (tenant_id, user_id)
+);
+
+CREATE INDEX idx_membership_user ON tenant_user_memberships(user_id);
+CREATE INDEX idx_membership_tenant_role ON tenant_user_memberships(tenant_id, role);
 
 -- ============================================================
 -- CUSTOMERS
