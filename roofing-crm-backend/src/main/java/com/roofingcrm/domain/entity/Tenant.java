@@ -27,4 +27,13 @@ public class Tenant extends BaseEntity {
 
     @Column(unique = true)
     private String slug;
+
+    @Column(length = 3)
+    private String defaultCurrencyCode; // e.g. "USD", "CAD", "GBP"
+
+    @Column(length = 64)
+    private String timeZone; // e.g. "America/Chicago"
+
+    @Column(length = 10)
+    private String locale; // e.g. "en_US"
 }

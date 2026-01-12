@@ -47,7 +47,8 @@ public class Lead extends TenantAuditedEntity {
             @AttributeOverride(name = "line2", column = @Column(name = "property_address_line2")),
             @AttributeOverride(name = "city", column = @Column(name = "property_city")),
             @AttributeOverride(name = "state", column = @Column(name = "property_state")),
-            @AttributeOverride(name = "zip", column = @Column(name = "property_zip"))
+            @AttributeOverride(name = "zip", column = @Column(name = "property_zip")),
+            @AttributeOverride(name = "countryCode", column = @Column(name = "property_country_code"))
     })
     private Address propertyAddress;
 

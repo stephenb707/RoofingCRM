@@ -25,4 +25,7 @@ public class Address {
     private String state;
 
     private String zip;
+
+    // ISO 3166-1 alpha-2 country code, e.g. "US", "CA", "GB"
+    private String countryCode;
 }
