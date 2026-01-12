@@ -41,6 +41,10 @@ public class Estimate extends TenantAuditedEntity {
     @Column(nullable = false, length = 50)
     private EstimateStatus status;
 
+    private String title;
+
+    private LocalDate issueDate;
+
     private LocalDate validUntil;
 
     @Column(precision = 12, scale = 2)
@@ -57,4 +61,7 @@ public class Estimate extends TenantAuditedEntity {
 
     @Column(columnDefinition = "text")
     private String internalNotes;
+
+    @OneToMany(mappedBy = "estimate", cascade = CascadeType.ALL, orphanRemoval = true)
+    private java.util.List<EstimateItem> items = new java.util.ArrayList<>();
 }

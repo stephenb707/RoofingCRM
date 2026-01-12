@@ -29,6 +29,8 @@ public class EstimateItem extends TenantAuditedEntity {
 
     @NotBlank
     @Column(nullable = false)
+    private String name;
+
     private String description;
 
     @NotNull
@@ -42,6 +44,8 @@ public class EstimateItem extends TenantAuditedEntity {
     @NotNull
     @Column(precision = 12, scale = 2, nullable = false)
     private BigDecimal lineTotal;
+
+    private String unit;
 
     private Integer sortOrder;
 }
