@@ -5,10 +5,12 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "../../lib/AuthContext";
 
-export default function LoginPage() {
+export default function RegisterPage() {
   const router = useRouter();
   const { api, setAuthFromLogin } = useAuth();
 
+  const [fullName, setFullName] = useState("");
+  const [tenantName, setTenantName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -20,12 +22,16 @@ export default function LoginPage() {
     setSubmitting(true);
 
     try {
-      const res = await api.post("/api/v1/auth/login", {
+      const res = await api.post("/api/v1/auth/register", {
+        fullName,
+        tenantName,
         email,
         password,
       });
+
+      // Reuse existing auth handler from login
       setAuthFromLogin(res.data);
-      // If exactly one tenant, go straight to /app/customers
+
       const tenants = res.data.tenants ?? [];
       if (tenants.length === 1) {
         router.push("/app/customers");
@@ -34,7 +40,7 @@ export default function LoginPage() {
       }
     } catch (err: unknown) {
       console.error(err);
-      setError("Invalid email or password");
+      setError("Could not create account. Please check your details.");
     } finally {
       setSubmitting(false);
     }
@@ -59,11 +65,41 @@ export default function LoginPage() {
               />
             </svg>
           </div>
-          <h1 className="text-2xl font-bold text-slate-800">Roofing CRM</h1>
-          <p className="text-sm text-slate-500 mt-1">Sign in to your account</p>
+          <h1 className="text-2xl font-bold text-slate-800">Create account</h1>
+          <p className="text-sm text-slate-500 mt-1">
+            Set up Roofing CRM for your roofing business
+          </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">
+              Your name
+            </label>
+            <input
+              type="text"
+              className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-shadow"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              required
+              placeholder="Jane Doe"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">
+              Company name
+            </label>
+            <input
+              type="text"
+              className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-shadow"
+              value={tenantName}
+              onChange={(e) => setTenantName(e.target.value)}
+              required
+              placeholder="Apex Roofing Co."
+            />
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">
               Email
@@ -78,6 +114,7 @@ export default function LoginPage() {
               placeholder="you@company.com"
             />
           </div>
+
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">
               Password
@@ -88,7 +125,7 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              autoComplete="current-password"
+              autoComplete="new-password"
               placeholder="••••••••"
             />
           </div>
@@ -136,21 +173,21 @@ export default function LoginPage() {
                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                   />
                 </svg>
-                Signing in...
+                Creating account...
               </span>
             ) : (
-              "Sign in"
+              "Create account"
             )}
           </button>
         </form>
 
         <p className="mt-6 text-center text-xs text-slate-500">
-          Don&apos;t have an account yet?{" "}
+          Already have an account?{" "}
           <Link
-            href="/register"
+            href="/login"
             className="text-sky-600 hover:text-sky-700 font-medium"
           >
-            Create one
+            Sign in
           </Link>
         </p>
       </div>
