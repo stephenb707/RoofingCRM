@@ -9,33 +9,26 @@ export type AuthState = {
   selectedTenantId: string | null;
 };
 
+export const emptyAuthState: AuthState = {
+  token: null,
+  userId: null,
+  email: null,
+  fullName: null,
+  tenants: [],
+  selectedTenantId: null,
+};
+
 const STORAGE_KEY = "roofingcrm_auth";
 
 export function loadAuthStateFromStorage(): AuthState {
-  if (typeof window === "undefined") {
-    return {
-      token: null,
-      userId: null,
-      email: null,
-      fullName: null,
-      tenants: [],
-      selectedTenantId: null,
-    };
-  }
+  if (typeof window === "undefined") return emptyAuthState;
 
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      return {
-        token: null,
-        userId: null,
-        email: null,
-        fullName: null,
-        tenants: [],
-        selectedTenantId: null,
-      };
-    }
-    const parsed = JSON.parse(raw) as AuthState;
+    if (!raw) return emptyAuthState;
+
+    const parsed = JSON.parse(raw) as Partial<AuthState>;
+
     return {
       token: parsed.token ?? null,
       userId: parsed.userId ?? null,
@@ -45,14 +38,7 @@ export function loadAuthStateFromStorage(): AuthState {
       selectedTenantId: parsed.selectedTenantId ?? null,
     };
   } catch {
-    return {
-      token: null,
-      userId: null,
-      email: null,
-      fullName: null,
-      tenants: [],
-      selectedTenantId: null,
-    };
+    return emptyAuthState;
   }
 }
 

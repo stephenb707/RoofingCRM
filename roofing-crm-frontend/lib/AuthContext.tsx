@@ -1,12 +1,13 @@
 "use client";
 
-import React, { createContext, useContext, useMemo, useState } from "react";
-import { AuthResponse, TenantSummary } from "./types";
+import React, { createContext, useContext, useMemo, useEffect, useState } from "react";
+import { AuthResponse } from "./types";
 import {
   AuthState,
   loadAuthStateFromStorage,
   saveAuthStateToStorage,
   clearAuthStateFromStorage,
+  emptyAuthState,
 } from "./authState";
 import { createApiClient } from "./apiClient";
 
@@ -23,9 +24,17 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const [auth, setAuth] = useState<AuthState>(() => loadAuthStateFromStorage());
+  const [auth, setAuth] = useState<AuthState>(emptyAuthState);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    setAuth(loadAuthStateFromStorage());
+    setHydrated(true);
+  }, []);
 
   const api = useMemo(() => createApiClient(() => auth), [auth]);
+
+  if(!hydrated) return null;
 
   const setAuthFromLogin = (response: AuthResponse) => {
     const next: AuthState = {
