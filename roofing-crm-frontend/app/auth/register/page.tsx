@@ -1,13 +1,13 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useAuth } from "../../lib/AuthContext";
+import { useAuth } from "@/lib/AuthContext";
 
 export default function RegisterPage() {
   const router = useRouter();
-  const { api, setAuthFromLogin } = useAuth();
+  const { api, auth, setAuthFromLogin } = useAuth();
 
   const [fullName, setFullName] = useState("");
   const [tenantName, setTenantName] = useState("");
@@ -15,6 +15,10 @@ export default function RegisterPage() {
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (auth.token) router.replace("/app/customers");
+  }, [auth.token]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -36,7 +40,7 @@ export default function RegisterPage() {
       if (tenants.length === 1) {
         router.push("/app/customers");
       } else {
-        router.push("/select-tenant");
+        router.push("/auth/select-tenant");
       }
     } catch (err: unknown) {
       console.error(err);
@@ -82,7 +86,7 @@ export default function RegisterPage() {
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               required
-              placeholder="Jane Doe"
+              placeholder="John Doe"
             />
           </div>
 
@@ -96,7 +100,7 @@ export default function RegisterPage() {
               value={tenantName}
               onChange={(e) => setTenantName(e.target.value)}
               required
-              placeholder="Apex Roofing Co."
+              placeholder="Your Roofing Co."
             />
           </div>
 
@@ -184,7 +188,7 @@ export default function RegisterPage() {
         <p className="mt-6 text-center text-xs text-slate-500">
           Already have an account?{" "}
           <Link
-            href="/login"
+            href="/auth/login"
             className="text-sky-600 hover:text-sky-700 font-medium"
           >
             Sign in

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useAuth } from "../../lib/AuthContext";
+import { useAuth } from "@/lib/AuthContext";
 import { useEffect } from "react";
 
 export default function SelectTenantPage() {
@@ -10,7 +10,7 @@ export default function SelectTenantPage() {
 
   useEffect(() => {
     if (!auth.token) {
-      router.replace("/login");
+      router.replace("/auth/login");
       return;
     }
     if (auth.tenants.length === 1 && auth.selectedTenantId) {
@@ -50,7 +50,7 @@ export default function SelectTenantPage() {
           <button
             onClick={() => {
               logout();
-              router.push("/login");
+              router.push("/auth/login");
             }}
             className="px-6 py-2.5 text-sm font-medium rounded-lg bg-slate-100 hover:bg-slate-200 transition-colors"
           >
@@ -114,7 +114,7 @@ export default function SelectTenantPage() {
           <button
             onClick={() => {
               logout();
-              router.push("/login");
+              router.push("/auth/login");
             }}
             className="w-full text-sm text-slate-500 hover:text-slate-700 transition-colors"
           >
