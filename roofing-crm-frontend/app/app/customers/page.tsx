@@ -1,8 +1,8 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useAuth } from "../../../lib/AuthContext";
-import { CustomerDto } from "../../../lib/types";
+import { useAuth } from "@/lib/AuthContext";
+import { CustomerDto } from "@/lib/types";
 
 export default function CustomersPage() {
   const { api } = useAuth();

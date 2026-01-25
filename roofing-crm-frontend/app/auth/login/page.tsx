@@ -1,18 +1,22 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useAuth } from "../../lib/AuthContext";
+import { useAuth } from "@/lib/AuthContext";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { api, setAuthFromLogin } = useAuth();
+  const { api, auth, setAuthFromLogin } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (auth.token) router.replace("/app/customers");
+  }, [auth.token]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -30,7 +34,7 @@ export default function LoginPage() {
       if (tenants.length === 1) {
         router.push("/app/customers");
       } else {
-        router.push("/select-tenant");
+        router.push("/auth/select-tenant");
       }
     } catch (err: unknown) {
       console.error(err);
@@ -147,7 +151,7 @@ export default function LoginPage() {
         <p className="mt-6 text-center text-xs text-slate-500">
           Don&apos;t have an account yet?{" "}
           <Link
-            href="/register"
+            href="/auth/register"
             className="text-sky-600 hover:text-sky-700 font-medium"
           >
             Create one

@@ -1,20 +1,22 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { useAuth } from "../../lib/AuthContext";
+import { useRouter, usePathname } from "next/navigation";
+import Link from "next/link";
+import { useAuth } from "@/lib/AuthContext";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { auth, logout } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     if (!auth.token) {
-      router.replace("/login");
+      router.replace("/auth/login");
       return;
     }
     if (!auth.selectedTenantId) {
-      router.replace("/select-tenant");
+      router.replace("/auth/select-tenant");
       return;
     }
   }, [auth, router]);
@@ -73,7 +75,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <button
             onClick={() => {
               logout();
-              router.push("/login");
+              router.push("/auth/login");
             }}
             className="px-3 py-1.5 text-xs font-medium border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
           >
@@ -85,13 +87,26 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       {/* Navigation */}
       <nav className="bg-white border-b border-slate-200 px-6">
         <div className="flex gap-1">
-          <a
+          <Link
             href="/app/customers"
-            className="px-4 py-3 text-sm font-medium text-sky-600 border-b-2 border-sky-600"
+            className={`px-4 py-3 text-sm font-medium transition-colors ${
+              pathname.startsWith("/app/customers")
+                ? "text-sky-600 border-b-2 border-sky-600"
+                : "text-slate-600 hover:text-slate-800 border-b-2 border-transparent"
+            }`}
           >
             Customers
-          </a>
-          {/* Add more nav items here later */}
+          </Link>
+          <Link
+            href="/app/leads"
+            className={`px-4 py-3 text-sm font-medium transition-colors ${
+              pathname.startsWith("/app/leads")
+                ? "text-sky-600 border-b-2 border-sky-600"
+                : "text-slate-600 hover:text-slate-800 border-b-2 border-transparent"
+            }`}
+          >
+            Leads
+          </Link>
         </div>
       </nav>
 
