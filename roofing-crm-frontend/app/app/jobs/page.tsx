@@ -4,24 +4,25 @@ import { useState, useMemo, useCallback } from "react";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import Link from "next/link";
 import { useAuth } from "@/lib/AuthContext";
-import { listLeads } from "@/lib/leadsApi";
+import { listJobs } from "@/lib/jobsApi";
 import { getApiErrorMessage } from "@/lib/apiError";
 import {
-  LEAD_STATUSES,
-  STATUS_LABELS,
-  STATUS_COLORS,
-  SOURCE_LABELS,
-} from "@/lib/leadsConstants";
-import { LeadStatus, LeadDto } from "@/lib/types";
+  JOB_STATUSES,
+  JOB_STATUS_LABELS,
+  JOB_STATUS_COLORS,
+  JOB_TYPE_LABELS,
+} from "@/lib/jobsConstants";
+import type { JobDto, JobStatus } from "@/lib/types";
 
-function formatAddress(lead: LeadDto): string {
-  const addr = lead.propertyAddress;
+function formatAddress(job: JobDto): string {
+  const addr = job.propertyAddress;
   if (!addr) return "—";
   const parts = [addr.line1, addr.city, addr.state].filter(Boolean);
   return parts.length > 0 ? parts.join(", ") : "—";
 }
 
-function formatDate(dateString: string): string {
+function formatDate(dateString: string | null): string {
+  if (!dateString) return "—";
   try {
     return new Date(dateString).toLocaleDateString("en-US", {
       month: "short",
@@ -33,33 +34,32 @@ function formatDate(dateString: string): string {
   }
 }
 
-export default function LeadsPage() {
+export default function JobsPage() {
   const { api, auth } = useAuth();
-  const [statusFilter, setStatusFilter] = useState<LeadStatus | "">("");
+  const [statusFilter, setStatusFilter] = useState<JobStatus | "">("");
   const [page, setPage] = useState(0);
   const pageSize = 20;
 
   const queryKey = useMemo(
-    () => ["leads", auth.selectedTenantId, statusFilter, page],
+    () => ["jobs", auth.selectedTenantId, statusFilter, page],
     [auth.selectedTenantId, statusFilter, page]
   );
 
   const { data, isLoading, isError, error, isFetching } = useQuery({
     queryKey,
-    queryFn: async () => {
-      return listLeads(api, {
+    queryFn: () =>
+      listJobs(api, {
         status: statusFilter || null,
         page,
         size: pageSize,
-      });
-    },
+      }),
     enabled: !!auth.selectedTenantId,
     placeholderData: keepPreviousData,
   });
 
   const handleStatusChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
-      setStatusFilter(e.target.value as LeadStatus | "");
+      setStatusFilter(e.target.value as JobStatus | "");
       setPage(0);
     },
     []
@@ -70,52 +70,49 @@ export default function LeadsPage() {
     setPage(0);
   }, []);
 
-  const leads = data?.content ?? [];
+  const jobs = data?.content ?? [];
   const totalPages = data?.totalPages ?? 0;
 
   return (
     <div className="max-w-6xl mx-auto">
-      {/* Page Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Leads</h1>
+          <h1 className="text-2xl font-bold text-slate-800">Jobs</h1>
           <p className="text-sm text-slate-500 mt-1">
-            Manage your sales pipeline
+            Manage roofing jobs and schedules
           </p>
         </div>
         <Link
-          href="/app/leads/new"
+          href="/app/jobs/new"
           className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
         >
-          + New Lead
+          + New Job
         </Link>
       </div>
 
-      {/* Filters */}
       <div className="bg-white rounded-xl border border-slate-200 p-4 mb-6">
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-2">
             <label
-              htmlFor="status-filter"
+              htmlFor="job-status-filter"
               className="text-sm font-medium text-slate-700"
             >
               Status:
             </label>
             <select
-              id="status-filter"
+              id="job-status-filter"
               value={statusFilter}
               onChange={handleStatusChange}
               className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
             >
               <option value="">All Statuses</option>
-              {LEAD_STATUSES.map((status) => (
-                <option key={status} value={status}>
-                  {STATUS_LABELS[status]}
+              {JOB_STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {JOB_STATUS_LABELS[s]}
                 </option>
               ))}
             </select>
           </div>
-
           {statusFilter && (
             <button
               onClick={handleClearFilters}
@@ -127,15 +124,13 @@ export default function LeadsPage() {
         </div>
       </div>
 
-      {/* Loading State (first load only) */}
-      {isLoading && leads.length === 0 && (
+      {isLoading && jobs.length === 0 && (
         <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-sky-600 mx-auto mb-4"></div>
-          <p className="text-sm text-slate-500">Loading leads...</p>
+          <p className="text-sm text-slate-500">Loading jobs...</p>
         </div>
       )}
 
-      {/* Error State */}
       {isError && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-6">
           <div className="flex items-start gap-3">
@@ -152,21 +147,17 @@ export default function LeadsPage() {
             </svg>
             <div>
               <h3 className="text-sm font-medium text-red-800">
-                Failed to load leads
+                Failed to load jobs
               </h3>
               <p className="text-sm text-red-600 mt-1">
-                Check that the backend is running and try again.
-              </p>
-              <p className="text-xs text-red-500 mt-2 font-mono">
-                {getApiErrorMessage(error, "Unknown error")}
+                {getApiErrorMessage(error, "An error occurred. Please try again.")}
               </p>
             </div>
           </div>
         </div>
       )}
 
-      {/* Empty State */}
-      {!isLoading && !isError && leads.length === 0 && (
+      {!isLoading && !isError && jobs.length === 0 && (
         <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
           <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg
@@ -179,48 +170,47 @@ export default function LeadsPage() {
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 strokeWidth={1.5}
-                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
               />
             </svg>
           </div>
           <h3 className="text-lg font-medium text-slate-800 mb-1">
-            {statusFilter ? "No leads match your filters" : "No leads yet"}
+            {statusFilter ? "No jobs match your filters" : "No jobs yet"}
           </h3>
           <p className="text-sm text-slate-500 mb-4">
             {statusFilter
-              ? "Try adjusting your filters or create a new lead."
-              : "Get started by adding your first lead."}
+              ? "Try adjusting your filters or create a new job."
+              : "Get started by creating your first job."}
           </p>
           <Link
-            href="/app/leads/new"
+            href="/app/jobs/new"
             className="inline-flex px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-sm font-medium rounded-lg transition-colors"
           >
-            + New Lead
+            + New Job
           </Link>
         </div>
       )}
 
-      {/* Leads Table */}
-      {!isError && leads.length > 0 && (
+      {!isError && jobs.length > 0 && (
         <>
           <div className="bg-white shadow-sm rounded-xl border border-slate-200 overflow-hidden">
             <table className="min-w-full divide-y divide-slate-200">
               <thead className="bg-slate-50">
                 <tr>
                   <th className="text-left px-6 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                    Customer
-                  </th>
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                    Property Address
+                    Type
                   </th>
                   <th className="text-left px-6 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">
                     Status
                   </th>
                   <th className="text-left px-6 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                    Source
+                    Property Address
                   </th>
                   <th className="text-left px-6 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                    Created
+                    Scheduled
+                  </th>
+                  <th className="text-left px-6 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                    Updated
                   </th>
                   <th className="text-right px-6 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">
                     Actions
@@ -228,46 +218,33 @@ export default function LeadsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
-                {leads.map((lead) => (
-                  <tr
-                    key={lead.id}
-                    className="hover:bg-slate-50 transition-colors"
-                  >
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 bg-sky-100 text-sky-700 rounded-full flex items-center justify-center font-medium text-sm">
-                          {lead.customerFirstName?.[0] ?? "?"}
-                          {lead.customerLastName?.[0] ?? ""}
-                        </div>
-                        <div>
-                          <div className="font-medium text-slate-800">
-                            {lead.customerFirstName} {lead.customerLastName}
-                          </div>
-                          <div className="text-xs text-slate-500">
-                            {lead.customerPhone ?? lead.customerEmail ?? "—"}
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-slate-600">
-                      {formatAddress(lead)}
+                {jobs.map((job) => (
+                  <tr key={job.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-6 py-4 text-sm text-slate-800">
+                      {JOB_TYPE_LABELS[job.type]}
                     </td>
                     <td className="px-6 py-4">
                       <span
-                        className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full ${STATUS_COLORS[lead.status]}`}
+                        className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full border ${JOB_STATUS_COLORS[job.status]}`}
                       >
-                        {STATUS_LABELS[lead.status]}
+                        {JOB_STATUS_LABELS[job.status]}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-600">
-                      {lead.source ? SOURCE_LABELS[lead.source] ?? lead.source : "—"}
+                      {formatAddress(job)}
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-600">
-                      {formatDate(lead.createdAt)}
+                      {formatDate(job.scheduledStartDate)}
+                      {job.scheduledEndDate &&
+                        job.scheduledEndDate !== job.scheduledStartDate &&
+                        ` – ${formatDate(job.scheduledEndDate)}`}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-slate-600">
+                      {formatDate(job.updatedAt)}
                     </td>
                     <td className="px-6 py-4 text-right">
                       <Link
-                        href={`/app/leads/${lead.id}`}
+                        href={`/app/jobs/${job.id}`}
                         className="text-sm text-sky-600 hover:text-sky-700 font-medium"
                       >
                         View
@@ -279,14 +256,15 @@ export default function LeadsPage() {
             </table>
           </div>
 
-          {/* Pagination */}
           {totalPages > 1 && (
             <div className="flex items-center justify-between mt-4">
               <p className="text-sm text-slate-500">
                 {isFetching ? (
-                  <span className="text-slate-500">Loading…</span>
+                  <span>Loading…</span>
                 ) : (
-                  <>Page {page + 1} of {totalPages}</>
+                  <>
+                    Page {page + 1} of {totalPages}
+                  </>
                 )}
               </p>
               <div className="flex gap-2">

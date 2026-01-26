@@ -107,6 +107,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           >
             Leads
           </Link>
+          <Link
+            href="/app/jobs"
+            className={`px-4 py-3 text-sm font-medium transition-colors ${
+              pathname.startsWith("/app/jobs")
+                ? "text-sky-600 border-b-2 border-sky-600"
+                : "text-slate-600 hover:text-slate-800 border-b-2 border-transparent"
+            }`}
+          >
+            Jobs
+          </Link>
         </div>
       </nav>
 

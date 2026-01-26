@@ -19,17 +19,21 @@ afterAll(() => {
   console.error = originalError;
 });
 
-// Mock next/navigation
-jest.mock("next/navigation", () => ({
-  useRouter: () => ({
-    push: jest.fn(),
-    replace: jest.fn(),
-    back: jest.fn(),
-    forward: jest.fn(),
-    refresh: jest.fn(),
-    prefetch: jest.fn(),
-  }),
-  usePathname: () => "/app/leads",
-  useParams: () => ({}),
-  useSearchParams: () => new URLSearchParams(),
-}));
+// Mock next/navigation (usePathname reads from pathnameState for Jobs tests)
+jest.mock("next/navigation", () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const pathnameState = require("@/__tests__/pathnameState");
+  return {
+    useRouter: () => ({
+      push: jest.fn(),
+      replace: jest.fn(),
+      back: jest.fn(),
+      forward: jest.fn(),
+      refresh: jest.fn(),
+      prefetch: jest.fn(),
+    }),
+    usePathname: () => pathnameState.__pathname,
+    useParams: () => ({}),
+    useSearchParams: () => new URLSearchParams(),
+  };
+});

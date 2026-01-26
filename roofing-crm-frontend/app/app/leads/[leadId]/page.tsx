@@ -1,47 +1,19 @@
 "use client";
 
-import { useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/AuthContext";
 import { getLead, updateLeadStatus } from "@/lib/leadsApi";
+import { getApiErrorMessage } from "@/lib/apiError";
+import {
+  LEAD_STATUSES,
+  STATUS_LABELS,
+  STATUS_COLORS,
+  SOURCE_LABELS,
+} from "@/lib/leadsConstants";
 import { LeadStatus, LeadDto } from "@/lib/types";
-
-const LEAD_STATUSES: LeadStatus[] = [
-  "NEW",
-  "CONTACTED",
-  "INSPECTION_SCHEDULED",
-  "QUOTE_SENT",
-  "WON",
-  "LOST",
-];
-
-const STATUS_LABELS: Record<LeadStatus, string> = {
-  NEW: "New",
-  CONTACTED: "Contacted",
-  INSPECTION_SCHEDULED: "Inspection Scheduled",
-  QUOTE_SENT: "Quote Sent",
-  WON: "Won",
-  LOST: "Lost",
-};
-
-const STATUS_COLORS: Record<LeadStatus, string> = {
-  NEW: "bg-blue-100 text-blue-700 border-blue-200",
-  CONTACTED: "bg-amber-100 text-amber-700 border-amber-200",
-  INSPECTION_SCHEDULED: "bg-purple-100 text-purple-700 border-purple-200",
-  QUOTE_SENT: "bg-sky-100 text-sky-700 border-sky-200",
-  WON: "bg-green-100 text-green-700 border-green-200",
-  LOST: "bg-red-100 text-red-700 border-red-200",
-};
-
-const SOURCE_LABELS: Record<string, string> = {
-  REFERRAL: "Referral",
-  WEBSITE: "Website",
-  DOOR_TO_DOOR: "Door to Door",
-  INSURANCE_PARTNER: "Insurance Partner",
-  OTHER: "Other",
-};
 
 function formatAddress(lead: LeadDto): string {
   const addr = lead.propertyAddress;
@@ -68,7 +40,6 @@ function formatDate(dateString: string): string {
 
 export default function LeadDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const leadId = params.leadId as string;
   const { api, auth } = useAuth();
   const queryClient = useQueryClient();
@@ -80,13 +51,14 @@ export default function LeadDetailPage() {
 
   const { data: lead, isLoading, isError, error } = useQuery({
     queryKey,
-    queryFn: async () => {
-      const result = await getLead(api, leadId);
-      setSelectedStatus(result.status);
-      return result;
-    },
+    queryFn: () => getLead(api, leadId),
     enabled: !!auth.selectedTenantId && !!leadId,
   });
+
+  useEffect(() => {
+    if (lead) setSelectedStatus(lead.status);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sync only when server status changes
+  }, [lead?.status]);
 
   const statusMutation = useMutation({
     mutationFn: async (newStatus: LeadStatus) => {
@@ -102,15 +74,8 @@ export default function LeadDetailPage() {
     },
     onError: (err: unknown) => {
       console.error("Failed to update lead status:", err);
-      if (err instanceof Error) {
-        setUpdateError(err.message);
-      } else {
-        setUpdateError("Failed to update status. Please try again.");
-      }
-      // Reset to original status
-      if (lead) {
-        setSelectedStatus(lead.status);
-      }
+      setUpdateError(getApiErrorMessage(err, "Failed to update status. Please try again."));
+      if (lead) setSelectedStatus(lead.status);
     },
   });
 
@@ -177,7 +142,7 @@ export default function LeadDetailPage() {
                 The lead could not be found or an error occurred.
               </p>
               <p className="text-xs text-red-500 mt-2 font-mono">
-                {error instanceof Error ? error.message : "Unknown error"}
+                {getApiErrorMessage(error, "Unknown error")}
               </p>
             </div>
           </div>
@@ -443,18 +408,17 @@ export default function LeadDetailPage() {
             </dl>
           </div>
 
-          {/* Convert to Job Placeholder */}
+          {/* Actions */}
           <div className="bg-white rounded-xl border border-slate-200 p-6">
             <h2 className="text-lg font-semibold text-slate-800 mb-4">
               Actions
             </h2>
-            <button
-              disabled
-              className="w-full px-4 py-2.5 text-sm font-medium text-slate-400 bg-slate-100 rounded-lg cursor-not-allowed"
-              title="Coming soon"
+            <Link
+              href={`/app/jobs/new?leadId=${leadId}`}
+              className="w-full inline-flex justify-center px-4 py-2.5 text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 rounded-lg transition-colors"
             >
-              Convert to Job (Coming Soon)
-            </button>
+              Create Job
+            </Link>
           </div>
         </div>
       </div>

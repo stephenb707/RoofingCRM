@@ -6,23 +6,9 @@ import Link from "next/link";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/AuthContext";
 import { createLead } from "@/lib/leadsApi";
+import { getApiErrorMessage } from "@/lib/apiError";
+import { LEAD_SOURCES, SOURCE_LABELS } from "@/lib/leadsConstants";
 import { LeadSource, CreateLeadRequest, AddressDto } from "@/lib/types";
-
-const LEAD_SOURCES: LeadSource[] = [
-  "REFERRAL",
-  "WEBSITE",
-  "DOOR_TO_DOOR",
-  "INSURANCE_PARTNER",
-  "OTHER",
-];
-
-const SOURCE_LABELS: Record<LeadSource, string> = {
-  REFERRAL: "Referral",
-  WEBSITE: "Website",
-  DOOR_TO_DOOR: "Door to Door",
-  INSURANCE_PARTNER: "Insurance Partner",
-  OTHER: "Other",
-};
 
 export default function NewLeadPage() {
   const router = useRouter();
@@ -63,11 +49,7 @@ export default function NewLeadPage() {
     },
     onError: (err: unknown) => {
       console.error("Failed to create lead:", err);
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError("Failed to create lead. Please try again.");
-      }
+      setError(getApiErrorMessage(err, "Failed to create lead. Please try again."));
     },
   });
 
@@ -101,7 +83,7 @@ export default function NewLeadPage() {
         lastName: lastName.trim(),
         primaryPhone: phone.trim(),
         email: email.trim() || null,
-        billingAddress: propertyAddress,
+        billingAddress: null,
       },
       source: source || null,
       leadNotes: notes.trim() || null,

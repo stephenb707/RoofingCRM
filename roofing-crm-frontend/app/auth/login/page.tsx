@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/AuthContext";
+import { getApiErrorMessage } from "@/lib/apiError";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -38,7 +39,7 @@ export default function LoginPage() {
       }
     } catch (err: unknown) {
       console.error(err);
-      setError("Invalid email or password");
+      setError(getApiErrorMessage(err, "Invalid email or password"));
     } finally {
       setSubmitting(false);
     }
