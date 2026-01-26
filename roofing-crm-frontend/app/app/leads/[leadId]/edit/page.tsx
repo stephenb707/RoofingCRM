@@ -157,8 +157,10 @@ export default function EditLeadPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Notes</label>
+              <label htmlFor="notes" className="block text-sm font-medium text-slate-700 mb-1.5">Notes</label>
               <textarea
+                id="notes"
+                name="notes"
                 value={leadNotes}
                 onChange={(e) => setLeadNotes(e.target.value)}
                 rows={4}

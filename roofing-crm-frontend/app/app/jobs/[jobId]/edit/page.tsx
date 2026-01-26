@@ -185,8 +185,10 @@ export default function EditJobPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Internal notes</label>
+              <label htmlFor="internalNotes" className="block text-sm font-medium text-slate-700 mb-1.5">Internal notes</label>
               <textarea
+                id="internalNotes"
+                name="internalNotes"
                 value={internalNotes}
                 onChange={(e) => setInternalNotes(e.target.value)}
                 rows={4}
