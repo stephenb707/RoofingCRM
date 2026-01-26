@@ -175,4 +175,26 @@ describe("LeadsPage", () => {
     const viewLink = screen.getByRole("link", { name: "View" });
     expect(viewLink).toHaveAttribute("href", "/app/leads/lead-123");
   });
+
+  it("does not render undefined when customer name fields are missing", async () => {
+    const leadNoCustomer: LeadDto = {
+      ...mockLead,
+      id: "lead-no-cust",
+      customerFirstName: undefined,
+      customerLastName: undefined,
+      customerEmail: undefined,
+      customerPhone: undefined,
+    };
+    mockedLeadsApi.listLeads.mockResolvedValue({
+      ...mockPageWithLeads,
+      content: [leadNoCustomer],
+    });
+
+    render(<LeadsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("123 Main St, Denver, CO")).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/undefined/)).not.toBeInTheDocument();
+  });
 });

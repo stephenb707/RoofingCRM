@@ -87,6 +87,13 @@ export interface UpdateLeadStatusRequest {
   status: LeadStatus;
 }
 
+export interface UpdateLeadRequest {
+  source?: LeadSource | null;
+  leadNotes?: string | null;
+  preferredContactMethod?: string | null;
+  propertyAddress?: AddressDto | null;
+}
+
 export interface PageResponse<T> {
   content: T[];
   totalElements: number;
@@ -119,6 +126,19 @@ export interface JobDto {
   crewName: string | null;
   createdAt: string;
   updatedAt: string;
+  customerFirstName?: string;
+  customerLastName?: string;
+  customerEmail?: string;
+  customerPhone?: string;
+}
+
+export interface UpdateJobRequest {
+  type?: JobType | null;
+  propertyAddress?: AddressDto | null;
+  scheduledStartDate?: string | null;
+  scheduledEndDate?: string | null;
+  internalNotes?: string | null;
+  crewName?: string | null;
 }
 
 export interface CreateJobRequest {

@@ -111,6 +111,10 @@ class LeadServiceImplTest extends AbstractIntegrationTest {
         assertNotNull(dto.getId());
         assertNotNull(dto.getCustomerId());
         assertEquals(LeadStatus.NEW, dto.getStatus());
+        assertEquals("Alice", dto.getCustomerFirstName());
+        assertEquals("Roofer", dto.getCustomerLastName());
+        assertEquals("alice@example.com", dto.getCustomerEmail());
+        assertEquals("555-0000", dto.getCustomerPhone());
     }
 
     @Test
@@ -141,10 +145,16 @@ class LeadServiceImplTest extends AbstractIntegrationTest {
         Page<LeadDto> wonLeads = leadService.listLeads(tenantId, userId, LeadStatus.WON, PageRequest.of(0, 10));
 
         assertEquals(1, newLeads.getTotalElements());
-        assertEquals(lead1.getId(), newLeads.getContent().get(0).getId());
+        LeadDto firstNew = newLeads.getContent().get(0);
+        assertEquals(lead1.getId(), firstNew.getId());
+        assertEquals("Lead1", firstNew.getCustomerFirstName());
+        assertEquals("New", firstNew.getCustomerLastName());
 
         assertEquals(1, wonLeads.getTotalElements());
-        assertEquals(lead2.getId(), wonLeads.getContent().get(0).getId());
+        LeadDto firstWon = wonLeads.getContent().get(0);
+        assertEquals(lead2.getId(), firstWon.getId());
+        assertEquals("Lead2", firstWon.getCustomerFirstName());
+        assertEquals("Won", firstWon.getCustomerLastName());
     }
 
     @Test

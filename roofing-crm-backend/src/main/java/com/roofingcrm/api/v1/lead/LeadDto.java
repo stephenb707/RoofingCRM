@@ -17,6 +17,11 @@ public class LeadDto {
 
     private UUID customerId;
 
+    private String customerFirstName;
+    private String customerLastName;
+    private String customerEmail;
+    private String customerPhone;
+
     private LeadStatus status;
 
     private LeadSource source;

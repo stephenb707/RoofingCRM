@@ -99,6 +99,8 @@ class JobControllerTest {
         dto.setStatus(JobStatus.SCHEDULED);
         dto.setType(JobType.REPAIR);
         dto.setCreatedAt(Instant.now());
+        dto.setCustomerFirstName("Jane");
+        dto.setCustomerLastName("Doe");
 
         when(jobService.getJob(eq(tenantId), eq(userId), eq(jobId))).thenReturn(dto);
 
@@ -106,7 +108,9 @@ class JobControllerTest {
                         .header("X-Tenant-Id", tenantId.toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id", is(jobId.toString())))
-                .andExpect(jsonPath("$.status", is("SCHEDULED")));
+                .andExpect(jsonPath("$.status", is("SCHEDULED")))
+                .andExpect(jsonPath("$.customerFirstName", is("Jane")))
+                .andExpect(jsonPath("$.customerLastName", is("Doe")));
     }
 
     @Test

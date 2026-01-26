@@ -140,6 +140,10 @@ class JobServiceImplTest extends AbstractIntegrationTest {
         assertEquals("Team Alpha", dto.getCrewName());
         assertNotNull(dto.getPropertyAddress());
         assertEquals("123 Main St", dto.getPropertyAddress().getLine1());
+        assertEquals("John", dto.getCustomerFirstName());
+        assertEquals("Doe", dto.getCustomerLastName());
+        assertEquals("555-1234", dto.getCustomerPhone());
+        assertNull(dto.getCustomerEmail());
     }
 
     @Test
@@ -156,6 +160,10 @@ class JobServiceImplTest extends AbstractIntegrationTest {
         assertNull(dto.getLeadId());
         assertEquals(JobStatus.SCHEDULED, dto.getStatus());
         assertEquals(JobType.REPAIR, dto.getType());
+        assertEquals("John", dto.getCustomerFirstName());
+        assertEquals("Doe", dto.getCustomerLastName());
+        assertEquals("555-1234", dto.getCustomerPhone());
+        assertNull(dto.getCustomerEmail());
     }
 
     @Test

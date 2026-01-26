@@ -237,12 +237,11 @@ export default function LeadsPage() {
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-9 h-9 bg-sky-100 text-sky-700 rounded-full flex items-center justify-center font-medium text-sm">
-                          {lead.customerFirstName?.[0] ?? "?"}
-                          {lead.customerLastName?.[0] ?? ""}
+                          {[lead.customerFirstName?.[0], lead.customerLastName?.[0]].filter(Boolean).join("") || "?"}
                         </div>
                         <div>
                           <div className="font-medium text-slate-800">
-                            {lead.customerFirstName} {lead.customerLastName}
+                            {[lead.customerFirstName, lead.customerLastName].filter(Boolean).join(" ") || "—"}
                           </div>
                           <div className="text-xs text-slate-500">
                             {lead.customerPhone ?? lead.customerEmail ?? "—"}

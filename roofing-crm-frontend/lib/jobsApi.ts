@@ -2,8 +2,8 @@ import type { AxiosInstance } from "axios";
 import type {
   JobDto,
   JobStatus,
-  JobType,
   CreateJobRequest,
+  UpdateJobRequest,
   PageResponse,
 } from "./types";
 
@@ -60,6 +60,18 @@ export async function createJob(
   payload: CreateJobRequest
 ): Promise<JobDto> {
   const res = await api.post<JobDto>("/api/v1/jobs", payload);
+  return res.data;
+}
+
+/**
+ * Update an existing job (type, propertyAddress, scheduled dates, internalNotes, crewName).
+ */
+export async function updateJob(
+  api: AxiosInstance,
+  jobId: string,
+  payload: UpdateJobRequest
+): Promise<JobDto> {
+  const res = await api.put<JobDto>(`/api/v1/jobs/${jobId}`, payload);
   return res.data;
 }
 

@@ -198,7 +198,12 @@ public class JobServiceImpl implements JobService {
         dto.setUpdatedAt(entity.getUpdatedAt());
 
         if (entity.getCustomer() != null) {
-            dto.setCustomerId(entity.getCustomer().getId());
+            Customer customer = entity.getCustomer();
+            dto.setCustomerId(customer.getId());
+            dto.setCustomerFirstName(customer.getFirstName());
+            dto.setCustomerLastName(customer.getLastName());
+            dto.setCustomerEmail(customer.getEmail());
+            dto.setCustomerPhone(customer.getPrimaryPhone());
         }
 
         if (entity.getLead() != null) {

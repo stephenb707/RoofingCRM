@@ -182,7 +182,7 @@ export default function LeadDetailPage() {
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-2xl font-bold text-slate-800">
-              {lead.customerFirstName} {lead.customerLastName}
+              {[lead.customerFirstName, lead.customerLastName].filter(Boolean).join(" ") || "—"}
             </h1>
             <p className="text-sm text-slate-500 mt-1">Lead Details</p>
           </div>
@@ -221,7 +221,7 @@ export default function LeadDetailPage() {
                   Name
                 </dt>
                 <dd className="mt-1 text-sm text-slate-800">
-                  {lead.customerFirstName} {lead.customerLastName}
+                  {[lead.customerFirstName, lead.customerLastName].filter(Boolean).join(" ") || "—"}
                 </dd>
               </div>
               <div>
@@ -414,12 +414,20 @@ export default function LeadDetailPage() {
             <h2 className="text-lg font-semibold text-slate-800 mb-4">
               Actions
             </h2>
-            <Link
-              href={`/app/jobs/new?leadId=${leadId}`}
-              className="w-full inline-flex justify-center px-4 py-2.5 text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 rounded-lg transition-colors"
-            >
-              Create Job
-            </Link>
+            <div className="space-y-2">
+              <Link
+                href={`/app/leads/${leadId}/edit`}
+                className="w-full inline-flex justify-center px-4 py-2.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors"
+              >
+                Edit Lead
+              </Link>
+              <Link
+                href={`/app/jobs/new?leadId=${leadId}`}
+                className="w-full inline-flex justify-center px-4 py-2.5 text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 rounded-lg transition-colors"
+              >
+                Create Job
+              </Link>
+            </div>
           </div>
         </div>
       </div>

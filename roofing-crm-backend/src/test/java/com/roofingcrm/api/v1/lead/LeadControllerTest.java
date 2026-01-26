@@ -93,6 +93,8 @@ class LeadControllerTest {
         dto.setId(leadId);
         dto.setStatus(LeadStatus.NEW);
         dto.setCreatedAt(Instant.now());
+        dto.setCustomerFirstName("Jane");
+        dto.setCustomerLastName("Doe");
 
         when(leadService.getLead(eq(tenantId), eq(userId), eq(leadId))).thenReturn(dto);
 
@@ -100,6 +102,8 @@ class LeadControllerTest {
                         .header("X-Tenant-Id", tenantId.toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id", is(leadId.toString())))
-                .andExpect(jsonPath("$.status", is("NEW")));
+                .andExpect(jsonPath("$.status", is("NEW")))
+                .andExpect(jsonPath("$.customerFirstName", is("Jane")))
+                .andExpect(jsonPath("$.customerLastName", is("Doe")));
     }
 }

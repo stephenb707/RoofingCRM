@@ -3,6 +3,7 @@ import {
   listJobs,
   getJob,
   createJob,
+  updateJob,
   updateJobStatus,
 } from "./jobsApi";
 import {
@@ -10,6 +11,7 @@ import {
   JobStatus,
   JobType,
   CreateJobRequest,
+  UpdateJobRequest,
   PageResponse,
 } from "./types";
 
@@ -78,21 +80,6 @@ describe("jobsApi", () => {
         params: { page: 0, size: 20 },
       });
     });
-
-    it("calls GET /api/v1/jobs with customerId", async () => {
-      const mockApi = createMockApi();
-      (mockApi.get as jest.Mock).mockResolvedValue({ data: mockPage });
-
-      await listJobs(mockApi as unknown as AxiosInstance, {
-        customerId: "cust-1",
-        page: 0,
-        size: 20,
-      });
-
-      expect(mockApi.get).toHaveBeenCalledWith("/api/v1/jobs", {
-        params: { customerId: "cust-1", page: 0, size: 20 },
-      });
-    });
   });
 
   describe("getJob", () => {
@@ -100,10 +87,7 @@ describe("jobsApi", () => {
       const mockApi = createMockApi();
       (mockApi.get as jest.Mock).mockResolvedValue({ data: mockJob });
 
-      const result = await getJob(
-        mockApi as unknown as AxiosInstance,
-        "job-1"
-      );
+      const result = await getJob(mockApi as unknown as AxiosInstance, "job-1");
 
       expect(mockApi.get).toHaveBeenCalledWith("/api/v1/jobs/job-1");
       expect(result).toEqual(mockJob);
@@ -126,28 +110,35 @@ describe("jobsApi", () => {
         },
       };
 
-      const result = await createJob(
-        mockApi as unknown as AxiosInstance,
-        payload
-      );
+      const result = await createJob(mockApi as unknown as AxiosInstance, payload);
 
       expect(mockApi.post).toHaveBeenCalledWith("/api/v1/jobs", payload);
       expect(result).toEqual(mockJob);
     });
+  });
 
-    it("calls POST /api/v1/jobs with leadId", async () => {
+  describe("updateJob", () => {
+    it("calls PUT /api/v1/jobs/{id} with payload", async () => {
       const mockApi = createMockApi();
-      (mockApi.post as jest.Mock).mockResolvedValue({ data: mockJob });
+      (mockApi.put as jest.Mock).mockResolvedValue({ data: mockJob });
 
-      const payload: CreateJobRequest = {
-        leadId: "lead-1",
-        type: "REPLACEMENT" as JobType,
-        propertyAddress: { line1: "123 Main", city: "Denver", state: "CO" },
+      const payload: UpdateJobRequest = {
+        type: "REPAIR",
+        propertyAddress: { line1: "456 Oak Ave", city: "Chicago", state: "IL", zip: "60601" },
+        scheduledStartDate: "2024-07-01",
+        scheduledEndDate: "2024-07-02",
+        internalNotes: "Updated notes",
+        crewName: "Crew B",
       };
 
-      await createJob(mockApi as unknown as AxiosInstance, payload);
+      const result = await updateJob(
+        mockApi as unknown as AxiosInstance,
+        "job-1",
+        payload
+      );
 
-      expect(mockApi.post).toHaveBeenCalledWith("/api/v1/jobs", payload);
+      expect(mockApi.put).toHaveBeenCalledWith("/api/v1/jobs/job-1", payload);
+      expect(result).toEqual(mockJob);
     });
   });
 

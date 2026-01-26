@@ -2,6 +2,7 @@ import { AxiosInstance } from "axios";
 import {
   LeadDto,
   CreateLeadRequest,
+  UpdateLeadRequest,
   UpdateLeadStatusRequest,
   LeadStatus,
   PageResponse,
@@ -57,6 +58,18 @@ export async function createLead(
   payload: CreateLeadRequest
 ): Promise<LeadDto> {
   const response = await api.post<LeadDto>("/api/v1/leads", payload);
+  return response.data;
+}
+
+/**
+ * Update an existing lead (source, leadNotes, preferredContactMethod, propertyAddress).
+ */
+export async function updateLead(
+  api: AxiosInstance,
+  leadId: string,
+  payload: UpdateLeadRequest
+): Promise<LeadDto> {
+  const response = await api.put<LeadDto>(`/api/v1/leads/${leadId}`, payload);
   return response.data;
 }
 

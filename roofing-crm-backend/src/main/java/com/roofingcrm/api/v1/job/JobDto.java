@@ -19,6 +19,11 @@ public class JobDto {
     private UUID customerId;
     private UUID leadId;
 
+    private String customerFirstName;
+    private String customerLastName;
+    private String customerEmail;
+    private String customerPhone;
+
     private JobStatus status;
     private JobType type;
 
