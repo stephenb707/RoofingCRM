@@ -16,8 +16,10 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (auth.token) router.replace("/app/customers");
-  }, [auth.token]);
+    if (!auth.token) return;
+    if (auth.selectedTenantId) router.replace("/app/customers");
+    else router.replace("/auth/select-tenant");
+  }, [auth.token, auth.selectedTenantId, router]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();

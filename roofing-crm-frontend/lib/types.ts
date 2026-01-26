@@ -135,3 +135,61 @@ export interface CreateJobRequest {
 export interface UpdateJobStatusRequest {
   status: JobStatus;
 }
+
+// Estimate-related types
+export type EstimateStatus = "DRAFT" | "SENT" | "ACCEPTED" | "REJECTED";
+
+export interface EstimateItemDto {
+  id: string;
+  name: string;
+  description?: string | null;
+  quantity: number;
+  unitPrice: number;
+  unit?: string | null;
+}
+
+export interface EstimateDto {
+  id: string;
+  jobId: string;
+  customerId?: string | null;
+  status: EstimateStatus;
+  title?: string | null;
+  notes?: string | null;
+  issueDate?: string | null; // YYYY-MM-DD
+  validUntil?: string | null; // YYYY-MM-DD
+  items: EstimateItemDto[];
+  subtotal?: number | null;
+  total?: number | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface EstimateItemRequest {
+  name: string;
+  description?: string | null;
+  quantity: number;
+  unitPrice: number;
+  unit?: string | null;
+}
+
+export interface CreateEstimateRequest {
+  title?: string | null;
+  notes?: string | null;
+  issueDate?: string | null;
+  validUntil?: string | null;
+  items: EstimateItemRequest[];
+  status?: EstimateStatus | null;
+}
+
+export interface UpdateEstimateRequest {
+  title?: string | null;
+  notes?: string | null;
+  issueDate?: string | null;
+  validUntil?: string | null;
+  items?: EstimateItemRequest[] | null;
+  status?: EstimateStatus | null;
+}
+
+export interface UpdateEstimateStatusRequest {
+  status: EstimateStatus;
+}

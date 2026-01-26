@@ -4,12 +4,13 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/AuthContext";
 import { listCustomers } from "@/lib/customersApi";
 import { getApiErrorMessage } from "@/lib/apiError";
+import { queryKeys } from "@/lib/queryKeys";
 
 export default function CustomersPage() {
   const { api, auth } = useAuth();
 
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ["customers", auth.selectedTenantId],
+    queryKey: queryKeys.customers(auth.selectedTenantId),
     queryFn: () => listCustomers(api, { page: 0, size: 50 }),
     enabled: !!auth.selectedTenantId,
   });
