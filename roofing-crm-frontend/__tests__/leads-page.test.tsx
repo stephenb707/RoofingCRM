@@ -93,7 +93,7 @@ describe("LeadsPage", () => {
       selector: "span.inline-flex",
     });
     expect(statusBadge).toBeInTheDocument();
-    expect(screen.getByText("WEBSITE")).toBeInTheDocument();
+    expect(screen.getByText("Website")).toBeInTheDocument();
   });
 
   it("renders error state when API fails", async () => {

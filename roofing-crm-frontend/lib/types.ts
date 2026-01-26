@@ -96,3 +96,42 @@ export interface PageResponse<T> {
   first: boolean;
   last: boolean;
 }
+
+// Job-related types
+export type JobStatus =
+  | "SCHEDULED"
+  | "IN_PROGRESS"
+  | "COMPLETED"
+  | "INVOICED";
+
+export type JobType = "REPLACEMENT" | "REPAIR" | "INSPECTION_ONLY";
+
+export interface JobDto {
+  id: string;
+  customerId: string | null;
+  leadId: string | null;
+  status: JobStatus;
+  type: JobType;
+  propertyAddress: AddressDto | null;
+  scheduledStartDate: string | null;
+  scheduledEndDate: string | null;
+  internalNotes: string | null;
+  crewName: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateJobRequest {
+  leadId?: string | null;
+  customerId?: string | null;
+  type: JobType;
+  propertyAddress: AddressDto;
+  scheduledStartDate?: string | null;
+  scheduledEndDate?: string | null;
+  internalNotes?: string | null;
+  crewName?: string | null;
+}
+
+export interface UpdateJobStatusRequest {
+  status: JobStatus;
+}

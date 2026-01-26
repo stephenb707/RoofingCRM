@@ -2,20 +2,19 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/AuthContext";
-import { CustomerDto } from "@/lib/types";
+import { listCustomers } from "@/lib/customersApi";
+import { getApiErrorMessage } from "@/lib/apiError";
 
 export default function CustomersPage() {
-  const { api } = useAuth();
+  const { api, auth } = useAuth();
 
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ["customers"],
-    queryFn: async () => {
-      const res = await api.get<{ content: CustomerDto[] }>(
-        "/api/v1/customers"
-      );
-      return res.data.content ?? [];
-    },
+    queryKey: ["customers", auth.selectedTenantId],
+    queryFn: () => listCustomers(api, { page: 0, size: 50 }),
+    enabled: !!auth.selectedTenantId,
   });
+
+  const customers = data?.content ?? [];
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -74,7 +73,7 @@ export default function CustomersPage() {
       )}
 
       {/* Empty State */}
-      {data && data.length === 0 && !isLoading && (
+      {data && customers.length === 0 && !isLoading && (
         <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
           <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg
@@ -101,7 +100,7 @@ export default function CustomersPage() {
       )}
 
       {/* Customer Table */}
-      {data && data.length > 0 && (
+      {data && customers.length > 0 && (
         <div className="bg-white shadow-sm rounded-xl border border-slate-200 overflow-hidden">
           <table className="min-w-full divide-y divide-slate-200">
             <thead className="bg-slate-50">
@@ -121,7 +120,7 @@ export default function CustomersPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
-              {data.map((customer) => (
+              {customers.map((customer) => (
                 <tr
                   key={customer.id}
                   className="hover:bg-slate-50 transition-colors"

@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/AuthContext";
+import { getApiErrorMessage } from "@/lib/apiError";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -44,7 +45,7 @@ export default function RegisterPage() {
       }
     } catch (err: unknown) {
       console.error(err);
-      setError("Could not create account. Please check your details.");
+      setError(getApiErrorMessage(err, "Could not create account. Please check your details."));
     } finally {
       setSubmitting(false);
     }
