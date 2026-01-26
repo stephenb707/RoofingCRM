@@ -3,11 +3,13 @@
 import { useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/AuthContext";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { auth, logout } = useAuth();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const pathname = usePathname();
 
   useEffect(() => {
@@ -74,6 +76,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
           <button
             onClick={() => {
+              queryClient.clear();
               logout();
               router.push("/auth/login");
             }}

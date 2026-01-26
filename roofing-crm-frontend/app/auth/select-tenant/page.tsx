@@ -1,12 +1,14 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/AuthContext";
 import { useEffect } from "react";
 
 export default function SelectTenantPage() {
   const { auth, selectTenant, logout } = useAuth();
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (!auth.token) {
@@ -49,6 +51,7 @@ export default function SelectTenantPage() {
           </p>
           <button
             onClick={() => {
+              queryClient.clear();
               logout();
               router.push("/auth/login");
             }}
@@ -78,6 +81,7 @@ export default function SelectTenantPage() {
             <button
               key={t.tenantId}
               onClick={() => {
+                queryClient.clear();
                 selectTenant(t.tenantId);
                 router.push("/app/customers");
               }}
@@ -113,6 +117,7 @@ export default function SelectTenantPage() {
         <div className="mt-6 pt-4 border-t border-slate-100">
           <button
             onClick={() => {
+              queryClient.clear();
               logout();
               router.push("/auth/login");
             }}

@@ -12,6 +12,7 @@ import {
   STATUS_COLORS,
   SOURCE_LABELS,
 } from "@/lib/leadsConstants";
+import { queryKeys } from "@/lib/queryKeys";
 import { LeadStatus, LeadDto } from "@/lib/types";
 
 function formatAddress(lead: LeadDto): string {
@@ -40,7 +41,7 @@ export default function LeadsPage() {
   const pageSize = 20;
 
   const queryKey = useMemo(
-    () => ["leads", auth.selectedTenantId, statusFilter, page],
+    () => queryKeys.leadsList(auth.selectedTenantId, statusFilter, "", "", page),
     [auth.selectedTenantId, statusFilter, page]
   );
 

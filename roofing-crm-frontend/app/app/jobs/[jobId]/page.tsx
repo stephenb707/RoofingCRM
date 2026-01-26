@@ -13,6 +13,7 @@ import {
   JOB_STATUS_COLORS,
   JOB_TYPE_LABELS,
 } from "@/lib/jobsConstants";
+import { queryKeys } from "@/lib/queryKeys";
 import type { JobDto, JobStatus } from "@/lib/types";
 
 function formatAddress(job: JobDto): string {
@@ -60,7 +61,7 @@ export default function JobDetailPage() {
   const [updateError, setUpdateError] = useState<string | null>(null);
 
   const { data: job, isLoading, isError, error } = useQuery({
-    queryKey: ["job", auth.selectedTenantId, jobId],
+    queryKey: queryKeys.job(auth.selectedTenantId, jobId),
     queryFn: () => getJob(api, jobId),
     enabled: !!auth.selectedTenantId && !!jobId,
   });
@@ -74,7 +75,7 @@ export default function JobDetailPage() {
     mutationFn: (newStatus: JobStatus) => updateJobStatus(api, jobId, newStatus),
     onSuccess: () => {
       setUpdateError(null);
-      queryClient.invalidateQueries({ queryKey: ["job", auth.selectedTenantId, jobId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.job(auth.selectedTenantId, jobId) });
       queryClient.invalidateQueries({ queryKey: ["jobs", auth.selectedTenantId] });
     },
     onError: (err: unknown) => {
@@ -201,6 +202,17 @@ export default function JobDetailPage() {
                 <dd className="mt-1 text-sm text-slate-700 whitespace-pre-wrap">{job.internalNotes}</dd>
               </div>
             )}
+            <div className="mt-4 pt-4 border-t border-slate-100">
+              <Link
+                href={`/app/jobs/${jobId}/estimates`}
+                className="inline-flex items-center gap-2 text-sm font-medium text-sky-600 hover:text-sky-700"
+              >
+                View Estimates
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </Link>
+            </div>
           </div>
         </div>
 

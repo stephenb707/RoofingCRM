@@ -12,6 +12,7 @@ import {
   JOB_STATUS_COLORS,
   JOB_TYPE_LABELS,
 } from "@/lib/jobsConstants";
+import { queryKeys } from "@/lib/queryKeys";
 import type { JobDto, JobStatus } from "@/lib/types";
 
 function formatAddress(job: JobDto): string {
@@ -41,7 +42,7 @@ export default function JobsPage() {
   const pageSize = 20;
 
   const queryKey = useMemo(
-    () => ["jobs", auth.selectedTenantId, statusFilter, page],
+    () => queryKeys.jobsList(auth.selectedTenantId, statusFilter, page),
     [auth.selectedTenantId, statusFilter, page]
   );
 

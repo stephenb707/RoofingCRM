@@ -13,6 +13,7 @@ import {
   STATUS_COLORS,
   SOURCE_LABELS,
 } from "@/lib/leadsConstants";
+import { queryKeys } from "@/lib/queryKeys";
 import { LeadStatus, LeadDto } from "@/lib/types";
 
 function formatAddress(lead: LeadDto): string {
@@ -47,7 +48,7 @@ export default function LeadDetailPage() {
   const [selectedStatus, setSelectedStatus] = useState<LeadStatus | null>(null);
   const [updateError, setUpdateError] = useState<string | null>(null);
 
-  const queryKey = ["lead", auth.selectedTenantId, leadId];
+  const queryKey = queryKeys.lead(auth.selectedTenantId, leadId);
 
   const { data: lead, isLoading, isError, error } = useQuery({
     queryKey,

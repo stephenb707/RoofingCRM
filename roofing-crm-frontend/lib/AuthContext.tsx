@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useMemo, useEffect, useState } from "react";
+import React, { createContext, useContext, useMemo, useEffect, useState, useRef } from "react";
 import { AuthResponse } from "./types";
 import {
   AuthState,
@@ -26,13 +26,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const [auth, setAuth] = useState<AuthState>(emptyAuthState);
   const [hydrated, setHydrated] = useState(false);
+  const authRef = useRef<AuthState>(auth);
 
   useEffect(() => {
     setAuth(loadAuthStateFromStorage());
     setHydrated(true);
   }, []);
 
-  const api = useMemo(() => createApiClient(() => auth), [auth]);
+  useEffect(() => {
+    authRef.current = auth;
+  }, [auth]);
+
+  const api = useMemo(() => createApiClient(() => authRef.current), []);
 
   if(!hydrated) return null;
 
