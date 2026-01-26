@@ -1,7 +1,26 @@
-# Maven build output
+# ===== Backend =====
 /roofing-crm-backend/target/
+*.log
 
-# Common IDE stuff (optional but recommended)
+# ===== Frontend (Next.js) =====
+/roofing-crm-frontend/node_modules/
+/roofing-crm-frontend/.next/
+/roofing-crm-frontend/out/
+/roofing-crm-frontend/.turbo/
+/roofing-crm-frontend/.swc/
+/roofing-crm-frontend/.env*
+!/roofing-crm-frontend/.env.example
+
+# ===== OS / IDE =====
+.DS_Store
+Thumbs.db
 .idea/
 .vscode/
 *.iml
+
+# ===== Archives / build artifacts =====
+*.zip
+*.jar
+*.war
+*.tar
+*.gz
