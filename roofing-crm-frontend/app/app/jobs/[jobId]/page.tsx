@@ -96,7 +96,7 @@ export default function JobDetailPage() {
     return (
       <div className="max-w-4xl mx-auto">
         <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-sky-600 mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-sky-600 mx-auto mb-4" />
           <p className="text-sm text-slate-500">Loading job details…</p>
         </div>
       </div>
@@ -106,10 +106,7 @@ export default function JobDetailPage() {
   if (isError) {
     return (
       <div className="max-w-4xl mx-auto">
-        <Link
-          href="/app/jobs"
-          className="text-sm text-slate-500 hover:text-slate-700 flex items-center gap-1 mb-4"
-        >
+        <Link href="/app/jobs" className="text-sm text-slate-500 hover:text-slate-700 flex items-center gap-1 mb-4">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
@@ -130,10 +127,7 @@ export default function JobDetailPage() {
   return (
     <div className="max-w-4xl mx-auto">
       <div className="mb-6">
-        <Link
-          href="/app/jobs"
-          className="text-sm text-slate-500 hover:text-slate-700 flex items-center gap-1 mb-2"
-        >
+        <Link href="/app/jobs" className="text-sm text-slate-500 hover:text-slate-700 flex items-center gap-1 mb-2">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
@@ -146,9 +140,7 @@ export default function JobDetailPage() {
             </h1>
             <p className="text-sm text-slate-500 mt-1">Job Details</p>
           </div>
-          <span
-            className={`inline-flex px-3 py-1.5 text-sm font-medium rounded-full border ${JOB_STATUS_COLORS[job.status]}`}
-          >
+          <span className={`inline-flex px-3 py-1.5 text-sm font-medium rounded-full border ${JOB_STATUS_COLORS[job.status]}`}>
             {JOB_STATUS_LABELS[job.status]}
           </span>
         </div>
@@ -202,7 +194,13 @@ export default function JobDetailPage() {
                 <dd className="mt-1 text-sm text-slate-700 whitespace-pre-wrap">{job.internalNotes}</dd>
               </div>
             )}
-            <div className="mt-4 pt-4 border-t border-slate-100">
+            <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap items-center gap-4">
+              <Link
+                href={`/app/jobs/${jobId}/edit`}
+                className="inline-flex items-center gap-2 text-sm font-medium text-slate-700 hover:text-slate-900"
+              >
+                Edit Job
+              </Link>
               <Link
                 href={`/app/jobs/${jobId}/estimates`}
                 className="inline-flex items-center gap-2 text-sm font-medium text-sky-600 hover:text-sky-700"

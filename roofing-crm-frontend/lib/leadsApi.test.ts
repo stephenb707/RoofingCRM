@@ -1,6 +1,6 @@
 import { AxiosInstance } from "axios";
-import { listLeads, getLead, createLead, updateLeadStatus } from "./leadsApi";
-import { LeadDto, CreateLeadRequest, PageResponse } from "./types";
+import { listLeads, getLead, createLead, updateLead, updateLeadStatus } from "./leadsApi";
+import { LeadDto, CreateLeadRequest, UpdateLeadRequest, PageResponse } from "./types";
 
 // Mock axios instance
 const createMockApi = () => ({
@@ -143,6 +143,29 @@ describe("leadsApi", () => {
       );
 
       expect(mockApi.post).toHaveBeenCalledWith("/api/v1/leads", payload);
+      expect(result).toEqual(mockLead);
+    });
+  });
+
+  describe("updateLead", () => {
+    it("should call PUT /api/v1/leads/{id} with payload", async () => {
+      const mockApi = createMockApi();
+      mockApi.put.mockResolvedValue({ data: mockLead });
+
+      const payload: UpdateLeadRequest = {
+        source: "REFERRAL",
+        leadNotes: "Updated notes",
+        preferredContactMethod: "Email",
+        propertyAddress: { line1: "456 Oak St", city: "Chicago", state: "IL", zip: "60601" },
+      };
+
+      const result = await updateLead(
+        mockApi as unknown as AxiosInstance,
+        "lead-123",
+        payload
+      );
+
+      expect(mockApi.put).toHaveBeenCalledWith("/api/v1/leads/lead-123", payload);
       expect(result).toEqual(mockLead);
     });
   });
