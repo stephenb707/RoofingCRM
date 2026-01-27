@@ -6,6 +6,7 @@ import com.roofingcrm.api.v1.lead.CreateLeadRequest;
 import com.roofingcrm.api.v1.lead.LeadDto;
 import com.roofingcrm.api.v1.lead.NewLeadCustomerRequest;
 import com.roofingcrm.api.v1.lead.UpdateLeadStatusRequest;
+import com.roofingcrm.domain.entity.Customer;
 import com.roofingcrm.domain.entity.Tenant;
 import com.roofingcrm.domain.entity.TenantUserMembership;
 import com.roofingcrm.domain.entity.User;
@@ -141,8 +142,8 @@ class LeadServiceImplTest extends AbstractIntegrationTest {
         // Update second lead to WON
         leadService.updateLeadStatus(tenantId, userId, lead2.getId(), LeadStatus.WON);
 
-        Page<LeadDto> newLeads = leadService.listLeads(tenantId, userId, LeadStatus.NEW, PageRequest.of(0, 10));
-        Page<LeadDto> wonLeads = leadService.listLeads(tenantId, userId, LeadStatus.WON, PageRequest.of(0, 10));
+        Page<LeadDto> newLeads = leadService.listLeads(tenantId, userId, LeadStatus.NEW, null, PageRequest.of(0, 10));
+        Page<LeadDto> wonLeads = leadService.listLeads(tenantId, userId, LeadStatus.WON, null, PageRequest.of(0, 10));
 
         assertEquals(1, newLeads.getTotalElements());
         LeadDto firstNew = newLeads.getContent().get(0);
@@ -182,5 +183,77 @@ class LeadServiceImplTest extends AbstractIntegrationTest {
         LeadDto updated = leadService.updateLeadStatus(tenantId, userId, lead.getId(), statusRequest.getStatus());
 
         assertEquals(LeadStatus.LOST, updated.getStatus());
+    }
+
+    @Test
+    void listLeads_returnsCustomerFields() {
+        CreateLeadRequest request = new CreateLeadRequest();
+        NewLeadCustomerRequest c = new NewLeadCustomerRequest();
+        c.setFirstName("Customer");
+        c.setLastName("Fields");
+        c.setPrimaryPhone("555-1234");
+        c.setEmail("customer@example.com");
+        request.setNewCustomer(c);
+        request.setPropertyAddress(createPropertyAddress());
+
+        LeadDto created = leadService.createLead(tenantId, userId, request);
+
+        Page<LeadDto> page = leadService.listLeads(tenantId, userId, null, null, PageRequest.of(0, 10));
+        LeadDto found = page.getContent().stream()
+                .filter(l -> l.getId().equals(created.getId()))
+                .findFirst()
+                .orElseThrow();
+
+        assertNotNull(found.getCustomerId());
+        assertEquals("Customer", found.getCustomerFirstName());
+        assertEquals("Fields", found.getCustomerLastName());
+        assertEquals("customer@example.com", found.getCustomerEmail());
+        assertEquals("555-1234", found.getCustomerPhone());
+    }
+
+    @Test
+    void listLeads_withCustomerIdFilter_returnsOnlyMatchingLeads() {
+        // Create two customers
+        Tenant tenant = tenantRepository.findById(tenantId).orElseThrow();
+        Customer customer1 = new Customer();
+        customer1.setTenant(tenant);
+        customer1.setFirstName("Customer1");
+        customer1.setLastName("Test");
+        customer1.setPrimaryPhone("111");
+        customer1 = customerRepository.save(customer1);
+        UUID customer1Id = Objects.requireNonNull(customer1.getId());
+
+        Customer customer2 = new Customer();
+        customer2.setTenant(tenant);
+        customer2.setFirstName("Customer2");
+        customer2.setLastName("Test");
+        customer2.setPrimaryPhone("222");
+        customer2 = customerRepository.save(customer2);
+        UUID customer2Id = Objects.requireNonNull(customer2.getId());
+
+        // Create leads for each customer
+        CreateLeadRequest request1 = new CreateLeadRequest();
+        request1.setCustomerId(customer1Id);
+        request1.setPropertyAddress(createPropertyAddress());
+        LeadDto lead1 = leadService.createLead(tenantId, userId, request1);
+
+        CreateLeadRequest request2 = new CreateLeadRequest();
+        request2.setCustomerId(customer2Id);
+        request2.setPropertyAddress(createPropertyAddress());
+        LeadDto lead2 = leadService.createLead(tenantId, userId, request2);
+
+        // Filter by customer1Id
+        Page<LeadDto> customer1Leads = leadService.listLeads(tenantId, userId, null, customer1Id, PageRequest.of(0, 10));
+        assertEquals(1, customer1Leads.getTotalElements());
+        assertEquals(lead1.getId(), customer1Leads.getContent().get(0).getId());
+
+        // Filter by customer2Id
+        Page<LeadDto> customer2Leads = leadService.listLeads(tenantId, userId, null, customer2Id, PageRequest.of(0, 10));
+        assertEquals(1, customer2Leads.getTotalElements());
+        assertEquals(lead2.getId(), customer2Leads.getContent().get(0).getId());
+
+        // No filter returns both
+        Page<LeadDto> allLeads = leadService.listLeads(tenantId, userId, null, null, PageRequest.of(0, 10));
+        assertEquals(2, allLeads.getTotalElements());
     }
 }

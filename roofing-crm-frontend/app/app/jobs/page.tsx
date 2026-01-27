@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback } from "react";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/AuthContext";
 import { listJobs } from "@/lib/jobsApi";
@@ -37,13 +38,15 @@ function formatDate(dateString: string | null): string {
 
 export default function JobsPage() {
   const { api, auth } = useAuth();
+  const searchParams = useSearchParams();
+  const customerIdFromQuery = searchParams.get("customerId");
   const [statusFilter, setStatusFilter] = useState<JobStatus | "">("");
   const [page, setPage] = useState(0);
   const pageSize = 20;
 
   const queryKey = useMemo(
-    () => queryKeys.jobsList(auth.selectedTenantId, statusFilter, page),
-    [auth.selectedTenantId, statusFilter, page]
+    () => queryKeys.jobsList(auth.selectedTenantId, statusFilter || null, customerIdFromQuery || null, page),
+    [auth.selectedTenantId, statusFilter, customerIdFromQuery, page]
   );
 
   const { data, isLoading, isError, error, isFetching } = useQuery({
@@ -51,6 +54,7 @@ export default function JobsPage() {
     queryFn: () =>
       listJobs(api, {
         status: statusFilter || null,
+        customerId: customerIdFromQuery || null,
         page,
         size: pageSize,
       }),

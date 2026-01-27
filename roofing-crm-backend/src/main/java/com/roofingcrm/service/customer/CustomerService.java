@@ -17,5 +17,5 @@ public interface CustomerService {
 
     CustomerDto getCustomer(@NonNull UUID tenantId, @NonNull UUID userId, UUID customerId);
 
-    Page<CustomerDto> listCustomers(@NonNull UUID tenantId, @NonNull UUID userId, Pageable pageable);
+    Page<CustomerDto> listCustomers(@NonNull UUID tenantId, @NonNull UUID userId, String q, Pageable pageable);
 }

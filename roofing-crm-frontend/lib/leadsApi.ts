@@ -10,12 +10,13 @@ import {
 
 export interface ListLeadsParams {
   status?: LeadStatus | null;
+  customerId?: string | null;
   page?: number;
   size?: number;
 }
 
 /**
- * Fetch paginated list of leads with optional status filter.
+ * Fetch paginated list of leads with optional status and customerId filters.
  */
 export async function listLeads(
   api: AxiosInstance,
@@ -25,6 +26,9 @@ export async function listLeads(
 
   if (params.status) {
     queryParams.status = params.status;
+  }
+  if (params.customerId != null && params.customerId !== "") {
+    queryParams.customerId = params.customerId;
   }
   if (params.page !== undefined) {
     queryParams.page = params.page;

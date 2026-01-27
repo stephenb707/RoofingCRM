@@ -31,6 +31,8 @@ export default function NewJobPage() {
 
   const [jobType, setJobType] = useState<JobType | "">("");
   const [customerId, setCustomerId] = useState<string>("");
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [debouncedCustomerSearch, setDebouncedCustomerSearch] = useState("");
   const [addressLine1, setAddressLine1] = useState("");
   const [addressLine2, setAddressLine2] = useState("");
   const [city, setCity] = useState("");
@@ -48,9 +50,17 @@ export default function NewJobPage() {
     enabled: !!auth.selectedTenantId && !!leadIdFromQuery,
   });
 
+  // Debounce customer search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedCustomerSearch(customerSearch);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [customerSearch]);
+
   const { data: customersData } = useQuery({
-    queryKey: ["customers", auth.selectedTenantId, "select"],
-    queryFn: () => listCustomers(api, { page: 0, size: 100 }),
+    queryKey: ["customers", auth.selectedTenantId, debouncedCustomerSearch || null, 0],
+    queryFn: () => listCustomers(api, { page: 0, size: 100, q: debouncedCustomerSearch || null }),
     enabled: !!auth.selectedTenantId && !leadIdFromQuery,
   });
 
@@ -181,6 +191,17 @@ export default function NewJobPage() {
         {!isLeadMode && (
           <div className="bg-white rounded-xl border border-slate-200 p-6 mb-6">
             <h2 className="text-lg font-semibold text-slate-800 mb-4">Customer</h2>
+            <label htmlFor="customer-search" className="block text-sm font-medium text-slate-700 mb-1.5">
+              Search customer <span className="text-red-500">*</span>
+            </label>
+            <input
+              id="customer-search"
+              type="text"
+              value={customerSearch}
+              onChange={(e) => setCustomerSearch(e.target.value)}
+              placeholder="Search by name, email, or phone..."
+              className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent mb-3"
+            />
             <label htmlFor="customer-select" className="block text-sm font-medium text-slate-700 mb-1.5">
               Select customer <span className="text-red-500">*</span>
             </label>

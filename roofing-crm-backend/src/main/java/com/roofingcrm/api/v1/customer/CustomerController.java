@@ -61,10 +61,11 @@ public class CustomerController {
     @GetMapping
     public ResponseEntity<Page<CustomerDto>> listCustomers(
             @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
+            @RequestParam(value = "q", required = false) String q,
             @PageableDefault(size = 20) Pageable pageable) {
 
         UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
-        Page<CustomerDto> page = customerService.listCustomers(tenantId, userId, pageable);
+        Page<CustomerDto> page = customerService.listCustomers(tenantId, userId, q, pageable);
         return ResponseEntity.ok(page);
     }
 }

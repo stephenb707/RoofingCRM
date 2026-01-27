@@ -80,9 +80,20 @@ public class CustomerServiceImpl implements CustomerService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<CustomerDto> listCustomers(@NonNull UUID tenantId, @NonNull UUID userId, Pageable pageable) {
+    public Page<CustomerDto> listCustomers(@NonNull UUID tenantId, @NonNull UUID userId, String q, Pageable pageable) {
         Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
-        return customerRepository.findByTenantAndArchivedFalse(tenant, pageable)
+        
+        if (q == null || q.trim().isEmpty()) {
+            return customerRepository.findByTenantAndArchivedFalse(tenant, pageable)
+                    .map(this::toDto);
+        }
+        
+        String normalizedQ = q.trim();
+        String digitsOnly = normalizedQ.replaceAll("\\D", "");
+        // Only pass digitsOnly if it's not empty to avoid matching all phones
+        String digitsOnlyParam = digitsOnly.isEmpty() ? null : digitsOnly;
+        
+        return customerRepository.search(tenant, normalizedQ, digitsOnlyParam, pageable)
                 .map(this::toDto);
     }
 

@@ -1,37 +1,69 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/AuthContext";
 import { listCustomers } from "@/lib/customersApi";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { queryKeys } from "@/lib/queryKeys";
 import { formatPhone } from "@/lib/format";
+import Link from "next/link";
+import { keepPreviousData } from "@tanstack/react-query";
 
 export default function CustomersPage() {
   const { api, auth } = useAuth();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [page, setPage] = useState(0);
+  const pageSize = 20;
+
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(searchQuery);
+      setPage(0); // Reset to first page on search
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: queryKeys.customers(auth.selectedTenantId),
-    queryFn: () => listCustomers(api, { page: 0, size: 50 }),
+    queryKey: queryKeys.customersList(auth.selectedTenantId, debouncedQuery || null, page),
+    queryFn: () => listCustomers(api, { page, size: pageSize, q: debouncedQuery || null }),
     enabled: !!auth.selectedTenantId,
+    placeholderData: keepPreviousData,
   });
 
   const customers = data?.content ?? [];
+  const totalPages = data?.totalPages ?? 0;
 
   return (
     <div className="max-w-6xl mx-auto">
       {/* Page Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800">Customers</h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Manage your customer database
-          </p>
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-800">Customers</h1>
+            <p className="text-sm text-slate-500 mt-1">
+              Manage your customer database
+            </p>
+          </div>
+          <Link
+            href="/app/customers/new"
+            className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+          >
+            + New Customer
+          </Link>
         </div>
-        {/* Placeholder for Add Customer button */}
-        <button className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm">
-          + Add Customer
-        </button>
+        {/* Search Input */}
+        <div className="max-w-md">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search customers by name, email, or phone..."
+            className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+          />
+        </div>
       </div>
 
       {/* Loading State */}
@@ -149,14 +181,42 @@ export default function CustomersPage() {
                     )}
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <button className="text-sm text-sky-600 hover:text-sky-700 font-medium">
+                    <Link
+                      href={`/app/customers/${customer.id}`}
+                      className="text-sm text-sky-600 hover:text-sky-700 font-medium"
+                    >
                       View
-                    </button>
+                    </Link>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Pagination */}
+      {data && totalPages > 1 && (
+        <div className="mt-6 flex items-center justify-between">
+          <div className="text-sm text-slate-600">
+            Page {page + 1} of {totalPages}
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={page === 0}
+              className="px-3 py-1.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+              disabled={page >= totalPages - 1}
+              className="px-3 py-1.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+          </div>
         </div>
       )}
     </div>

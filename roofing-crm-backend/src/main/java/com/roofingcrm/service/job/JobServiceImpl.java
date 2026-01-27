@@ -151,7 +151,9 @@ public class JobServiceImpl implements JobService {
         Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
 
         Page<Job> page;
-        if (statusFilter != null) {
+        if (statusFilter != null && customerIdFilter != null) {
+            page = jobRepository.findByTenantAndStatusAndCustomerIdAndArchivedFalse(tenant, statusFilter, customerIdFilter, pageable);
+        } else if (statusFilter != null) {
             page = jobRepository.findByTenantAndStatusAndArchivedFalse(tenant, statusFilter, pageable);
         } else if (customerIdFilter != null) {
             page = jobRepository.findByTenantAndCustomerIdAndArchivedFalse(tenant, customerIdFilter, pageable);

@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback } from "react";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/AuthContext";
 import { listLeads } from "@/lib/leadsApi";
@@ -37,13 +38,15 @@ function formatDate(dateString: string): string {
 
 export default function LeadsPage() {
   const { api, auth } = useAuth();
+  const searchParams = useSearchParams();
+  const customerIdFromQuery = searchParams.get("customerId");
   const [statusFilter, setStatusFilter] = useState<LeadStatus | "">("");
   const [page, setPage] = useState(0);
   const pageSize = 20;
 
   const queryKey = useMemo(
-    () => queryKeys.leadsList(auth.selectedTenantId, statusFilter, "", "", page),
-    [auth.selectedTenantId, statusFilter, page]
+    () => queryKeys.leadsList(auth.selectedTenantId, statusFilter || null, customerIdFromQuery || null, page),
+    [auth.selectedTenantId, statusFilter, customerIdFromQuery, page]
   );
 
   const { data, isLoading, isError, error, isFetching } = useQuery({
@@ -51,6 +54,7 @@ export default function LeadsPage() {
     queryFn: async () => {
       return listLeads(api, {
         status: statusFilter || null,
+        customerId: customerIdFromQuery || null,
         page,
         size: pageSize,
       });
