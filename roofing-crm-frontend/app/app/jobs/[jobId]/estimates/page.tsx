@@ -86,7 +86,7 @@ export default function JobEstimatesPage() {
             <thead className="bg-slate-50">
               <tr>
                 <th className="text-left px-6 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                  Title / #
+                  Title
                 </th>
                 <th className="text-left px-6 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">
                   Status

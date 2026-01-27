@@ -19,9 +19,28 @@ export interface CustomerDto {
   lastName: string;
   primaryPhone?: string | null;
   email?: string | null;
+  billingAddress?: AddressDto | null;
   notes?: string | null;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface CreateCustomerRequest {
+  firstName: string;
+  lastName: string;
+  primaryPhone: string;
+  email?: string | null;
+  billingAddress?: AddressDto | null;
+  notes?: string | null;
+}
+
+export interface UpdateCustomerRequest {
+  firstName: string;
+  lastName: string;
+  primaryPhone: string;
+  email?: string | null;
+  billingAddress?: AddressDto | null;
+  notes?: string | null;
 }
 
 // Lead-related types

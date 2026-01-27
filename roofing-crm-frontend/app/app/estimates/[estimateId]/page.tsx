@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams, useSearchParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/AuthContext";
@@ -31,29 +31,12 @@ function lineTotal(it: { quantity: number; unitPrice: number }): number {
   return Number(it.quantity) * Number(it.unitPrice);
 }
 
-function toDateInputValue(s: string | null | undefined): string {
-  if (!s) return "";
-  try {
-    return new Date(s).toISOString().slice(0, 10);
-  } catch {
-    return "";
-  }
-}
-
 export default function EstimateDetailPage() {
   const params = useParams();
-  const searchParams = useSearchParams();
-  const router = useRouter();
   const estimateId = params.estimateId as string;
   const { api, auth } = useAuth();
   const queryClient = useQueryClient();
 
-  const [isEditingHeader, setIsEditingHeader] = useState(false);
-  const [headerTitle, setHeaderTitle] = useState("");
-  const [headerNotes, setHeaderNotes] = useState("");
-  const [headerIssueDate, setHeaderIssueDate] = useState("");
-  const [headerValidUntil, setHeaderValidUntil] = useState("");
-  const [headerError, setHeaderError] = useState<string | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<EstimateStatus | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
   const [itemsError, setItemsError] = useState<string | null>(null);
@@ -76,20 +59,9 @@ export default function EstimateDetailPage() {
   useEffect(() => {
     if (estimate) {
       setSelectedStatus(estimate.status as EstimateStatus);
-      setHeaderTitle(estimate.title ?? "");
-      setHeaderNotes(estimate.notes ?? "");
-      setHeaderIssueDate(toDateInputValue(estimate.issueDate));
-      setHeaderValidUntil(toDateInputValue(estimate.validUntil));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sync only when server status changes
   }, [estimate?.status]);
-
-  useEffect(() => {
-    const editParam = searchParams.get("edit");
-    if (editParam === "1") {
-      setIsEditingHeader(true);
-    }
-  }, [searchParams]);
 
   const statusMutation = useMutation({
     mutationFn: (status: EstimateStatus) => updateEstimateStatus(api, estimateId, status),
@@ -124,49 +96,6 @@ export default function EstimateDetailPage() {
       setItemsError(getApiErrorMessage(err, "Failed to update items."));
     },
   });
-
-  const headerMutation = useMutation({
-    mutationFn: (payload: { title?: string | null; notes?: string | null; issueDate?: string | null; validUntil?: string | null; items: EstimateItemRequest[] }) =>
-      updateEstimate(api, estimateId, payload),
-    onSuccess: () => {
-      setHeaderError(null);
-      setIsEditingHeader(false);
-      queryClient.invalidateQueries({ queryKey: queryKeys.estimate(auth.selectedTenantId, estimateId) });
-      if (estimate?.jobId) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.estimatesForJob(auth.selectedTenantId, estimate.jobId) });
-      }
-      // Remove edit param from URL
-      router.replace(`/app/estimates/${estimateId}`);
-    },
-    onError: (err) => {
-      console.error("Update estimate header failed:", err);
-      setHeaderError(getApiErrorMessage(err, "Failed to update estimate. Please try again."));
-    },
-  });
-
-  const handleSaveHeader = () => {
-    if (!estimate) return;
-    const items = (estimate.items ?? []).map(toItemRequest);
-    headerMutation.mutate({
-      title: headerTitle.trim() || null,
-      notes: headerNotes.trim() || null,
-      issueDate: headerIssueDate || null,
-      validUntil: headerValidUntil || null,
-      items,
-    });
-  };
-
-  const handleCancelHeader = () => {
-    if (estimate) {
-      setHeaderTitle(estimate.title ?? "");
-      setHeaderNotes(estimate.notes ?? "");
-      setHeaderIssueDate(toDateInputValue(estimate.issueDate));
-      setHeaderValidUntil(toDateInputValue(estimate.validUntil));
-    }
-    setIsEditingHeader(false);
-    setHeaderError(null);
-    router.replace(`/app/estimates/${estimateId}`);
-  };
 
   const handleStatusChange = (s: EstimateStatus) => {
     if (s === estimate?.status) return;
@@ -250,59 +179,13 @@ export default function EstimateDetailPage() {
           Back to Estimates
         </Link>
         <div className="flex items-start justify-between">
-          <div className="flex-1">
-            {isEditingHeader ? (
-              <div className="space-y-3">
-                <input
-                  type="text"
-                  value={headerTitle}
-                  onChange={(e) => setHeaderTitle(e.target.value)}
-                  placeholder="Estimate title"
-                  className="w-full text-2xl font-bold text-slate-800 border-b-2 border-sky-500 focus:outline-none pb-1"
-                />
-                <textarea
-                  value={headerNotes}
-                  onChange={(e) => setHeaderNotes(e.target.value)}
-                  placeholder="Notes (optional)"
-                  rows={2}
-                  className="w-full text-sm text-slate-600 border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-500"
-                />
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-500 mb-1">Issue date</label>
-                    <input
-                      type="date"
-                      value={headerIssueDate}
-                      onChange={(e) => setHeaderIssueDate(e.target.value)}
-                      className="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-500 mb-1">Valid until</label>
-                    <input
-                      type="date"
-                      value={headerValidUntil}
-                      onChange={(e) => setHeaderValidUntil(e.target.value)}
-                      className="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-                    />
-                  </div>
-                </div>
-                {headerError && (
-                  <div className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
-                    {headerError}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <>
-                <h1 className="text-2xl font-bold text-slate-800">
-                  {estimate.title || `Estimate`}
-                </h1>
-                <p className="text-sm text-slate-500 mt-1">
-                  Job: <Link href={`/app/jobs/${jobId}`} className="text-sky-600 hover:underline">View job</Link>
-                </p>
-              </>
-            )}
+          <div>
+            <h1 className="text-2xl font-bold text-slate-800">
+              {estimate.title || `Estimate`}
+            </h1>
+            <p className="text-sm text-slate-500 mt-1">
+              Job: <Link href={`/app/jobs/${jobId}`} className="text-sky-600 hover:underline">View job</Link>
+            </p>
           </div>
           <StatusBadge
             label={ESTIMATE_STATUS_LABELS[estimate.status as EstimateStatus]}
@@ -539,33 +422,12 @@ export default function EstimateDetailPage() {
               Actions
             </h2>
             <div className="space-y-2">
-              {isEditingHeader ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={handleSaveHeader}
-                    disabled={headerMutation.isPending}
-                    className="w-full inline-flex justify-center px-4 py-2.5 text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 rounded-lg transition-colors disabled:opacity-60"
-                  >
-                    {headerMutation.isPending ? "Saving…" : "Save Changes"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleCancelHeader}
-                    className="w-full inline-flex justify-center px-4 py-2.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors"
-                  >
-                    Cancel Edit
-                  </button>
-                </>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setIsEditingHeader(true)}
-                  className="w-full inline-flex justify-center px-4 py-2.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors"
-                >
-                  Edit Estimate
-                </button>
-              )}
+              <Link
+                href={`/app/estimates/${estimateId}/edit`}
+                className="w-full inline-flex justify-center px-4 py-2.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors"
+              >
+                Edit Estimate
+              </Link>
               <Link
                 href={`/app/jobs/${jobId}/estimates`}
                 className="w-full inline-flex justify-center px-4 py-2.5 text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 rounded-lg transition-colors"

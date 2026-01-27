@@ -131,10 +131,56 @@ class CustomerServiceImplTest extends AbstractIntegrationTest {
         request.setPrimaryPhone("555-1234");
         CustomerDto dto = customerService.createCustomer(tenantId, userId, request);
 
-        Page<CustomerDto> page = customerService.listCustomers(tenantId, userId, PageRequest.of(0, 10));
+        Page<CustomerDto> page = customerService.listCustomers(tenantId, userId, null, PageRequest.of(0, 10));
 
         assertEquals(1, page.getTotalElements());
         assertEquals(dto.getId(), page.getContent().get(0).getId());
+    }
+
+    @Test
+    void listCustomers_withSearchQuery_returnsMatchingCustomers() {
+        // Create multiple customers
+        CreateCustomerRequest request1 = new CreateCustomerRequest();
+        request1.setFirstName("John");
+        request1.setLastName("Smith");
+        request1.setPrimaryPhone("312-111-2222");
+        request1.setEmail("john.smith@example.com");
+        CustomerDto smith = customerService.createCustomer(tenantId, userId, request1);
+
+        CreateCustomerRequest request2 = new CreateCustomerRequest();
+        request2.setFirstName("Jane");
+        request2.setLastName("Doe");
+        request2.setPrimaryPhone("555-5678");
+        request2.setEmail("jane.doe@example.com");
+        CustomerDto doe = customerService.createCustomer(tenantId, userId, request2);
+
+        CreateCustomerRequest request3 = new CreateCustomerRequest();
+        request3.setFirstName("Bob");
+        request3.setLastName("Johnson");
+        request3.setPrimaryPhone("773-999-8888");
+        request3.setEmail("bob@example.com");
+        CustomerDto johnson = customerService.createCustomer(tenantId, userId, request3);
+
+        // Search by last name - should NOT return Johnson (who has a phone but doesn't match "smith")
+        Page<CustomerDto> smithResults = customerService.listCustomers(tenantId, userId, "smith", PageRequest.of(0, 10));
+        assertEquals(1, smithResults.getTotalElements());
+        assertEquals(smith.getId(), smithResults.getContent().get(0).getId());
+        // Verify Johnson is NOT in results
+        assertTrue(smithResults.getContent().stream().noneMatch(c -> c.getId().equals(johnson.getId())));
+
+        // Search by phone digits
+        Page<CustomerDto> phoneResults = customerService.listCustomers(tenantId, userId, "312", PageRequest.of(0, 10));
+        assertEquals(1, phoneResults.getTotalElements());
+        assertEquals(smith.getId(), phoneResults.getContent().get(0).getId());
+
+        // Search by email
+        Page<CustomerDto> emailResults = customerService.listCustomers(tenantId, userId, "jane.doe", PageRequest.of(0, 10));
+        assertEquals(1, emailResults.getTotalElements());
+        assertEquals(doe.getId(), emailResults.getContent().get(0).getId());
+
+        // Empty search returns all
+        Page<CustomerDto> allResults = customerService.listCustomers(tenantId, userId, null, PageRequest.of(0, 10));
+        assertEquals(3, allResults.getTotalElements());
     }
 
     @Test

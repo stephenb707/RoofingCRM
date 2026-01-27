@@ -63,10 +63,11 @@ public class LeadController {
     public ResponseEntity<Page<LeadDto>> listLeads(
             @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
             @RequestParam(value = "status", required = false) LeadStatus status,
+            @RequestParam(value = "customerId", required = false) UUID customerId,
             @PageableDefault(size = 20) Pageable pageable) {
 
         UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
-        Page<LeadDto> page = leadService.listLeads(tenantId, userId, status, pageable);
+        Page<LeadDto> page = leadService.listLeads(tenantId, userId, status, customerId, pageable);
         return ResponseEntity.ok(page);
     }
 

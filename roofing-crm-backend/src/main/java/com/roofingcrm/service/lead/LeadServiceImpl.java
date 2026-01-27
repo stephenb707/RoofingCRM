@@ -111,12 +111,16 @@ public class LeadServiceImpl implements LeadService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<LeadDto> listLeads(@NonNull UUID tenantId, @NonNull UUID userId, LeadStatus statusFilter, Pageable pageable) {
+    public Page<LeadDto> listLeads(@NonNull UUID tenantId, @NonNull UUID userId, LeadStatus statusFilter, UUID customerId, Pageable pageable) {
         Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
 
         Page<Lead> page;
-        if (statusFilter != null) {
+        if (statusFilter != null && customerId != null) {
+            page = leadRepository.findByTenantAndStatusAndCustomerIdAndArchivedFalse(tenant, statusFilter, customerId, pageable);
+        } else if (statusFilter != null) {
             page = leadRepository.findByTenantAndStatusAndArchivedFalse(tenant, statusFilter, pageable);
+        } else if (customerId != null) {
+            page = leadRepository.findByTenantAndCustomerIdAndArchivedFalse(tenant, customerId, pageable);
         } else {
             page = leadRepository.findByTenantAndArchivedFalse(tenant, pageable);
         }

@@ -5,20 +5,23 @@
 
 export const queryKeys = {
   customers: (tenantId: string | null) => ["customers", tenantId] as const,
+  customersList: (tenantId: string | null, q: string | null, page: number) =>
+    ["customers", tenantId, q ?? "", page] as const,
+  customer: (tenantId: string | null, customerId: string) =>
+    ["customer", tenantId, customerId] as const,
 
   leadsList: (
     tenantId: string | null,
-    status: string,
-    source: string,
-    search: string,
+    status: string | null,
+    customerId: string | null,
     page: number
-  ) => ["leads", tenantId, status, source, search, page] as const,
+  ) => ["leads", tenantId, status ?? "", customerId ?? "", page] as const,
 
   lead: (tenantId: string | null, leadId: string) =>
     ["lead", tenantId, leadId] as const,
 
-  jobsList: (tenantId: string | null, status: string, page: number) =>
-    ["jobs", tenantId, status, page] as const,
+  jobsList: (tenantId: string | null, status: string | null, customerId: string | null, page: number) =>
+    ["jobs", tenantId, status ?? "", customerId ?? "", page] as const,
 
   job: (tenantId: string | null, jobId: string) =>
     ["job", tenantId, jobId] as const,

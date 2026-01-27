@@ -254,4 +254,77 @@ class JobServiceImplTest extends AbstractIntegrationTest {
         assertThrows(ResourceNotFoundException.class,
                 () -> jobService.getJob(tenantId, userId, randomId));
     }
+
+    @Test
+    void listJobs_returnsCustomerFields() {
+        // Create a customer with full details
+        Tenant tenant = tenantRepository.findById(tenantId).orElseThrow();
+        Customer customer = new Customer();
+        customer.setTenant(tenant);
+        customer.setFirstName("Customer");
+        customer.setLastName("Fields");
+        customer.setPrimaryPhone("555-1234");
+        customer.setEmail("customer@example.com");
+        customer = customerRepository.save(customer);
+
+        // Create a job linked to that customer
+        CreateJobRequest request = new CreateJobRequest();
+        request.setCustomerId(customer.getId());
+        request.setType(JobType.REPLACEMENT);
+        request.setPropertyAddress(createPropertyAddress());
+        JobDto created = jobService.createJob(tenantId, userId, request);
+
+        // List jobs and verify customer fields are populated
+        Page<JobDto> page = jobService.listJobs(tenantId, userId, null, null, PageRequest.of(0, 10));
+        JobDto found = page.getContent().stream()
+                .filter(j -> j.getId().equals(created.getId()))
+                .findFirst()
+                .orElseThrow();
+
+        assertNotNull(found.getCustomerId());
+        assertEquals("Customer", found.getCustomerFirstName());
+        assertEquals("Fields", found.getCustomerLastName());
+        assertEquals("customer@example.com", found.getCustomerEmail());
+        assertEquals("555-1234", found.getCustomerPhone());
+    }
+
+    @Test
+    void listJobs_withStatusAndCustomerIdFilter_returnsOnlyMatching() {
+        // Create another customer
+        Tenant tenant = tenantRepository.findById(tenantId).orElseThrow();
+        Customer otherCustomer = new Customer();
+        otherCustomer.setTenant(tenant);
+        otherCustomer.setFirstName("Jane");
+        otherCustomer.setLastName("Smith");
+        otherCustomer.setPrimaryPhone("555-5678");
+        otherCustomer = customerRepository.save(otherCustomer);
+
+        // Create jobs with different statuses for different customers
+        CreateJobRequest request1 = new CreateJobRequest();
+        request1.setCustomerId(customerId);
+        request1.setType(JobType.REPLACEMENT);
+        request1.setPropertyAddress(createPropertyAddress());
+        JobDto job1 = jobService.createJob(tenantId, userId, request1);
+
+        CreateJobRequest request2 = new CreateJobRequest();
+        request2.setCustomerId(customerId);
+        request2.setType(JobType.REPAIR);
+        request2.setPropertyAddress(createPropertyAddress());
+        JobDto job2 = jobService.createJob(tenantId, userId, request2);
+        jobService.updateJobStatus(tenantId, userId, job2.getId(), JobStatus.IN_PROGRESS);
+
+        CreateJobRequest request3 = new CreateJobRequest();
+        request3.setCustomerId(otherCustomer.getId());
+        request3.setType(JobType.REPLACEMENT);
+        request3.setPropertyAddress(createPropertyAddress());
+        jobService.createJob(tenantId, userId, request3);
+
+        // Filter by status and customerId
+        Page<JobDto> filtered = jobService.listJobs(tenantId, userId, JobStatus.SCHEDULED, customerId, PageRequest.of(0, 10));
+
+        assertEquals(1, filtered.getTotalElements());
+        assertEquals(job1.getId(), filtered.getContent().get(0).getId());
+        assertEquals("John", filtered.getContent().get(0).getCustomerFirstName());
+        assertEquals("Doe", filtered.getContent().get(0).getCustomerLastName());
+    }
 }
