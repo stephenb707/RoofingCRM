@@ -14,27 +14,8 @@ import {
   JOB_TYPE_LABELS,
 } from "@/lib/jobsConstants";
 import { queryKeys } from "@/lib/queryKeys";
-import type { JobDto, JobStatus } from "@/lib/types";
-
-function formatAddress(job: JobDto): string {
-  const addr = job.propertyAddress;
-  if (!addr) return "—";
-  const parts = [addr.line1, addr.city, addr.state].filter(Boolean);
-  return parts.length > 0 ? parts.join(", ") : "—";
-}
-
-function formatDate(dateString: string | null): string {
-  if (!dateString) return "—";
-  try {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-  } catch {
-    return "—";
-  }
-}
+import { formatAddress, formatDate } from "@/lib/format";
+import type { JobStatus } from "@/lib/types";
 
 export default function JobsPage() {
   const { api, auth } = useAuth();
@@ -236,7 +217,7 @@ export default function JobsPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-600">
-                      {formatAddress(job)}
+                      {formatAddress(job.propertyAddress)}
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-600">
                       {formatDate(job.scheduledStartDate)}

@@ -87,7 +87,7 @@ describe("LeadsPage", () => {
       expect(screen.getByText("John Doe")).toBeInTheDocument();
     });
 
-    expect(screen.getByText("123 Main St, Denver, CO")).toBeInTheDocument();
+    expect(screen.getByText("123 Main St, Denver, CO, 80202")).toBeInTheDocument();
     // Check status badge specifically - there are multiple elements with "New" text
     const statusBadge = screen.getByText("New", {
       selector: "span.inline-flex",
@@ -193,7 +193,7 @@ describe("LeadsPage", () => {
     render(<LeadsPage />);
 
     await waitFor(() => {
-      expect(screen.getByText("123 Main St, Denver, CO")).toBeInTheDocument();
+      expect(screen.getByText("123 Main St, Denver, CO, 80202")).toBeInTheDocument();
     });
     expect(screen.queryByText(/undefined/)).not.toBeInTheDocument();
   });

@@ -14,42 +14,8 @@ import {
   JOB_TYPE_LABELS,
 } from "@/lib/jobsConstants";
 import { queryKeys } from "@/lib/queryKeys";
-import type { JobDto, JobStatus } from "@/lib/types";
-
-function formatAddress(job: JobDto): string {
-  const addr = job.propertyAddress;
-  if (!addr) return "—";
-  const parts = [addr.line1, addr.line2, addr.city, addr.state, addr.zip].filter(Boolean);
-  return parts.length > 0 ? parts.join(", ") : "—";
-}
-
-function formatDate(s: string | null): string {
-  if (!s) return "—";
-  try {
-    return new Date(s).toLocaleDateString("en-US", {
-      month: "long",
-      day: "numeric",
-      year: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    });
-  } catch {
-    return "—";
-  }
-}
-
-function formatDateShort(s: string | null): string {
-  if (!s) return "—";
-  try {
-    return new Date(s).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-  } catch {
-    return "—";
-  }
-}
+import { formatAddress, formatDate, formatDateTime } from "@/lib/format";
+import type { JobStatus } from "@/lib/types";
 
 export default function JobDetailPage() {
   const params = useParams();
@@ -136,7 +102,7 @@ export default function JobDetailPage() {
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-2xl font-bold text-slate-800">
-              {JOB_TYPE_LABELS[job.type]} — {formatAddress(job)}
+              {JOB_TYPE_LABELS[job.type]} — {formatAddress(job.propertyAddress)}
             </h1>
             <p className="text-sm text-slate-500 mt-1">Job Details</p>
           </div>
@@ -145,6 +111,18 @@ export default function JobDetailPage() {
           </span>
         </div>
       </div>
+
+      {job.leadId && (
+        <div className="mb-6 bg-white rounded-xl border border-slate-200 p-6">
+          <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2">Created from Lead</h2>
+          <Link
+            href={`/app/leads/${job.leadId}`}
+            className="text-sm font-medium text-sky-600 hover:text-sky-700"
+          >
+            View Lead
+          </Link>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
@@ -165,15 +143,15 @@ export default function JobDetailPage() {
               </div>
               <div className="sm:col-span-2">
                 <dt className="text-xs font-medium text-slate-500 uppercase tracking-wider">Property address</dt>
-                <dd className="mt-1 text-sm text-slate-800">{formatAddress(job)}</dd>
+                <dd className="mt-1 text-sm text-slate-800">{formatAddress(job.propertyAddress)}</dd>
               </div>
               <div>
                 <dt className="text-xs font-medium text-slate-500 uppercase tracking-wider">Scheduled start</dt>
-                <dd className="mt-1 text-sm text-slate-800">{formatDateShort(job.scheduledStartDate)}</dd>
+                <dd className="mt-1 text-sm text-slate-800">{formatDate(job.scheduledStartDate)}</dd>
               </div>
               <div>
                 <dt className="text-xs font-medium text-slate-500 uppercase tracking-wider">Scheduled end</dt>
-                <dd className="mt-1 text-sm text-slate-800">{formatDateShort(job.scheduledEndDate)}</dd>
+                <dd className="mt-1 text-sm text-slate-800">{formatDate(job.scheduledEndDate)}</dd>
               </div>
               <div>
                 <dt className="text-xs font-medium text-slate-500 uppercase tracking-wider">Crew</dt>
@@ -181,11 +159,11 @@ export default function JobDetailPage() {
               </div>
               <div>
                 <dt className="text-xs font-medium text-slate-500 uppercase tracking-wider">Created</dt>
-                <dd className="mt-1 text-sm text-slate-800">{formatDate(job.createdAt)}</dd>
+                <dd className="mt-1 text-sm text-slate-800">{formatDateTime(job.createdAt)}</dd>
               </div>
               <div>
                 <dt className="text-xs font-medium text-slate-500 uppercase tracking-wider">Updated</dt>
-                <dd className="mt-1 text-sm text-slate-800">{formatDate(job.updatedAt)}</dd>
+                <dd className="mt-1 text-sm text-slate-800">{formatDateTime(job.updatedAt)}</dd>
               </div>
             </dl>
             {job.internalNotes && (
@@ -246,16 +224,22 @@ export default function JobDetailPage() {
             </h2>
             <div className="space-y-2">
               <Link
+                href={`/app/jobs/${jobId}/estimates/new`}
+                className="w-full inline-flex justify-center px-4 py-2.5 text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 rounded-lg transition-colors"
+              >
+                Create Estimate
+              </Link>
+              <Link
+                href={`/app/jobs/${jobId}/estimates`}
+                className="w-full inline-flex justify-center px-4 py-2.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors"
+              >
+                View Estimates
+              </Link>
+              <Link
                 href={`/app/jobs/${jobId}/edit`}
                 className="w-full inline-flex justify-center px-4 py-2.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors"
               >
                 Edit Job
-              </Link>
-              <Link
-                href={`/app/jobs/${jobId}/estimates`}
-                className="w-full inline-flex justify-center px-4 py-2.5 text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 rounded-lg transition-colors"
-              >
-                View Estimates
               </Link>
             </div>
           </div>

@@ -1,6 +1,7 @@
 -- ============================================================
 -- V1__initial_schema.sql
--- Initial database schema for Roofing CRM
+-- Baseline schema for Roofing CRM (squashed from legacy V1–V4).
+-- DB reset required if upgrading from pre-squash migrations.
 -- ============================================================
 
 -- ============================================================
@@ -83,6 +84,7 @@ CREATE TABLE customers (
 
 CREATE INDEX idx_customer_tenant_last_name ON customers(tenant_id, last_name);
 CREATE INDEX idx_customer_tenant_email ON customers(tenant_id, email);
+CREATE INDEX idx_customers_tenant_archived ON customers(tenant_id, archived);
 
 -- ============================================================
 -- LEADS
@@ -111,6 +113,8 @@ CREATE TABLE leads (
 
 CREATE INDEX idx_lead_tenant_status ON leads(tenant_id, status);
 CREATE INDEX idx_lead_tenant_source ON leads(tenant_id, source);
+CREATE INDEX idx_leads_tenant_customer ON leads(tenant_id, customer_id);
+CREATE INDEX idx_leads_tenant_customer_status ON leads(tenant_id, customer_id, status);
 
 -- ============================================================
 -- JOBS
@@ -145,6 +149,7 @@ CREATE TABLE jobs (
 
 CREATE INDEX idx_job_tenant_status ON jobs(tenant_id, status);
 CREATE INDEX idx_job_tenant_customer ON jobs(tenant_id, customer_id);
+CREATE UNIQUE INDEX ux_jobs_tenant_lead ON jobs (tenant_id, lead_id) WHERE lead_id IS NOT NULL;
 
 -- ============================================================
 -- ESTIMATES

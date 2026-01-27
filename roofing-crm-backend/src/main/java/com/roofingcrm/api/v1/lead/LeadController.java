@@ -1,5 +1,6 @@
 package com.roofingcrm.api.v1.lead;
 
+import com.roofingcrm.api.v1.job.JobDto;
 import com.roofingcrm.domain.enums.LeadStatus;
 import com.roofingcrm.security.SecurityUtils;
 import com.roofingcrm.service.lead.LeadService;
@@ -80,5 +81,16 @@ public class LeadController {
         UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
         LeadDto updated = leadService.updateLeadStatus(tenantId, userId, leadId, request.getStatus());
         return ResponseEntity.ok(updated);
+    }
+
+    @PostMapping("/{id}/convert")
+    public ResponseEntity<JobDto> convertLeadToJob(
+            @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
+            @PathVariable("id") UUID leadId,
+            @Valid @RequestBody ConvertLeadToJobRequest request) {
+
+        UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
+        JobDto job = leadService.convertLeadToJob(tenantId, userId, leadId, request);
+        return ResponseEntity.ok(job);
     }
 }

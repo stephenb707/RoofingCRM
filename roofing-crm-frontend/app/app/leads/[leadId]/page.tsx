@@ -14,31 +14,8 @@ import {
   SOURCE_LABELS,
 } from "@/lib/leadsConstants";
 import { queryKeys } from "@/lib/queryKeys";
-import { formatPhone } from "@/lib/format";
-import { LeadStatus, LeadDto } from "@/lib/types";
-
-function formatAddress(lead: LeadDto): string {
-  const addr = lead.propertyAddress;
-  if (!addr) return "—";
-  const parts = [addr.line1, addr.line2, addr.city, addr.state, addr.zip].filter(
-    Boolean
-  );
-  return parts.length > 0 ? parts.join(", ") : "—";
-}
-
-function formatDate(dateString: string): string {
-  try {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      month: "long",
-      day: "numeric",
-      year: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    });
-  } catch {
-    return "—";
-  }
-}
+import { formatAddress, formatDateTime, formatPhone } from "@/lib/format";
+import { LeadStatus } from "@/lib/types";
 
 export default function LeadDetailPage() {
   const params = useParams();
@@ -195,6 +172,29 @@ export default function LeadDetailPage() {
         </div>
       </div>
 
+      {lead.convertedJobId && (
+        <div className="mb-6 bg-white rounded-xl border border-slate-200 p-6">
+          <h2 className="text-lg font-semibold text-slate-800 mb-3">Converted to Job</h2>
+          <p className="text-sm text-slate-600 mb-4">
+            This lead has been converted to a job. View the job or create an estimate.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <Link
+              href={`/app/jobs/${lead.convertedJobId}`}
+              className="inline-flex items-center px-4 py-2.5 text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 rounded-lg transition-colors"
+            >
+              View Job
+            </Link>
+            <Link
+              href={`/app/jobs/${lead.convertedJobId}/estimates/new`}
+              className="inline-flex items-center px-4 py-2.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors"
+            >
+              Create Estimate
+            </Link>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
@@ -276,7 +276,7 @@ export default function LeadDetailPage() {
               </svg>
               Property Address
             </h2>
-            <p className="text-sm text-slate-800">{formatAddress(lead)}</p>
+            <p className="text-sm text-slate-800">{formatAddress(lead.propertyAddress)}</p>
           </div>
 
           {/* Notes */}
@@ -396,7 +396,7 @@ export default function LeadDetailPage() {
                   Created
                 </dt>
                 <dd className="mt-1 text-sm text-slate-800">
-                  {formatDate(lead.createdAt)}
+                  {formatDateTime(lead.createdAt)}
                 </dd>
               </div>
               <div>
@@ -404,7 +404,7 @@ export default function LeadDetailPage() {
                   Last Updated
                 </dt>
                 <dd className="mt-1 text-sm text-slate-800">
-                  {formatDate(lead.updatedAt)}
+                  {formatDateTime(lead.updatedAt)}
                 </dd>
               </div>
             </dl>
@@ -416,17 +416,34 @@ export default function LeadDetailPage() {
               Actions
             </h2>
             <div className="space-y-2">
+              {lead.convertedJobId ? (
+                <>
+                  <Link
+                    href={`/app/jobs/${lead.convertedJobId}`}
+                    className="w-full inline-flex justify-center px-4 py-2.5 text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 rounded-lg transition-colors"
+                  >
+                    View Job
+                  </Link>
+                  <Link
+                    href={`/app/jobs/${lead.convertedJobId}/estimates/new`}
+                    className="w-full inline-flex justify-center px-4 py-2.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors"
+                  >
+                    Create Estimate
+                  </Link>
+                </>
+              ) : lead.status !== "LOST" ? (
+                <Link
+                  href={`/app/leads/${leadId}/convert`}
+                  className="w-full inline-flex justify-center px-4 py-2.5 text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 rounded-lg transition-colors"
+                >
+                  Convert to Job
+                </Link>
+              ) : null}
               <Link
                 href={`/app/leads/${leadId}/edit`}
                 className="w-full inline-flex justify-center px-4 py-2.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors"
               >
                 Edit Lead
-              </Link>
-              <Link
-                href={`/app/jobs/new?leadId=${leadId}`}
-                className="w-full inline-flex justify-center px-4 py-2.5 text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 rounded-lg transition-colors"
-              >
-                Create Job
               </Link>
             </div>
           </div>

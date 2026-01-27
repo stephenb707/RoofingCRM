@@ -27,4 +27,7 @@ public interface JobRepository extends JpaRepository<Job, UUID> {
 
     @EntityGraph(attributePaths = {"customer"})
     Optional<Job> findByIdAndTenantAndArchivedFalse(UUID id, Tenant tenant);
+
+    @EntityGraph(attributePaths = {"customer"})
+    Optional<Job> findByTenantAndLeadIdAndArchivedFalse(Tenant tenant, UUID leadId);
 }

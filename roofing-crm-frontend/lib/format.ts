@@ -16,7 +16,7 @@ export function formatAddress(address?: AddressDto | null): string {
 }
 
 /**
- * Format an ISO date string for display.
+ * Format an ISO date string for display (short: "Jan 1, 2024").
  * Returns "—" if missing or invalid.
  */
 export function formatDate(iso?: string | null): string {
@@ -26,6 +26,25 @@ export function formatDate(iso?: string | null): string {
       month: "short",
       day: "numeric",
       year: "numeric",
+    });
+  } catch {
+    return "—";
+  }
+}
+
+/**
+ * Format an ISO date string for display with time (e.g. "January 1, 2024 at 12:00 PM").
+ * Returns "—" if missing or invalid.
+ */
+export function formatDateTime(iso?: string | null): string {
+  if (iso == null || iso === "") return "—";
+  try {
+    return new Date(iso).toLocaleDateString("en-US", {
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
     });
   } catch {
     return "—";

@@ -55,6 +55,8 @@ C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\c
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\repository\JobRepository.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\tenant\TenantAccessServiceImpl.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\entity\CommunicationLog.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\exception\LeadConversionNotAllowedException.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\lead\ConvertLeadToJobRequest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\auth\LoginRequest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\entity\Job.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\estimate\UpdateEstimateRequest.java

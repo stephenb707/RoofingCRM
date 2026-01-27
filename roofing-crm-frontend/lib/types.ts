@@ -83,6 +83,8 @@ export interface LeadDto {
   customerLastName?: string;
   customerPhone?: string;
   customerEmail?: string;
+  /** Set when this lead has been converted to a job. */
+  convertedJobId?: string | null;
 }
 
 export interface NewLeadCustomerRequest {
@@ -104,6 +106,14 @@ export interface CreateLeadRequest {
 
 export interface UpdateLeadStatusRequest {
   status: LeadStatus;
+}
+
+export interface ConvertLeadToJobRequest {
+  type: JobType;
+  scheduledStartDate?: string | null;
+  scheduledEndDate?: string | null;
+  crewName?: string | null;
+  internalNotes?: string | null;
 }
 
 export interface UpdateLeadRequest {
