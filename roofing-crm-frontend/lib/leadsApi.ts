@@ -4,6 +4,8 @@ import {
   CreateLeadRequest,
   UpdateLeadRequest,
   UpdateLeadStatusRequest,
+  ConvertLeadToJobRequest,
+  JobDto,
   LeadStatus,
   PageResponse,
 } from "./types";
@@ -88,6 +90,21 @@ export async function updateLeadStatus(
   const payload: UpdateLeadStatusRequest = { status };
   const response = await api.post<LeadDto>(
     `/api/v1/leads/${leadId}/status`,
+    payload
+  );
+  return response.data;
+}
+
+/**
+ * Convert a lead to a job.
+ */
+export async function convertLeadToJob(
+  api: AxiosInstance,
+  leadId: string,
+  payload: ConvertLeadToJobRequest
+): Promise<JobDto> {
+  const response = await api.post<JobDto>(
+    `/api/v1/leads/${leadId}/convert`,
     payload
   );
   return response.data;

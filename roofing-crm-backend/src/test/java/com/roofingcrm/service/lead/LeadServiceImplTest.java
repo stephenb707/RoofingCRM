@@ -2,6 +2,8 @@ package com.roofingcrm.service.lead;
 
 import com.roofingcrm.AbstractIntegrationTest;
 import com.roofingcrm.api.v1.common.AddressDto;
+import com.roofingcrm.api.v1.job.JobDto;
+import com.roofingcrm.api.v1.lead.ConvertLeadToJobRequest;
 import com.roofingcrm.api.v1.lead.CreateLeadRequest;
 import com.roofingcrm.api.v1.lead.LeadDto;
 import com.roofingcrm.api.v1.lead.NewLeadCustomerRequest;
@@ -10,13 +12,16 @@ import com.roofingcrm.domain.entity.Customer;
 import com.roofingcrm.domain.entity.Tenant;
 import com.roofingcrm.domain.entity.TenantUserMembership;
 import com.roofingcrm.domain.entity.User;
+import com.roofingcrm.domain.enums.JobType;
 import com.roofingcrm.domain.enums.LeadStatus;
 import com.roofingcrm.domain.enums.UserRole;
 import com.roofingcrm.domain.repository.CustomerRepository;
+import com.roofingcrm.domain.repository.JobRepository;
 import com.roofingcrm.domain.repository.LeadRepository;
 import com.roofingcrm.domain.repository.TenantRepository;
 import com.roofingcrm.domain.repository.TenantUserMembershipRepository;
 import com.roofingcrm.domain.repository.UserRepository;
+import com.roofingcrm.service.exception.LeadConversionNotAllowedException;
 import com.roofingcrm.service.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -45,6 +50,9 @@ class LeadServiceImplTest extends AbstractIntegrationTest {
     private CustomerRepository customerRepository;
 
     @Autowired
+    private JobRepository jobRepository;
+
+    @Autowired
     private UserRepository userRepository;
 
     @Autowired
@@ -58,6 +66,7 @@ class LeadServiceImplTest extends AbstractIntegrationTest {
     @BeforeEach
     void setUp() {
         membershipRepository.deleteAll();
+        jobRepository.deleteAll();
         leadRepository.deleteAll();
         customerRepository.deleteAll();
         userRepository.deleteAll();
@@ -255,5 +264,143 @@ class LeadServiceImplTest extends AbstractIntegrationTest {
         // No filter returns both
         Page<LeadDto> allLeads = leadService.listLeads(tenantId, userId, null, null, PageRequest.of(0, 10));
         assertEquals(2, allLeads.getTotalElements());
+    }
+
+    @Test
+    void convertLeadToJob_createsJobAndUpdatesLeadStatus() {
+        // Create customer and lead
+        Tenant tenant = tenantRepository.findById(tenantId).orElseThrow();
+        Customer customer = new Customer();
+        customer.setTenant(tenant);
+        customer.setFirstName("Convert");
+        customer.setLastName("Test");
+        customer.setPrimaryPhone("555-9999");
+        customer.setEmail("convert@example.com");
+        customer = customerRepository.save(customer);
+
+        CreateLeadRequest leadRequest = new CreateLeadRequest();
+        leadRequest.setCustomerId(customer.getId());
+        leadRequest.setPropertyAddress(createPropertyAddress());
+        LeadDto lead = leadService.createLead(tenantId, userId, leadRequest);
+
+        // Update lead to a convertible status
+        leadService.updateLeadStatus(tenantId, userId, lead.getId(), LeadStatus.QUOTE_SENT);
+
+        // Convert to job
+        ConvertLeadToJobRequest convertRequest = new ConvertLeadToJobRequest();
+        convertRequest.setType(JobType.REPLACEMENT);
+        convertRequest.setScheduledStartDate(java.time.LocalDate.now().plusDays(7));
+        convertRequest.setCrewName("Team Alpha");
+        convertRequest.setInternalNotes("Converted from lead");
+
+        JobDto job = leadService.convertLeadToJob(tenantId, userId, lead.getId(), convertRequest);
+
+        // Assert job properties
+        assertNotNull(job.getId());
+        assertEquals(lead.getId(), job.getLeadId());
+        assertEquals(customer.getId(), job.getCustomerId());
+        assertEquals("Convert", job.getCustomerFirstName());
+        assertEquals("Test", job.getCustomerLastName());
+        assertEquals("convert@example.com", job.getCustomerEmail());
+        assertEquals("555-9999", job.getCustomerPhone());
+        assertEquals(JobType.REPLACEMENT, job.getType());
+        assertEquals(convertRequest.getScheduledStartDate(), job.getScheduledStartDate());
+        assertEquals("Team Alpha", job.getCrewName());
+        assertEquals("Converted from lead", job.getInternalNotes());
+
+        // Assert property address matches lead
+        assertNotNull(job.getPropertyAddress());
+        assertEquals("456 Roof St", job.getPropertyAddress().getLine1());
+        assertEquals("Chicago", job.getPropertyAddress().getCity());
+        assertEquals("IL", job.getPropertyAddress().getState());
+        assertEquals("60602", job.getPropertyAddress().getZip());
+
+        // Assert lead status updated to WON
+        LeadDto updatedLead = leadService.getLead(tenantId, userId, lead.getId());
+        assertEquals(LeadStatus.WON, updatedLead.getStatus());
+    }
+
+    @Test
+    void convertLeadToJob_isIdempotent_returnsExistingJob() {
+        // Create customer and lead
+        Tenant tenant = tenantRepository.findById(tenantId).orElseThrow();
+        Customer customer = new Customer();
+        customer.setTenant(tenant);
+        customer.setFirstName("Idempotent");
+        customer.setLastName("Test");
+        customer.setPrimaryPhone("555-8888");
+        customer = customerRepository.save(customer);
+
+        CreateLeadRequest leadRequest = new CreateLeadRequest();
+        leadRequest.setCustomerId(customer.getId());
+        leadRequest.setPropertyAddress(createPropertyAddress());
+        LeadDto lead = leadService.createLead(tenantId, userId, leadRequest);
+
+        // Convert first time
+        ConvertLeadToJobRequest convertRequest = new ConvertLeadToJobRequest();
+        convertRequest.setType(JobType.REPAIR);
+        JobDto job1 = leadService.convertLeadToJob(tenantId, userId, lead.getId(), convertRequest);
+
+        // Convert second time
+        ConvertLeadToJobRequest convertRequest2 = new ConvertLeadToJobRequest();
+        convertRequest2.setType(JobType.INSPECTION_ONLY); // Different type, should be ignored
+        JobDto job2 = leadService.convertLeadToJob(tenantId, userId, lead.getId(), convertRequest2);
+
+        // Assert same job returned
+        assertEquals(job1.getId(), job2.getId());
+
+        // Assert only one job exists for this lead
+        assertTrue(jobRepository.findByTenantAndLeadIdAndArchivedFalse(tenant, lead.getId()).isPresent());
+        assertEquals(1, jobRepository.findByTenantAndLeadIdAndArchivedFalse(tenant, lead.getId()).stream().count());
+    }
+
+    @Test
+    void convertLeadToJob_whenLeadLost_returnsConflict() {
+        // Create customer and lead
+        Tenant tenant = tenantRepository.findById(tenantId).orElseThrow();
+        Customer customer = new Customer();
+        customer.setTenant(tenant);
+        customer.setFirstName("Lost");
+        customer.setLastName("Lead");
+        customer.setPrimaryPhone("555-7777");
+        customer = customerRepository.save(customer);
+
+        CreateLeadRequest leadRequest = new CreateLeadRequest();
+        leadRequest.setCustomerId(customer.getId());
+        leadRequest.setPropertyAddress(createPropertyAddress());
+        LeadDto lead = leadService.createLead(tenantId, userId, leadRequest);
+
+        // Mark lead as LOST
+        leadService.updateLeadStatus(tenantId, userId, lead.getId(), LeadStatus.LOST);
+
+        // Attempt conversion
+        ConvertLeadToJobRequest convertRequest = new ConvertLeadToJobRequest();
+        convertRequest.setType(JobType.REPLACEMENT);
+
+        assertThrows(LeadConversionNotAllowedException.class,
+                () -> leadService.convertLeadToJob(tenantId, userId, lead.getId(), convertRequest));
+    }
+
+    @Test
+    void getLead_whenConverted_setsConvertedJobId() {
+        Tenant tenant = tenantRepository.findById(tenantId).orElseThrow();
+        Customer customer = new Customer();
+        customer.setTenant(tenant);
+        customer.setFirstName("Converted");
+        customer.setLastName("Lead");
+        customer.setPrimaryPhone("555-6666");
+        customer = customerRepository.save(customer);
+
+        CreateLeadRequest leadRequest = new CreateLeadRequest();
+        leadRequest.setCustomerId(customer.getId());
+        leadRequest.setPropertyAddress(createPropertyAddress());
+        LeadDto lead = leadService.createLead(tenantId, userId, leadRequest);
+
+        ConvertLeadToJobRequest convertRequest = new ConvertLeadToJobRequest();
+        convertRequest.setType(JobType.REPLACEMENT);
+        JobDto job = leadService.convertLeadToJob(tenantId, userId, lead.getId(), convertRequest);
+
+        LeadDto got = leadService.getLead(tenantId, userId, lead.getId());
+        assertEquals(job.getId(), got.getConvertedJobId());
     }
 }

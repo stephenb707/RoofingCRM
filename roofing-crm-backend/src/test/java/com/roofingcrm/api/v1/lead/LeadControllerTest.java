@@ -88,6 +88,7 @@ class LeadControllerTest {
     void getLead_returnsOk() throws Exception {
         UUID tenantId = UUID.randomUUID();
         UUID leadId = UUID.randomUUID();
+        UUID convertedJobId = UUID.randomUUID();
 
         LeadDto dto = new LeadDto();
         dto.setId(leadId);
@@ -95,6 +96,7 @@ class LeadControllerTest {
         dto.setCreatedAt(Instant.now());
         dto.setCustomerFirstName("Jane");
         dto.setCustomerLastName("Doe");
+        dto.setConvertedJobId(convertedJobId);
 
         when(leadService.getLead(eq(tenantId), eq(userId), eq(leadId))).thenReturn(dto);
 
@@ -104,6 +106,7 @@ class LeadControllerTest {
                 .andExpect(jsonPath("$.id", is(leadId.toString())))
                 .andExpect(jsonPath("$.status", is("NEW")))
                 .andExpect(jsonPath("$.customerFirstName", is("Jane")))
-                .andExpect(jsonPath("$.customerLastName", is("Doe")));
+                .andExpect(jsonPath("$.customerLastName", is("Doe")))
+                .andExpect(jsonPath("$.convertedJobId", is(convertedJobId.toString())));
     }
 }

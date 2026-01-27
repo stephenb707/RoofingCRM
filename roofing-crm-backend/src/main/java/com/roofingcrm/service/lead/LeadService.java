@@ -1,8 +1,10 @@
 package com.roofingcrm.service.lead;
 
+import com.roofingcrm.api.v1.job.JobDto;
 import com.roofingcrm.api.v1.lead.CreateLeadRequest;
 import com.roofingcrm.api.v1.lead.LeadDto;
 import com.roofingcrm.api.v1.lead.UpdateLeadRequest;
+import com.roofingcrm.api.v1.lead.ConvertLeadToJobRequest;
 import com.roofingcrm.domain.enums.LeadStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -21,4 +23,6 @@ public interface LeadService {
     Page<LeadDto> listLeads(@NonNull UUID tenantId, @NonNull UUID userId, LeadStatus statusFilter, UUID customerId, Pageable pageable);
 
     LeadDto updateLeadStatus(@NonNull UUID tenantId, @NonNull UUID userId, UUID leadId, LeadStatus newStatus);
+
+    JobDto convertLeadToJob(@NonNull UUID tenantId, @NonNull UUID userId, UUID leadId, ConvertLeadToJobRequest request);
 }

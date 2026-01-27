@@ -14,27 +14,8 @@ import {
   SOURCE_LABELS,
 } from "@/lib/leadsConstants";
 import { queryKeys } from "@/lib/queryKeys";
-import { formatPhone } from "@/lib/format";
-import { LeadStatus, LeadDto } from "@/lib/types";
-
-function formatAddress(lead: LeadDto): string {
-  const addr = lead.propertyAddress;
-  if (!addr) return "—";
-  const parts = [addr.line1, addr.city, addr.state].filter(Boolean);
-  return parts.length > 0 ? parts.join(", ") : "—";
-}
-
-function formatDate(dateString: string): string {
-  try {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-  } catch {
-    return "—";
-  }
-}
+import { formatAddress, formatDate, formatPhone } from "@/lib/format";
+import { LeadStatus } from "@/lib/types";
 
 export default function LeadsPage() {
   const { api, auth } = useAuth();
@@ -255,7 +236,7 @@ export default function LeadsPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-600">
-                      {formatAddress(lead)}
+                      {formatAddress(lead.propertyAddress)}
                     </td>
                     <td className="px-6 py-4">
                       <span

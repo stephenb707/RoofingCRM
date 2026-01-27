@@ -34,4 +34,7 @@ public class LeadDto {
 
     private Instant createdAt;
     private Instant updatedAt;
+
+    /** Set when this lead has been converted to a job (one job per lead). */
+    private UUID convertedJobId;
 }
