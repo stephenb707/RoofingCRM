@@ -14,6 +14,7 @@ import {
   SOURCE_LABELS,
 } from "@/lib/leadsConstants";
 import { queryKeys } from "@/lib/queryKeys";
+import { formatPhone } from "@/lib/format";
 import { LeadStatus, LeadDto } from "@/lib/types";
 
 function formatAddress(lead: LeadDto): string {
@@ -229,7 +230,7 @@ export default function LeadDetailPage() {
                   Phone
                 </dt>
                 <dd className="mt-1 text-sm text-slate-800">
-                  {lead.customerPhone || "—"}
+                  {formatPhone(lead.customerPhone)}
                 </dd>
               </div>
               <div>
@@ -408,7 +409,7 @@ export default function LeadDetailPage() {
               </div>
             </dl>
           </div>
-
+          
           {/* Actions */}
           <div className="bg-white rounded-xl border border-slate-200 p-6">
             <h2 className="text-lg font-semibold text-slate-800 mb-4">

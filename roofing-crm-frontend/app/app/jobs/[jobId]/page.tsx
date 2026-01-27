@@ -194,23 +194,6 @@ export default function JobDetailPage() {
                 <dd className="mt-1 text-sm text-slate-700 whitespace-pre-wrap">{job.internalNotes}</dd>
               </div>
             )}
-            <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap items-center gap-4">
-              <Link
-                href={`/app/jobs/${jobId}/edit`}
-                className="inline-flex items-center gap-2 text-sm font-medium text-slate-700 hover:text-slate-900"
-              >
-                Edit Job
-              </Link>
-              <Link
-                href={`/app/jobs/${jobId}/estimates`}
-                className="inline-flex items-center gap-2 text-sm font-medium text-sky-600 hover:text-sky-700"
-              >
-                View Estimates
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </Link>
-            </div>
           </div>
         </div>
 
@@ -254,6 +237,27 @@ export default function JobDetailPage() {
                 Updating status…
               </div>
             )}
+          </div>
+
+          {/* Actions */}
+          <div className="bg-white rounded-xl border border-slate-200 p-6">
+            <h2 className="text-lg font-semibold text-slate-800 mb-4">
+              Actions
+            </h2>
+            <div className="space-y-2">
+              <Link
+                href={`/app/jobs/${jobId}/edit`}
+                className="w-full inline-flex justify-center px-4 py-2.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors"
+              >
+                Edit Job
+              </Link>
+              <Link
+                href={`/app/jobs/${jobId}/estimates`}
+                className="w-full inline-flex justify-center px-4 py-2.5 text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 rounded-lg transition-colors"
+              >
+                View Estimates
+              </Link>
+            </div>
           </div>
         </div>
       </div>

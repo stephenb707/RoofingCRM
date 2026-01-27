@@ -47,6 +47,20 @@ describe("JobDetailPage", () => {
     expect(screen.getByText("Some notes")).toBeInTheDocument();
   });
 
+  it("renders Edit Job and View Estimates links in Actions section", async () => {
+    render(<JobDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("123 Main St, Denver, CO, 80202")).toBeInTheDocument();
+    });
+
+    const editLink = screen.getByRole("link", { name: /Edit Job/i });
+    expect(editLink).toHaveAttribute("href", "/app/jobs/job-1/edit");
+
+    const viewEstimatesLink = screen.getByRole("link", { name: /View Estimates/i });
+    expect(viewEstimatesLink).toHaveAttribute("href", "/app/jobs/job-1/estimates");
+  });
+
   it("calls updateJobStatus when clicking a status button", async () => {
     mockedJobsApi.updateJobStatus.mockResolvedValue({ ...mockJob, status: "IN_PROGRESS" });
 

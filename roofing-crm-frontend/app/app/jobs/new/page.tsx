@@ -10,6 +10,7 @@ import { listCustomers } from "@/lib/customersApi";
 import { createJob } from "@/lib/jobsApi";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { JOB_TYPES, JOB_TYPE_LABELS } from "@/lib/jobsConstants";
+import { formatAddress } from "@/lib/format";
 import type { JobType, AddressDto, CreateJobRequest } from "@/lib/types";
 
 const emptyAddress: AddressDto = {
@@ -160,8 +161,20 @@ export default function NewJobPage() {
       <form onSubmit={handleSubmit}>
         {isLeadMode && lead && (
           <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 mb-6">
-            <p className="text-sm font-medium text-slate-700">Creating job from lead</p>
-            <p className="text-xs text-slate-500 mt-1">Lead ID: {leadIdFromQuery}</p>
+            <p className="text-sm font-medium text-slate-700 mb-2">Creating job from lead</p>
+            {lead.customerFirstName || lead.customerLastName ? (
+              <p className="text-xs text-slate-600 mb-1">
+                Customer: {[lead.customerFirstName, lead.customerLastName].filter(Boolean).join(" ") || "—"}
+              </p>
+            ) : null}
+            {lead.propertyAddress ? (
+              <p className="text-xs text-slate-600 mb-1">
+                Address: {formatAddress(lead.propertyAddress)}
+              </p>
+            ) : null}
+            <p className="text-xs text-slate-500 mt-2">
+              Lead: <Link href={`/app/leads/${leadIdFromQuery}`} className="text-sky-600 hover:underline">View lead</Link> (ID: {leadIdFromQuery?.slice(0, 8)}…)
+            </p>
           </div>
         )}
 
