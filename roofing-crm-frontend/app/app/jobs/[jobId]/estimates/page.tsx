@@ -123,12 +123,14 @@ export default function JobEstimatesPage() {
                     {formatDate(est.updatedAt ?? est.createdAt)}
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <Link
-                      href={`/app/estimates/${est.id}`}
-                      className="text-sm text-sky-600 hover:text-sky-700 font-medium"
-                    >
-                      View
-                    </Link>
+                    <div className="flex items-center justify-end gap-3">
+                      <Link
+                        href={`/app/estimates/${est.id}`}
+                        className="text-sm text-sky-600 hover:text-sky-700 font-medium"
+                      >
+                        View
+                      </Link>
+                    </div>
                   </td>
                 </tr>
               ))}

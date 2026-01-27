@@ -5,11 +5,15 @@ import * as estimatesApi from "@/lib/estimatesApi";
 import type { EstimateDto } from "@/lib/types";
 
 jest.mock("@/lib/estimatesApi");
+const mockReplace = jest.fn();
+const mockPush = jest.fn();
+let mockSearchParams = new URLSearchParams();
+
 jest.mock("next/navigation", () => ({
-  useRouter: () => ({ push: jest.fn(), replace: jest.fn(), back: jest.fn() }),
+  useRouter: () => ({ push: mockPush, replace: mockReplace, back: jest.fn() }),
   usePathname: () => "/app/estimates/est-1",
   useParams: () => ({ estimateId: "est-1" }),
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => mockSearchParams,
 }));
 
 const mockedEstimatesApi = estimatesApi as jest.Mocked<typeof estimatesApi>;
@@ -35,6 +39,9 @@ const mockEstimate: EstimateDto = {
 describe("EstimateDetailPage", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockReplace.mockClear();
+    mockPush.mockClear();
+    mockSearchParams = new URLSearchParams();
     mockedEstimatesApi.getEstimate.mockResolvedValue(mockEstimate);
   });
 
@@ -130,6 +137,84 @@ describe("EstimateDetailPage", () => {
           items: expect.arrayContaining([expect.objectContaining({ name: "Shingles" })]),
         })
       );
+    });
+  });
+
+  it("toggles edit mode when clicking Edit Estimate button in Actions section", async () => {
+    render(<EstimateDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Estimate 1")).toBeInTheDocument();
+    });
+
+    const editBtn = screen.getByRole("button", { name: /Edit Estimate/i });
+    fireEvent.click(editBtn);
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText("Estimate title")).toBeInTheDocument();
+    });
+  });
+
+  it("saves header changes and calls updateEstimate with correct payload", async () => {
+    mockedEstimatesApi.updateEstimate.mockResolvedValue({
+      ...mockEstimate,
+      title: "Updated Title",
+      notes: "Updated notes",
+    });
+
+    render(<EstimateDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Estimate 1")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Edit Estimate/i }));
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText("Estimate title")).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByPlaceholderText("Estimate title"), { target: { value: "Updated Title" } });
+    fireEvent.change(screen.getByPlaceholderText("Notes (optional)"), { target: { value: "Updated notes" } });
+
+    fireEvent.click(screen.getByRole("button", { name: /Save Changes/i }));
+
+    await waitFor(() => {
+      expect(mockedEstimatesApi.updateEstimate).toHaveBeenCalledWith(
+        expect.anything(),
+        "est-1",
+        expect.objectContaining({
+          title: "Updated Title",
+          notes: "Updated notes",
+          items: expect.any(Array),
+        })
+      );
+    });
+  });
+
+  it("shows Cancel Edit button in Actions when in edit mode", async () => {
+    mockSearchParams = new URLSearchParams("edit=1");
+
+    render(<EstimateDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText("Estimate title")).toBeInTheDocument();
+    });
+
+    const cancelBtn = screen.getByRole("button", { name: /Cancel Edit/i });
+    expect(cancelBtn).toBeInTheDocument();
+
+    const saveBtn = screen.getByRole("button", { name: /Save Changes/i });
+    expect(saveBtn).toBeInTheDocument();
+  });
+
+  it("starts in edit mode when edit=1 query param is present", async () => {
+    mockSearchParams = new URLSearchParams("edit=1");
+
+    render(<EstimateDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText("Estimate title")).toBeInTheDocument();
     });
   });
 });

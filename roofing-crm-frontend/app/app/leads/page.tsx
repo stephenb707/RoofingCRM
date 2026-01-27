@@ -13,6 +13,7 @@ import {
   SOURCE_LABELS,
 } from "@/lib/leadsConstants";
 import { queryKeys } from "@/lib/queryKeys";
+import { formatPhone } from "@/lib/format";
 import { LeadStatus, LeadDto } from "@/lib/types";
 
 function formatAddress(lead: LeadDto): string {
@@ -244,7 +245,7 @@ export default function LeadsPage() {
                             {[lead.customerFirstName, lead.customerLastName].filter(Boolean).join(" ") || "—"}
                           </div>
                           <div className="text-xs text-slate-500">
-                            {lead.customerPhone ?? lead.customerEmail ?? "—"}
+                            {lead.customerPhone ? formatPhone(lead.customerPhone) : lead.customerEmail ?? "—"}
                           </div>
                         </div>
                       </div>

@@ -5,6 +5,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { listCustomers } from "@/lib/customersApi";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { queryKeys } from "@/lib/queryKeys";
+import { formatPhone } from "@/lib/format";
 
 export default function CustomersPage() {
   const { api, auth } = useAuth();
@@ -140,9 +141,7 @@ export default function CustomersPage() {
                     </div>
                   </td>
                   <td className="px-6 py-4 text-sm text-slate-600">
-                    {customer.primaryPhone ?? (
-                      <span className="text-slate-400">—</span>
-                    )}
+                    {formatPhone(customer.primaryPhone)}
                   </td>
                   <td className="px-6 py-4 text-sm text-slate-600">
                     {customer.email ?? (

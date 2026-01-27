@@ -51,3 +51,23 @@ export function formatMoney(
     return "—";
   }
 }
+
+/**
+ * Format a phone number for display.
+ * - 10 digits: (XXX) XXX-XXXX
+ * - 11 digits starting with 1: +1 (XXX) XXX-XXXX
+ * - Otherwise: returns original string
+ * Returns "—" if input is null/undefined/empty.
+ */
+export function formatPhone(raw?: string | null): string {
+  if (!raw) return "—";
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length === 10) {
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+  if (digits.length === 11 && digits.startsWith("1")) {
+    const d = digits.slice(1);
+    return `+1 (${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
+  }
+  return raw;
+}
