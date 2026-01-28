@@ -34,21 +34,20 @@ export function formatDate(iso?: string | null): string {
 
 /**
  * Format an ISO date string for display with time (e.g. "January 1, 2024 at 12:00 PM").
+ * Uses toLocaleString for reliable time across browsers.
  * Returns "—" if missing or invalid.
  */
 export function formatDateTime(iso?: string | null): string {
-  if (iso == null || iso === "") return "—";
-  try {
-    return new Date(iso).toLocaleDateString("en-US", {
-      month: "long",
-      day: "numeric",
-      year: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    });
-  } catch {
-    return "—";
-  }
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
 
 /**
@@ -89,4 +88,19 @@ export function formatPhone(raw?: string | null): string {
     return `+1 (${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
   }
   return raw;
+}
+
+/**
+ * Format byte count for display (B, KB, MB, GB).
+ * Returns "—" if null/undefined/NaN.
+ */
+export function formatFileSize(bytes?: number | null): string {
+  if (bytes == null || Number.isNaN(bytes)) return "—";
+  if (bytes < 1024) return `${bytes} B`;
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${kb.toFixed(1)} KB`;
+  const mb = kb / 1024;
+  if (mb < 1024) return `${mb.toFixed(1)} MB`;
+  const gb = mb / 1024;
+  return `${gb.toFixed(1)} GB`;
 }

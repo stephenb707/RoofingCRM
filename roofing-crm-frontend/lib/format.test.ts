@@ -1,4 +1,23 @@
-import { formatPhone } from "./format";
+import { formatPhone, formatFileSize } from "./format";
+
+describe("formatFileSize", () => {
+  it("formats bytes as B, KB, MB, GB", () => {
+    expect(formatFileSize(0)).toBe("0 B");
+    expect(formatFileSize(500)).toBe("500 B");
+    expect(formatFileSize(1024)).toBe("1.0 KB");
+    expect(formatFileSize(1536)).toBe("1.5 KB");
+    expect(formatFileSize(1024 * 1024)).toBe("1.0 MB");
+    expect(formatFileSize(2.5 * 1024 * 1024)).toBe("2.5 MB");
+    expect(formatFileSize(1024 * 1024 * 1024)).toBe("1.0 GB");
+    expect(formatFileSize(1.5 * 1024 * 1024 * 1024)).toBe("1.5 GB");
+  });
+
+  it("returns — for null/undefined/NaN", () => {
+    expect(formatFileSize(null)).toBe("—");
+    expect(formatFileSize(undefined)).toBe("—");
+    expect(formatFileSize(Number.NaN)).toBe("—");
+  });
+});
 
 describe("formatPhone", () => {
   it("formats 10-digit US phone number", () => {

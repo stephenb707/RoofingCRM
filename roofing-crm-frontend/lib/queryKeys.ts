@@ -31,4 +31,13 @@ export const queryKeys = {
 
   estimate: (tenantId: string | null, estimateId: string) =>
     ["estimate", tenantId, estimateId] as const,
+
+  leadAttachments: (tenantId: string | null, leadId: string) =>
+    ["attachments", "lead", tenantId, leadId] as const,
+  jobAttachments: (tenantId: string | null, jobId: string) =>
+    ["attachments", "job", tenantId, jobId] as const,
+  leadCommLogs: (tenantId: string | null, leadId: string) =>
+    ["commLogs", "lead", tenantId, leadId] as const,
+  jobCommLogs: (tenantId: string | null, jobId: string) =>
+    ["commLogs", "job", tenantId, jobId] as const,
 };

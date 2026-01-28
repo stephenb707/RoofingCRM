@@ -15,7 +15,14 @@ import {
 } from "@/lib/jobsConstants";
 import { queryKeys } from "@/lib/queryKeys";
 import { formatAddress, formatDate, formatDateTime } from "@/lib/format";
-import type { JobStatus } from "@/lib/types";
+import { listJobAttachments, uploadJobAttachment, downloadAttachment } from "@/lib/attachmentsApi";
+import {
+  listJobCommunicationLogs,
+  addJobCommunicationLog,
+} from "@/lib/communicationLogsApi";
+import { AttachmentSection } from "@/components/AttachmentSection";
+import { CommunicationLogSection } from "@/components/CommunicationLogSection";
+import type { JobStatus, CreateCommunicationLogRequest } from "@/lib/types";
 
 export default function JobDetailPage() {
   const params = useParams();
@@ -25,6 +32,8 @@ export default function JobDetailPage() {
 
   const [selectedStatus, setSelectedStatus] = useState<JobStatus | null>(null);
   const [updateError, setUpdateError] = useState<string | null>(null);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [commLogError, setCommLogError] = useState<string | null>(null);
 
   const { data: job, isLoading, isError, error } = useQuery({
     queryKey: queryKeys.job(auth.selectedTenantId, jobId),
@@ -57,6 +66,62 @@ export default function JobDetailPage() {
       statusMutation.mutate(newStatus);
     }
   };
+
+  const attachmentsQuery = useQuery({
+    queryKey: queryKeys.jobAttachments(auth.selectedTenantId, jobId),
+    queryFn: () => listJobAttachments(api, jobId),
+    enabled: !!auth.selectedTenantId && !!jobId,
+  });
+
+  const uploadAttachmentMutation = useMutation({
+    mutationFn: (file: File) => uploadJobAttachment(api, jobId, file),
+    onSuccess: () => {
+      setAttachmentError(null);
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.jobAttachments(auth.selectedTenantId, jobId),
+      });
+    },
+    onError: (err: unknown) => {
+      console.error("Failed to upload attachment:", err);
+      setAttachmentError(getApiErrorMessage(err, "Failed to upload. Please try again."));
+    },
+  });
+
+  const handleDownloadAttachment = async (attachmentId: string, fileName: string) => {
+    try {
+      const blob = await downloadAttachment(api, attachmentId);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName || attachmentId;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Failed to download attachment:", err);
+      setAttachmentError(getApiErrorMessage(err, "Failed to download."));
+    }
+  };
+
+  const commLogsQuery = useQuery({
+    queryKey: queryKeys.jobCommLogs(auth.selectedTenantId, jobId),
+    queryFn: () => listJobCommunicationLogs(api, jobId),
+    enabled: !!auth.selectedTenantId && !!jobId,
+  });
+
+  const addCommLogMutation = useMutation({
+    mutationFn: (payload: CreateCommunicationLogRequest) =>
+      addJobCommunicationLog(api, jobId, payload),
+    onSuccess: () => {
+      setCommLogError(null);
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.jobCommLogs(auth.selectedTenantId, jobId),
+      });
+    },
+    onError: (err: unknown) => {
+      console.error("Failed to add communication log:", err);
+      setCommLogError(getApiErrorMessage(err, "Failed to add log. Please try again."));
+    },
+  });
 
   if (isLoading) {
     return (
@@ -173,6 +238,27 @@ export default function JobDetailPage() {
               </div>
             )}
           </div>
+
+          {/* Attachments */}
+          <AttachmentSection
+            title="Attachments"
+            attachments={attachmentsQuery.data ?? []}
+            onUpload={(file) => uploadAttachmentMutation.mutate(file)}
+            onDownload={handleDownloadAttachment}
+            isLoading={attachmentsQuery.isLoading}
+            isUploading={uploadAttachmentMutation.isPending}
+            errorMessage={attachmentError}
+          />
+
+          {/* Communication Logs */}
+          <CommunicationLogSection
+            title="Communication Logs"
+            logs={commLogsQuery.data ?? []}
+            onAdd={(payload) => addCommLogMutation.mutate(payload)}
+            isLoading={commLogsQuery.isLoading}
+            isSubmitting={addCommLogMutation.isPending}
+            errorMessage={commLogError}
+          />
         </div>
 
         <div className="space-y-6">
