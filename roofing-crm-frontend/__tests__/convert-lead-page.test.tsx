@@ -179,8 +179,8 @@ describe("ConvertLeadPage", () => {
     const createEstimateLink = screen.getByRole("link", { name: /create estimate/i });
     expect(createEstimateLink).toHaveAttribute("href", "/app/jobs/job-99/estimates/new");
 
-    const backToLeadLinks = screen.getAllByRole("link", { name: /back to lead/i });
-    expect(backToLeadLinks.some((el) => el.getAttribute("href") === "/app/leads/lead-1")).toBe(true);
+    const backToLeadLink = screen.getByRole("link", { name: /back to lead/i });
+    expect(backToLeadLink).toHaveAttribute("href", "/app/leads/lead-1");
 
     expect(screen.queryByLabelText(/job type/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /convert to job/i })).not.toBeInTheDocument();
@@ -203,8 +203,8 @@ describe("ConvertLeadPage", () => {
 
     expect(screen.getByText(/leads with status lost cannot be converted/i)).toBeInTheDocument();
 
-    const backToLeadLinks = screen.getAllByRole("link", { name: /back to lead/i });
-    expect(backToLeadLinks.some((el) => el.getAttribute("href") === "/app/leads/lead-1")).toBe(true);
+    const backToLeadLink = screen.getByRole("link", { name: /back to lead/i });
+    expect(backToLeadLink).toHaveAttribute("href", "/app/leads/lead-1");
 
     expect(screen.queryByLabelText(/job type/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /convert to job/i })).not.toBeInTheDocument();

@@ -93,16 +93,16 @@ export default function ConvertLeadPage() {
     );
   }
 
-  // Already converted: show message + links, no form
+  // Already converted: show message + links, no form (single "Back to Lead" in actions)
   if (lead.convertedJobId) {
     return (
       <div className="max-w-2xl mx-auto">
         <div className="mb-6">
-          <Link href={`/app/leads/${leadId}`} className="text-sm text-slate-500 hover:text-slate-700 flex items-center gap-1 mb-2">
+          <Link href={`/app/leads/${leadId}`} className="text-sm text-slate-500 hover:text-slate-700 flex items-center gap-1 mb-2" aria-label="Back">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
-            Back to Lead
+            Back
           </Link>
         </div>
         <div className="bg-white rounded-xl border border-slate-200 p-6">
@@ -133,16 +133,16 @@ export default function ConvertLeadPage() {
     );
   }
 
-  // LOST: cannot convert
+  // LOST: cannot convert (single "Back to Lead" in card)
   if (lead.status === "LOST") {
     return (
       <div className="max-w-2xl mx-auto">
         <div className="mb-6">
-          <Link href={`/app/leads/${leadId}`} className="text-sm text-slate-500 hover:text-slate-700 flex items-center gap-1 mb-2">
+          <Link href={`/app/leads/${leadId}`} className="text-sm text-slate-500 hover:text-slate-700 flex items-center gap-1 mb-2" aria-label="Back">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
-            Back to Lead
+            Back
           </Link>
         </div>
         <div className="bg-white rounded-xl border border-slate-200 p-6">

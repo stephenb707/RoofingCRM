@@ -15,7 +15,14 @@ import {
 } from "@/lib/leadsConstants";
 import { queryKeys } from "@/lib/queryKeys";
 import { formatAddress, formatDateTime, formatPhone } from "@/lib/format";
-import { LeadStatus } from "@/lib/types";
+import { listLeadAttachments, uploadLeadAttachment, downloadAttachment } from "@/lib/attachmentsApi";
+import {
+  listLeadCommunicationLogs,
+  addLeadCommunicationLog,
+} from "@/lib/communicationLogsApi";
+import { AttachmentSection } from "@/components/AttachmentSection";
+import { CommunicationLogSection } from "@/components/CommunicationLogSection";
+import { LeadStatus, CreateCommunicationLogRequest } from "@/lib/types";
 
 export default function LeadDetailPage() {
   const params = useParams();
@@ -25,6 +32,8 @@ export default function LeadDetailPage() {
 
   const [selectedStatus, setSelectedStatus] = useState<LeadStatus | null>(null);
   const [updateError, setUpdateError] = useState<string | null>(null);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [commLogError, setCommLogError] = useState<string | null>(null);
 
   const queryKey = queryKeys.lead(auth.selectedTenantId, leadId);
 
@@ -64,6 +73,62 @@ export default function LeadDetailPage() {
       statusMutation.mutate(newStatus);
     }
   };
+
+  const attachmentsQuery = useQuery({
+    queryKey: queryKeys.leadAttachments(auth.selectedTenantId, leadId),
+    queryFn: () => listLeadAttachments(api, leadId),
+    enabled: !!auth.selectedTenantId && !!leadId,
+  });
+
+  const uploadAttachmentMutation = useMutation({
+    mutationFn: (file: File) => uploadLeadAttachment(api, leadId, file),
+    onSuccess: () => {
+      setAttachmentError(null);
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.leadAttachments(auth.selectedTenantId, leadId),
+      });
+    },
+    onError: (err: unknown) => {
+      console.error("Failed to upload attachment:", err);
+      setAttachmentError(getApiErrorMessage(err, "Failed to upload. Please try again."));
+    },
+  });
+
+  const handleDownloadAttachment = async (attachmentId: string, fileName: string) => {
+    try {
+      const blob = await downloadAttachment(api, attachmentId);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName || attachmentId;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Failed to download attachment:", err);
+      setAttachmentError(getApiErrorMessage(err, "Failed to download."));
+    }
+  };
+
+  const commLogsQuery = useQuery({
+    queryKey: queryKeys.leadCommLogs(auth.selectedTenantId, leadId),
+    queryFn: () => listLeadCommunicationLogs(api, leadId),
+    enabled: !!auth.selectedTenantId && !!leadId,
+  });
+
+  const addCommLogMutation = useMutation({
+    mutationFn: (payload: CreateCommunicationLogRequest) =>
+      addLeadCommunicationLog(api, leadId, payload),
+    onSuccess: () => {
+      setCommLogError(null);
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.leadCommLogs(auth.selectedTenantId, leadId),
+      });
+    },
+    onError: (err: unknown) => {
+      console.error("Failed to add communication log:", err);
+      setCommLogError(getApiErrorMessage(err, "Failed to add log. Please try again."));
+    },
+  });
 
   // Loading State
   if (isLoading) {
@@ -303,6 +368,27 @@ export default function LeadDetailPage() {
               </p>
             </div>
           )}
+
+          {/* Attachments */}
+          <AttachmentSection
+            title="Attachments"
+            attachments={attachmentsQuery.data ?? []}
+            onUpload={(file) => uploadAttachmentMutation.mutate(file)}
+            onDownload={handleDownloadAttachment}
+            isLoading={attachmentsQuery.isLoading}
+            isUploading={uploadAttachmentMutation.isPending}
+            errorMessage={attachmentError}
+          />
+
+          {/* Communication Logs */}
+          <CommunicationLogSection
+            title="Communication Logs"
+            logs={commLogsQuery.data ?? []}
+            onAdd={(payload) => addCommLogMutation.mutate(payload)}
+            isLoading={commLogsQuery.isLoading}
+            isSubmitting={addCommLogMutation.isPending}
+            errorMessage={commLogError}
+          />
         </div>
 
         {/* Sidebar */}

@@ -242,3 +242,43 @@ export interface UpdateEstimateRequest {
 export interface UpdateEstimateStatusRequest {
   status: EstimateStatus;
 }
+
+// Attachment types
+export interface AttachmentDto {
+  id: string;
+  fileName: string | null;
+  contentType: string | null;
+  fileSize: number | null;
+  storageProvider?: string | null;
+  storageKey?: string | null;
+  leadId?: string | null;
+  jobId?: string | null;
+  description?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+// Communication log types (match backend channel/direction strings)
+export type CommunicationChannel = "CALL" | "SMS" | "EMAIL" | "NOTE";
+export type CommunicationDirection = "INBOUND" | "OUTBOUND";
+
+export interface CommunicationLogDto {
+  id: string;
+  channel: string;
+  direction: string | null;
+  subject: string | null;
+  body: string | null;
+  occurredAt: string;
+  leadId?: string | null;
+  jobId?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface CreateCommunicationLogRequest {
+  channel: string;
+  direction?: string | null;
+  subject: string;
+  body?: string | null;
+  occurredAt?: string | null;
+}

@@ -1,10 +1,15 @@
 import React from "react";
 import { render, screen, waitFor, fireEvent } from "./test-utils";
+import userEvent from "@testing-library/user-event";
 import JobDetailPage from "@/app/app/jobs/[jobId]/page";
 import * as jobsApi from "@/lib/jobsApi";
+import * as attachmentsApi from "@/lib/attachmentsApi";
+import * as communicationLogsApi from "@/lib/communicationLogsApi";
 import { JobDto } from "@/lib/types";
 
 jest.mock("@/lib/jobsApi");
+jest.mock("@/lib/attachmentsApi");
+jest.mock("@/lib/communicationLogsApi");
 jest.mock("next/navigation", () => ({
   useRouter: () => ({ push: jest.fn(), replace: jest.fn(), back: jest.fn() }),
   usePathname: () => "/app/jobs/job-1",
@@ -13,6 +18,8 @@ jest.mock("next/navigation", () => ({
 }));
 
 const mockedJobsApi = jobsApi as jest.Mocked<typeof jobsApi>;
+const mockedAttachmentsApi = attachmentsApi as jest.Mocked<typeof attachmentsApi>;
+const mockedCommLogsApi = communicationLogsApi as jest.Mocked<typeof communicationLogsApi>;
 
 const mockJob: JobDto = {
   id: "job-1",
@@ -33,6 +40,8 @@ describe("JobDetailPage", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockedJobsApi.getJob.mockResolvedValue(mockJob);
+    mockedAttachmentsApi.listJobAttachments.mockResolvedValue([]);
+    mockedCommLogsApi.listJobCommunicationLogs.mockResolvedValue([]);
   });
 
   it("renders job overview and status", async () => {
@@ -97,6 +106,80 @@ describe("JobDetailPage", () => {
         expect.anything(),
         "job-1",
         "IN_PROGRESS"
+      );
+    });
+  });
+
+  it("renders Attachments and Communication Logs section headings", async () => {
+    render(<JobDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("123 Main St, Denver, CO, 80202")).toBeInTheDocument();
+    });
+
+    expect(screen.getByRole("heading", { name: /^Attachments$/ })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /^Communication Logs$/ })).toBeInTheDocument();
+  });
+
+  it("uploading file calls uploadJobAttachment", async () => {
+    mockedAttachmentsApi.uploadJobAttachment.mockResolvedValue({
+      id: "att-1",
+      fileName: "doc.pdf",
+      contentType: "application/pdf",
+      fileSize: 100,
+      leadId: null,
+      jobId: "job-1",
+      createdAt: "2024-01-01T00:00:00Z",
+      updatedAt: "2024-01-01T00:00:00Z",
+    });
+
+    render(<JobDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: /^Attachments$/ })).toBeInTheDocument();
+    });
+
+    const fileInput = document.querySelector('input[type="file"]');
+    expect(fileInput).toBeInTheDocument();
+    if (fileInput) {
+      const file = new File(["content"], "doc.pdf", { type: "application/pdf" });
+      fireEvent.change(fileInput, { target: { files: [file] } });
+    }
+
+    await waitFor(() => {
+      expect(mockedAttachmentsApi.uploadJobAttachment).toHaveBeenCalled();
+    });
+  });
+
+  it("adding communication log calls addJobCommunicationLog", async () => {
+    const user = userEvent.setup();
+    mockedCommLogsApi.addJobCommunicationLog.mockResolvedValue({
+      id: "log-1",
+      channel: "CALL",
+      direction: "OUTBOUND",
+      subject: "Scheduled",
+      body: null,
+      occurredAt: "2024-01-15T14:00:00Z",
+      leadId: null,
+      jobId: "job-1",
+      createdAt: "2024-01-15T14:00:00Z",
+      updatedAt: "2024-01-15T14:00:00Z",
+    });
+
+    render(<JobDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: /^Communication Logs$/ })).toBeInTheDocument();
+    });
+
+    await user.type(screen.getByLabelText(/subject/i), "Scheduled visit");
+    await user.click(screen.getByRole("button", { name: /add log/i }));
+
+    await waitFor(() => {
+      expect(mockedCommLogsApi.addJobCommunicationLog).toHaveBeenCalledWith(
+        expect.anything(),
+        "job-1",
+        expect.objectContaining({ subject: "Scheduled visit", channel: "NOTE" })
       );
     });
   });
