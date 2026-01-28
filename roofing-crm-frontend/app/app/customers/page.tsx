@@ -124,12 +124,25 @@ export default function CustomersPage() {
               />
             </svg>
           </div>
-          <h3 className="text-lg font-medium text-slate-800 mb-1">
-            No customers yet
-          </h3>
-          <p className="text-sm text-slate-500">
-            Get started by adding your first customer.
-          </p>
+          {debouncedQuery.trim().length > 0 ? (
+            <>
+              <h3 className="text-lg font-medium text-slate-800 mb-1">
+                No matching customers
+              </h3>
+              <p className="text-sm text-slate-500">
+                No customers match &quot;{debouncedQuery}&quot;.
+              </p>
+            </>
+          ) : (
+            <>
+              <h3 className="text-lg font-medium text-slate-800 mb-1">
+                No customers yet
+              </h3>
+              <p className="text-sm text-slate-500">
+                Get started by adding your first customer.
+              </p>
+            </>
+          )}
         </div>
       )}
 

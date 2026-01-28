@@ -3,13 +3,15 @@ import { render, screen, fireEvent, waitFor } from "./test-utils";
 import userEvent from "@testing-library/user-event";
 import NewLeadPage from "@/app/app/leads/new/page";
 import * as leadsApi from "@/lib/leadsApi";
-import { LeadDto } from "@/lib/types";
+import * as customersApi from "@/lib/customersApi";
+import { LeadDto, CustomerDto } from "@/lib/types";
+import { PageResponse } from "@/lib/types";
 
-// Mock the leadsApi module
 jest.mock("@/lib/leadsApi");
+jest.mock("@/lib/customersApi");
 const mockedLeadsApi = leadsApi as jest.Mocked<typeof leadsApi>;
+const mockedCustomersApi = customersApi as jest.Mocked<typeof customersApi>;
 
-// Mock useRouter
 const mockPush = jest.fn();
 jest.mock("next/navigation", () => ({
   useRouter: () => ({
@@ -20,6 +22,51 @@ jest.mock("next/navigation", () => ({
   usePathname: () => "/app/leads/new",
   useParams: () => ({}),
 }));
+
+const mockCustomer: CustomerDto = {
+  id: "cust-456",
+  firstName: "Jane",
+  lastName: "Doe",
+  primaryPhone: "555-999-8888",
+  email: "jane@example.com",
+  notes: null,
+  createdAt: "2024-01-01T00:00:00Z",
+  updatedAt: "2024-01-01T00:00:00Z",
+};
+
+// Customer with raw phone digits for formatting assertion
+const mockCustomerWithRawPhone: CustomerDto = {
+  id: "cust-raw",
+  firstName: "John",
+  lastName: "Smith",
+  primaryPhone: "3121112222",
+  email: null,
+  notes: null,
+  createdAt: "2024-01-01T00:00:00Z",
+  updatedAt: "2024-01-01T00:00:00Z",
+};
+
+const mockCustomerWithBillingAddress: CustomerDto = {
+  ...mockCustomer,
+  billingAddress: {
+    line1: "789 Billing Rd",
+    line2: null,
+    city: "Denver",
+    state: "CO",
+    zip: "80202",
+    countryCode: "US",
+  },
+};
+
+const customersPage: PageResponse<CustomerDto> = {
+  content: [mockCustomer],
+  totalElements: 1,
+  totalPages: 1,
+  number: 0,
+  size: 100,
+  first: true,
+  last: true,
+};
 
 const mockCreatedLead: LeadDto = {
   id: "new-lead-123",
@@ -45,6 +92,7 @@ const mockCreatedLead: LeadDto = {
 describe("NewLeadPage", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockedCustomersApi.listCustomers.mockResolvedValue({ content: [], totalElements: 0, totalPages: 0, number: 0, size: 100, first: true, last: true });
   });
 
   it("renders the form with all sections", () => {
@@ -105,14 +153,15 @@ describe("NewLeadPage", () => {
     expect(mockedLeadsApi.createLead).not.toHaveBeenCalled();
   });
 
-  it("calls createLead and redirects on successful submission", async () => {
+  it("calls createLead with newCustomer and redirects when no existing customer selected", async () => {
     mockedLeadsApi.createLead.mockResolvedValue(mockCreatedLead);
+    mockedCustomersApi.listCustomers.mockResolvedValue({ content: [], totalElements: 0, totalPages: 0, number: 0, size: 100, first: true, last: true });
 
     render(<NewLeadPage />);
 
     const user = userEvent.setup();
 
-    // Fill in required fields
+    // Fill in required fields (manual customer entry)
     await user.type(screen.getByPlaceholderText("John"), "John");
     await user.type(screen.getByPlaceholderText("Doe"), "Doe");
     await user.type(
@@ -121,7 +170,6 @@ describe("NewLeadPage", () => {
     );
     await user.type(screen.getByPlaceholderText("123 Main Street"), "123 Main St");
 
-    // Submit the form
     const submitButton = screen.getByRole("button", { name: "Create Lead" });
     await user.click(submitButton);
 
@@ -144,6 +192,131 @@ describe("NewLeadPage", () => {
     await waitFor(() => {
       expect(mockPush).toHaveBeenCalledWith("/app/leads/new-lead-123");
     });
+  });
+
+  it("calls createLead with customerId and newCustomer null when existing customer selected", async () => {
+    mockedLeadsApi.createLead.mockResolvedValue({ ...mockCreatedLead, customerId: "cust-456" });
+    mockedCustomersApi.listCustomers.mockResolvedValue(customersPage);
+    mockedCustomersApi.getCustomer.mockResolvedValue(mockCustomer);
+
+    render(<NewLeadPage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("option", { name: /Jane Doe/ })).toBeInTheDocument();
+    });
+
+    const user = userEvent.setup();
+    await user.selectOptions(screen.getByLabelText("Select customer"), "cust-456");
+    await user.type(screen.getByPlaceholderText("123 Main Street"), "123 Main St");
+
+    await user.click(screen.getByRole("button", { name: "Create Lead" }));
+
+    await waitFor(() => {
+      expect(mockedLeadsApi.createLead).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          customerId: "cust-456",
+          newCustomer: null,
+          propertyAddress: expect.objectContaining({ line1: "123 Main St" }),
+        })
+      );
+    });
+    expect(mockPush).toHaveBeenCalledWith("/app/leads/new-lead-123");
+  });
+
+  it("when selecting existing customer, property address does NOT auto-fill from billing", async () => {
+    mockedCustomersApi.listCustomers.mockResolvedValue(customersPage);
+    mockedCustomersApi.getCustomer.mockResolvedValue(mockCustomerWithBillingAddress);
+
+    render(<NewLeadPage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("option", { name: /Jane Doe/ })).toBeInTheDocument();
+    });
+
+    const user = userEvent.setup();
+    await user.selectOptions(screen.getByLabelText("Select customer"), "cust-456");
+
+    await waitFor(() => {
+      expect(mockedCustomersApi.getCustomer).toHaveBeenCalledWith(expect.anything(), "cust-456");
+    });
+
+    expect(screen.getByPlaceholderText("123 Main Street")).toHaveValue("");
+    expect(screen.getByPlaceholderText("Denver")).toHaveValue("");
+    expect(screen.getByPlaceholderText("CO")).toHaveValue("");
+    expect(screen.getByPlaceholderText("80202")).toHaveValue("");
+  });
+
+  it("when selecting existing customer, clicking Use billing address fills property address", async () => {
+    mockedCustomersApi.listCustomers.mockResolvedValue(customersPage);
+    mockedCustomersApi.getCustomer.mockResolvedValue(mockCustomerWithBillingAddress);
+
+    render(<NewLeadPage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("option", { name: /Jane Doe/ })).toBeInTheDocument();
+    });
+
+    const user = userEvent.setup();
+    await user.selectOptions(screen.getByLabelText("Select customer"), "cust-456");
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Use billing address" })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Use billing address" }));
+
+    expect(screen.getByDisplayValue("789 Billing Rd")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Denver")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("CO")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("80202")).toBeInTheDocument();
+  });
+
+  it("when customer is selected, Clear is visible and clicking it shows Customer Information again", async () => {
+    mockedCustomersApi.listCustomers.mockResolvedValue(customersPage);
+    mockedCustomersApi.getCustomer.mockResolvedValue(mockCustomer);
+
+    render(<NewLeadPage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("option", { name: /Jane Doe/ })).toBeInTheDocument();
+    });
+
+    const user = userEvent.setup();
+    await user.selectOptions(screen.getByLabelText("Select customer"), "cust-456");
+
+    expect(screen.getByRole("button", { name: "Clear" })).toBeInTheDocument();
+    expect(screen.queryByText("Customer Information")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Clear" }));
+
+    expect(screen.getByText("Customer Information")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("John")).toBeInTheDocument();
+  });
+
+  it("when selecting existing customer, clicking Clear address clears property address", async () => {
+    mockedCustomersApi.listCustomers.mockResolvedValue(customersPage);
+    mockedCustomersApi.getCustomer.mockResolvedValue(mockCustomerWithBillingAddress);
+
+    render(<NewLeadPage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("option", { name: /Jane Doe/ })).toBeInTheDocument();
+    });
+
+    const user = userEvent.setup();
+    await user.selectOptions(screen.getByLabelText("Select customer"), "cust-456");
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Use billing address" })).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole("button", { name: "Use billing address" }));
+    expect(screen.getByDisplayValue("789 Billing Rd")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Clear address" }));
+
+    expect(screen.getByPlaceholderText("123 Main Street")).toHaveValue("");
+    expect(screen.getByPlaceholderText("Denver")).toHaveValue("");
+    expect(screen.getByPlaceholderText("CO")).toHaveValue("");
+    expect(screen.getByPlaceholderText("80202")).toHaveValue("");
   });
 
   it("shows error message when createLead fails", async () => {
@@ -185,5 +358,26 @@ describe("NewLeadPage", () => {
     expect(options).toContain("DOOR_TO_DOOR");
     expect(options).toContain("INSURANCE_PARTNER");
     expect(options).toContain("OTHER");
+  });
+
+  it("customer dropdown shows formatted phone in option label", async () => {
+    const pageWithRawPhone = {
+      content: [mockCustomerWithRawPhone],
+      totalElements: 1,
+      totalPages: 1,
+      number: 0,
+      size: 100,
+      first: true,
+      last: true,
+    };
+    mockedCustomersApi.listCustomers.mockResolvedValue(pageWithRawPhone);
+
+    render(<NewLeadPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/\(312\)\s*111-2222/)).toBeInTheDocument();
+    });
+    const option = screen.getByRole("option", { name: /John Smith/ });
+    expect(option).toHaveTextContent(/\(312\)\s*111-2222/);
   });
 });

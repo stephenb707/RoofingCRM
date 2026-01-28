@@ -25,11 +25,17 @@ public interface CustomerRepository extends JpaRepository<Customer, UUID> {
                lower(c.firstName) like lower(concat('%', :q, '%'))
             or lower(c.lastName) like lower(concat('%', :q, '%'))
             or lower(c.email) like lower(concat('%', :q, '%'))
+            or lower(concat(concat(c.firstName, ' '), c.lastName)) like lower(concat('%', :q, '%'))
+            or lower(concat(concat(c.lastName, ' '), c.firstName)) like lower(concat('%', :q, '%'))
             or (
                  :digitsOnly IS NOT NULL AND :digitsOnly <> ''
                  AND replace(replace(replace(replace(c.primaryPhone, '-', ''), ' ', ''), '(', ''), ')', '') like concat('%', :digitsOnly, '%')
                )
+            or (COALESCE(:qNoSpaces, '') <> '' AND (
+                 lower(concat(c.firstName, c.lastName)) like lower(concat('%', :qNoSpaces, '%'))
+                 or lower(concat(c.lastName, c.firstName)) like lower(concat('%', :qNoSpaces, '%'))
+               ))
           )
         """)
-    Page<Customer> search(@Param("tenant") Tenant tenant, @Param("q") String q, @Param("digitsOnly") String digitsOnly, Pageable pageable);
+    Page<Customer> search(@Param("tenant") Tenant tenant, @Param("q") String q, @Param("digitsOnly") String digitsOnly, @Param("qNoSpaces") String qNoSpaces, Pageable pageable);
 }

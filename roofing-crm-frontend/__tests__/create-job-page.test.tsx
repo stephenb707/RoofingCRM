@@ -37,6 +37,29 @@ const mockCustomer: CustomerDto = {
   updatedAt: "2024-01-01T00:00:00Z",
 };
 
+const mockCustomerRawPhone: CustomerDto = {
+  id: "cust-raw",
+  firstName: "John",
+  lastName: "Smith",
+  primaryPhone: "3121112222",
+  email: null,
+  notes: null,
+  createdAt: "2024-01-01T00:00:00Z",
+  updatedAt: "2024-01-01T00:00:00Z",
+};
+
+const mockCustomerWithAddress: CustomerDto = {
+  ...mockCustomer,
+  billingAddress: {
+    line1: "456 Billing Ave",
+    line2: "Suite 2",
+    city: "Chicago",
+    state: "IL",
+    zip: "60601",
+    countryCode: "US",
+  },
+};
+
 const mockLead: LeadDto = {
   id: "lead-1",
   customerId: "cust-1",
@@ -123,8 +146,110 @@ describe("NewJobPage", () => {
     });
   });
 
+  describe("Customer mode billing address assist (opt-in)", () => {
+    it("does NOT auto-fill address when selecting a customer", async () => {
+      mockedCustomersApi.listCustomers.mockResolvedValue(customersPage);
+      mockedCustomersApi.getCustomer.mockResolvedValue(mockCustomerWithAddress);
+      mockedJobsApi.createJob.mockResolvedValue(mockCreatedJob);
+
+      render(<NewJobPage />);
+
+      await waitFor(() => {
+        expect(screen.getByRole("option", { name: /Jane Doe/ })).toBeInTheDocument();
+      });
+
+      const user = userEvent.setup();
+      await user.selectOptions(screen.getByLabelText(/Select customer/i), "cust-1");
+
+      await waitFor(() => {
+        expect(mockedCustomersApi.getCustomer).toHaveBeenCalledWith(expect.anything(), "cust-1");
+      });
+
+      expect(screen.getByPlaceholderText("123 Main Street")).toHaveValue("");
+      expect(screen.getByPlaceholderText("Apt 4B")).toHaveValue("");
+      expect(screen.getByPlaceholderText("Denver")).toHaveValue("");
+      expect(screen.getByPlaceholderText("CO")).toHaveValue("");
+      expect(screen.getByPlaceholderText("80202")).toHaveValue("");
+    });
+
+    it("fills address when clicking Use billing address", async () => {
+      mockedCustomersApi.listCustomers.mockResolvedValue(customersPage);
+      mockedCustomersApi.getCustomer.mockResolvedValue(mockCustomerWithAddress);
+      mockedJobsApi.createJob.mockResolvedValue(mockCreatedJob);
+
+      render(<NewJobPage />);
+
+      await waitFor(() => {
+        expect(screen.getByRole("option", { name: /Jane Doe/ })).toBeInTheDocument();
+      });
+
+      const user = userEvent.setup();
+      await user.selectOptions(screen.getByLabelText(/Select customer/i), "cust-1");
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "Use billing address" })).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole("button", { name: "Use billing address" }));
+
+      expect(screen.getByDisplayValue("456 Billing Ave")).toBeInTheDocument();
+      expect(screen.getByDisplayValue("Suite 2")).toBeInTheDocument();
+      expect(screen.getByDisplayValue("Chicago")).toBeInTheDocument();
+      expect(screen.getByDisplayValue("IL")).toBeInTheDocument();
+      expect(screen.getByDisplayValue("60601")).toBeInTheDocument();
+    });
+
+    it("clears address when clicking Clear address", async () => {
+      mockedCustomersApi.listCustomers.mockResolvedValue(customersPage);
+      mockedCustomersApi.getCustomer.mockResolvedValue(mockCustomerWithAddress);
+      mockedJobsApi.createJob.mockResolvedValue(mockCreatedJob);
+
+      render(<NewJobPage />);
+
+      await waitFor(() => {
+        expect(screen.getByRole("option", { name: /Jane Doe/ })).toBeInTheDocument();
+      });
+
+      const user = userEvent.setup();
+      await user.selectOptions(screen.getByLabelText(/Select customer/i), "cust-1");
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "Use billing address" })).toBeInTheDocument();
+      });
+      await user.click(screen.getByRole("button", { name: "Use billing address" }));
+      expect(screen.getByDisplayValue("456 Billing Ave")).toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Clear address" }));
+
+      expect(screen.getByPlaceholderText("123 Main Street")).toHaveValue("");
+      expect(screen.getByPlaceholderText("Apt 4B")).toHaveValue("");
+      expect(screen.getByPlaceholderText("Denver")).toHaveValue("");
+      expect(screen.getByPlaceholderText("CO")).toHaveValue("");
+      expect(screen.getByPlaceholderText("80202")).toHaveValue("");
+    });
+  });
+
+  it("customer dropdown shows formatted phone in option label", async () => {
+    const pageWithRawPhone: PageResponse<CustomerDto> = {
+      content: [mockCustomerRawPhone],
+      totalElements: 1,
+      totalPages: 1,
+      number: 0,
+      size: 100,
+      first: true,
+      last: true,
+    };
+    mockedCustomersApi.listCustomers.mockResolvedValue(pageWithRawPhone);
+
+    render(<NewJobPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/\(312\)\s*111-2222/)).toBeInTheDocument();
+    });
+    const option = screen.getByRole("option", { name: /John Smith/ });
+    expect(option).toHaveTextContent(/\(312\)\s*111-2222/);
+  });
+
   describe("Lead mode (leadId param)", () => {
-    it("loads lead, prefills address, and creates job with leadId and propertyAddress", async () => {
+    it("loads lead, prefills address from lead, and creates job with leadId; does NOT show BillingAddressAssist", async () => {
       searchParamsStr = "leadId=lead-1";
       mockedLeadsApi.getLead.mockResolvedValue(mockLead);
       mockedJobsApi.createJob.mockResolvedValue({ ...mockCreatedJob, leadId: "lead-1" });
@@ -138,6 +263,8 @@ describe("NewJobPage", () => {
       await waitFor(() => {
         expect(screen.getByDisplayValue("999 Lead St")).toBeInTheDocument();
       });
+
+      expect(screen.queryByTestId("billing-address-assist")).not.toBeInTheDocument();
 
       const user = userEvent.setup();
       await user.selectOptions(screen.getByLabelText(/Job type/i), "REPLACEMENT");

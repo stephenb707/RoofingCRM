@@ -6,11 +6,12 @@ import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/AuthContext";
 import { getLead } from "@/lib/leadsApi";
-import { listCustomers } from "@/lib/customersApi";
+import { listCustomers, getCustomer } from "@/lib/customersApi";
 import { createJob } from "@/lib/jobsApi";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { JOB_TYPES, JOB_TYPE_LABELS } from "@/lib/jobsConstants";
-import { formatAddress } from "@/lib/format";
+import { formatAddress, formatPhone } from "@/lib/format";
+import { BillingAddressAssist } from "@/components/BillingAddressAssist";
 import type { JobType, AddressDto, CreateJobRequest } from "@/lib/types";
 
 const emptyAddress: AddressDto = {
@@ -66,8 +67,15 @@ export default function NewJobPage() {
 
   const customers = customersData?.content ?? [];
 
+  const { data: selectedCustomer } = useQuery({
+    queryKey: ["customer", auth.selectedTenantId, customerId],
+    queryFn: () => getCustomer(api, customerId),
+    enabled: !!auth.selectedTenantId && !!customerId && !leadIdFromQuery,
+  });
+
+  // Lead mode only: prefill address from lead (explicit lead flow; no auto-fill from customer billing)
   useEffect(() => {
-    if (lead?.propertyAddress) {
+    if (leadIdFromQuery && lead?.propertyAddress) {
       const a = lead.propertyAddress;
       setAddressLine1(a.line1 ?? "");
       setAddressLine2(a.line2 ?? "");
@@ -75,7 +83,26 @@ export default function NewJobPage() {
       setState(a.state ?? "");
       setZip(a.zip ?? "");
     }
-  }, [lead?.propertyAddress]);
+  }, [leadIdFromQuery, lead?.propertyAddress]);
+
+  const handleUseBillingAddress = () => {
+    if (selectedCustomer?.billingAddress) {
+      const a = selectedCustomer.billingAddress;
+      setAddressLine1(a.line1 ?? "");
+      setAddressLine2(a.line2 ?? "");
+      setCity(a.city ?? "");
+      setState(a.state ?? "");
+      setZip(a.zip ?? "");
+    }
+  };
+
+  const handleClearAddress = () => {
+    setAddressLine1("");
+    setAddressLine2("");
+    setCity("");
+    setState("");
+    setZip("");
+  };
 
   const createMutation = useMutation({
     mutationFn: (payload: CreateJobRequest) => createJob(api, payload),
@@ -213,12 +240,15 @@ export default function NewJobPage() {
               className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
             >
               <option value="">Select customer</option>
-              {customers.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.firstName} {c.lastName}
-                  {c.primaryPhone ? ` — ${c.primaryPhone}` : ""}
-                </option>
-              ))}
+              {customers.map((c) => {
+                const phoneFormatted = formatPhone(c.primaryPhone ?? null);
+                const displayExtra = phoneFormatted !== "—" ? ` — ${phoneFormatted}` : c.email ? ` — ${c.email}` : "";
+                return (
+                  <option key={c.id} value={c.id}>
+                    {c.firstName} {c.lastName}{displayExtra}
+                  </option>
+                );
+              })}
             </select>
           </div>
         )}
@@ -245,6 +275,16 @@ export default function NewJobPage() {
                 ))}
               </select>
             </div>
+
+            {!isLeadMode && customerId && (
+              <BillingAddressAssist
+                billingAddress={selectedCustomer?.billingAddress ?? null}
+                onUseBillingAddress={handleUseBillingAddress}
+                onClearAddress={handleClearAddress}
+                disabled={!selectedCustomer}
+                className="mb-2"
+              />
+            )}
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">
