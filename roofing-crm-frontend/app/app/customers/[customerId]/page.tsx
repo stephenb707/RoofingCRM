@@ -220,19 +220,6 @@ export default function CustomerDetailPage() {
         </div>
 
         <div className="space-y-6">
-          {/* Actions */}
-          <div className="bg-white rounded-xl border border-slate-200 p-6">
-            <h2 className="text-lg font-semibold text-slate-800 mb-4">Actions</h2>
-            <div className="space-y-2">
-              <Link
-                href={`/app/customers/${customerId}/edit`}
-                className="w-full inline-flex justify-center px-4 py-2.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors"
-              >
-                Edit Customer
-              </Link>
-            </div>
-          </div>
-
           {/* Details */}
           <div className="bg-white rounded-xl border border-slate-200 p-6">
             <h2 className="text-lg font-semibold text-slate-800 mb-4">Details</h2>
@@ -246,6 +233,19 @@ export default function CustomerDetailPage() {
                 <dd className="mt-1 text-sm text-slate-800">{formatDate(customer.updatedAt)}</dd>
               </div>
             </dl>
+          </div>
+
+          {/* Actions */}
+          <div className="bg-white rounded-xl border border-slate-200 p-6">
+            <h2 className="text-lg font-semibold text-slate-800 mb-4">Actions</h2>
+            <div className="space-y-2">
+              <Link
+                href={`/app/customers/${customerId}/edit`}
+                className="w-full inline-flex justify-center px-4 py-2.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors"
+              >
+                Edit Customer
+              </Link>
+            </div>
           </div>
         </div>
       </div>

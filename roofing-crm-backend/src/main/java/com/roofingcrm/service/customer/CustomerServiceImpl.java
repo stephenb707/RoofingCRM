@@ -83,17 +83,15 @@ public class CustomerServiceImpl implements CustomerService {
     public Page<CustomerDto> listCustomers(@NonNull UUID tenantId, @NonNull UUID userId, String q, Pageable pageable) {
         Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
         
-        if (q == null || q.trim().isEmpty()) {
+        String qNormalized = (q == null) ? null : q.trim().replaceAll("\\s+", " ");
+        if (qNormalized == null || qNormalized.isBlank()) {
             return customerRepository.findByTenantAndArchivedFalse(tenant, pageable)
                     .map(this::toDto);
         }
-        
-        String normalizedQ = q.trim();
-        String digitsOnly = normalizedQ.replaceAll("\\D", "");
-        // Only pass digitsOnly if it's not empty to avoid matching all phones
+        String digitsOnly = qNormalized.replaceAll("\\D", "");
         String digitsOnlyParam = digitsOnly.isEmpty() ? null : digitsOnly;
-        
-        return customerRepository.search(tenant, normalizedQ, digitsOnlyParam, pageable)
+        String qNoSpaces = qNormalized.replace(" ", "");
+        return customerRepository.search(tenant, qNormalized, digitsOnlyParam, qNoSpaces, pageable)
                 .map(this::toDto);
     }
 

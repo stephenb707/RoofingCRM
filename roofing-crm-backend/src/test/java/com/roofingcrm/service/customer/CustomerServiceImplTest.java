@@ -184,6 +184,46 @@ class CustomerServiceImplTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void listCustomers_withFullNameSearch_matchesJohnD() {
+        CreateCustomerRequest request = new CreateCustomerRequest();
+        request.setFirstName("John");
+        request.setLastName("Doe");
+        request.setPrimaryPhone("555-1234");
+        request.setEmail("john@example.com");
+        CustomerDto doe = customerService.createCustomer(tenantId, userId, request);
+
+        Page<CustomerDto> results = customerService.listCustomers(tenantId, userId, "John D", PageRequest.of(0, 10));
+        assertEquals(1, results.getTotalElements());
+        assertEquals(doe.getId(), results.getContent().get(0).getId());
+    }
+
+    @Test
+    void listCustomers_withReverseFullNameSearch_matchesDoeJo() {
+        CreateCustomerRequest request = new CreateCustomerRequest();
+        request.setFirstName("John");
+        request.setLastName("Doe");
+        request.setPrimaryPhone("555-1234");
+        CustomerDto doe = customerService.createCustomer(tenantId, userId, request);
+
+        Page<CustomerDto> results = customerService.listCustomers(tenantId, userId, "Doe Jo", PageRequest.of(0, 10));
+        assertEquals(1, results.getTotalElements());
+        assertEquals(doe.getId(), results.getContent().get(0).getId());
+    }
+
+    @Test
+    void listCustomers_withExtraSpaces_stillMatches() {
+        CreateCustomerRequest request = new CreateCustomerRequest();
+        request.setFirstName("John");
+        request.setLastName("Doe");
+        request.setPrimaryPhone("555-1234");
+        CustomerDto doe = customerService.createCustomer(tenantId, userId, request);
+
+        Page<CustomerDto> results = customerService.listCustomers(tenantId, userId, "  John D  ", PageRequest.of(0, 10));
+        assertEquals(1, results.getTotalElements());
+        assertEquals(doe.getId(), results.getContent().get(0).getId());
+    }
+
+    @Test
     void getCustomer_nonExisting_throwsNotFound() {
         UUID randomId = UUID.randomUUID();
         assertThrows(ResourceNotFoundException.class,

@@ -1,12 +1,15 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/AuthContext";
 import { createLead } from "@/lib/leadsApi";
+import { listCustomers, getCustomer } from "@/lib/customersApi";
 import { getApiErrorMessage } from "@/lib/apiError";
+import { formatPhone } from "@/lib/format";
+import { BillingAddressAssist } from "@/components/BillingAddressAssist";
 import { LEAD_SOURCES, SOURCE_LABELS } from "@/lib/leadsConstants";
 import { LeadSource, CreateLeadRequest, AddressDto } from "@/lib/types";
 
@@ -15,7 +18,12 @@ export default function NewLeadPage() {
   const { api, auth } = useAuth();
   const queryClient = useQueryClient();
 
-  // Customer fields
+  // Customer selection: existing vs new
+  const [customerId, setCustomerId] = useState("");
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [debouncedCustomerSearch, setDebouncedCustomerSearch] = useState("");
+
+  // Customer fields (used when no existing customer selected)
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
@@ -34,6 +42,45 @@ export default function NewLeadPage() {
   const [preferredContact, setPreferredContact] = useState("");
 
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedCustomerSearch(customerSearch);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [customerSearch]);
+
+  const { data: customersData } = useQuery({
+    queryKey: ["customers", auth.selectedTenantId, debouncedCustomerSearch || null, 0],
+    queryFn: () => listCustomers(api, { page: 0, size: 100, q: debouncedCustomerSearch || null }),
+    enabled: !!auth.selectedTenantId,
+  });
+  const customers = customersData?.content ?? [];
+
+  const { data: selectedCustomer } = useQuery({
+    queryKey: ["customer", auth.selectedTenantId, customerId],
+    queryFn: () => getCustomer(api, customerId),
+    enabled: !!auth.selectedTenantId && !!customerId,
+  });
+
+  const handleUseBillingAddress = () => {
+    if (selectedCustomer?.billingAddress) {
+      const a = selectedCustomer.billingAddress;
+      setAddressLine1(a.line1 ?? "");
+      setAddressLine2(a.line2 ?? "");
+      setCity(a.city ?? "");
+      setState(a.state ?? "");
+      setZip(a.zip ?? "");
+    }
+  };
+
+  const handleClearAddress = () => {
+    setAddressLine1("");
+    setAddressLine2("");
+    setCity("");
+    setState("");
+    setZip("");
+  };
 
   const mutation = useMutation({
     mutationFn: async (payload: CreateLeadRequest) => {
@@ -57,12 +104,6 @@ export default function NewLeadPage() {
     e.preventDefault();
     setError(null);
 
-    // Validate required fields
-    if (!firstName.trim() || !lastName.trim() || !phone.trim()) {
-      setError("Please fill in all required customer fields.");
-      return;
-    }
-
     if (!addressLine1.trim()) {
       setError("Property address is required.");
       return;
@@ -77,7 +118,25 @@ export default function NewLeadPage() {
       countryCode: "US",
     };
 
-    const payload: CreateLeadRequest = {
+    if (customerId) {
+      mutation.mutate({
+        customerId,
+        newCustomer: null,
+        source: source || null,
+        leadNotes: notes.trim() || null,
+        propertyAddress,
+        preferredContactMethod: preferredContact.trim() || null,
+      });
+      return;
+    }
+
+    if (!firstName.trim() || !lastName.trim() || !phone.trim()) {
+      setError("Please fill in all required customer fields or select an existing customer.");
+      return;
+    }
+
+    mutation.mutate({
+      customerId: null,
       newCustomer: {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
@@ -89,9 +148,7 @@ export default function NewLeadPage() {
       leadNotes: notes.trim() || null,
       propertyAddress,
       preferredContactMethod: preferredContact.trim() || null,
-    };
-
-    mutation.mutate(payload);
+    });
   };
 
   return (
@@ -124,72 +181,128 @@ export default function NewLeadPage() {
       </div>
 
       <form onSubmit={handleSubmit}>
-        {/* Customer Information */}
+        {/* Select existing customer (optional) */}
+        <div className="bg-white rounded-xl border border-slate-200 p-6 mb-6">
+          <div className="flex items-center justify-between gap-2 mb-4">
+            <h2 className="text-lg font-semibold text-slate-800">
+              Select existing customer (optional)
+            </h2>
+            {customerId && (
+              <button
+                type="button"
+                onClick={() => setCustomerId("")}
+                className="text-sm text-slate-600 hover:text-slate-800 hover:underline"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+          <div className="space-y-3">
+            <input
+              type="text"
+              value={customerSearch}
+              onChange={(e) => setCustomerSearch(e.target.value)}
+              placeholder="Search by name, email, or phone…"
+              className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+              aria-label="Search customers"
+            />
+            <select
+              value={customerId}
+              onChange={(e) => setCustomerId(e.target.value)}
+              className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+              aria-label="Select customer"
+            >
+              <option value="">Select customer</option>
+              {customers.map((c) => {
+                const phoneFormatted = formatPhone(c.primaryPhone ?? null);
+                const displayExtra = phoneFormatted !== "—" ? ` — ${phoneFormatted}` : c.email ? ` — ${c.email}` : "";
+                return (
+                  <option key={c.id} value={c.id}>
+                    {c.firstName} {c.lastName}{displayExtra}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+        </div>
+
+        {/* Customer Information (manual entry when no customer selected) */}
+        {!customerId && (
         <div className="bg-white rounded-xl border border-slate-200 p-6 mb-6">
           <h2 className="text-lg font-semibold text-slate-800 mb-4">
             Customer Information
           </h2>
-
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                First Name <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                required
-                className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
-                placeholder="John"
-              />
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                  First Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  required
+                  className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+                  placeholder="John"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                  Last Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  required
+                  className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+                  placeholder="Doe"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                  Phone <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  required
+                  className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+                  placeholder="(555) 123-4567"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+                  placeholder="john@example.com"
+                />
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                Last Name <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                required
-                className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
-                placeholder="Doe"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                Phone <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                required
-                className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
-                placeholder="(555) 123-4567"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                Email
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
-                placeholder="john@example.com"
-              />
-            </div>
-          </div>
         </div>
+        )}
 
         {/* Property Address */}
         <div className="bg-white rounded-xl border border-slate-200 p-6 mb-6">
           <h2 className="text-lg font-semibold text-slate-800 mb-4">
             Property Address
           </h2>
+
+          {customerId && (
+            <BillingAddressAssist
+              billingAddress={selectedCustomer?.billingAddress ?? null}
+              onUseBillingAddress={handleUseBillingAddress}
+              onClearAddress={handleClearAddress}
+              disabled={!selectedCustomer}
+              className="mb-4"
+            />
+          )}
 
           <div className="space-y-4">
             <div>

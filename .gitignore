@@ -1,5 +1,6 @@
 # ===== Backend =====
 /roofing-crm-backend/target/
+/roofing-crm-backend/uploads/
 *.log
 
 # ===== Frontend (Next.js) =====

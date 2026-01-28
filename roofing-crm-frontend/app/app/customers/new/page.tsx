@@ -128,7 +128,7 @@ export default function NewCustomerPage() {
                 onChange={(e) => setPrimaryPhone(e.target.value)}
                 required
                 className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
-                placeholder="(312) 555-1234"
+                placeholder="(555) 123-4567"
               />
             </div>
             <div>
@@ -138,7 +138,7 @@ export default function NewCustomerPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
-                placeholder="john.doe@example.com"
+                placeholder="john@example.com"
               />
             </div>
             <div>
@@ -176,7 +176,7 @@ export default function NewCustomerPage() {
                 value={line2}
                 onChange={(e) => setLine2(e.target.value)}
                 className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
-                placeholder="Apt 4"
+                placeholder="Apt 4B"
               />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -187,7 +187,7 @@ export default function NewCustomerPage() {
                   value={city}
                   onChange={(e) => setCity(e.target.value)}
                   className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
-                  placeholder="Chicago"
+                  placeholder="Denver"
                 />
               </div>
               <div>
@@ -197,7 +197,7 @@ export default function NewCustomerPage() {
                   value={state}
                   onChange={(e) => setState(e.target.value)}
                   className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
-                  placeholder="IL"
+                  placeholder="CO"
                 />
               </div>
               <div>
@@ -207,7 +207,7 @@ export default function NewCustomerPage() {
                   value={zip}
                   onChange={(e) => setZip(e.target.value)}
                   className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
-                  placeholder="60601"
+                  placeholder="80202"
                 />
               </div>
             </div>
