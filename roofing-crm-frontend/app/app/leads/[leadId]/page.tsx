@@ -505,10 +505,10 @@ export default function LeadDetailPage() {
               {lead.convertedJobId ? (
                 <>
                   <Link
-                    href={`/app/jobs/${lead.convertedJobId}`}
+                    href={`/app/tasks/new?leadId=${leadId}`}
                     className="w-full inline-flex justify-center px-4 py-2.5 text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 rounded-lg transition-colors"
                   >
-                    View Job
+                    Create Task
                   </Link>
                   <Link
                     href={`/app/jobs/${lead.convertedJobId}/estimates/new`}
@@ -530,6 +530,12 @@ export default function LeadDetailPage() {
                 className="w-full inline-flex justify-center px-4 py-2.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors"
               >
                 Edit Lead
+              </Link>
+              <Link
+                href={`/app/jobs/${lead.convertedJobId}`}
+                className="w-full inline-flex justify-center px-4 py-2.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors"
+              >
+                View Job
               </Link>
             </div>
           </div>

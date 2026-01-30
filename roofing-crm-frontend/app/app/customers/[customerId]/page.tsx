@@ -240,6 +240,12 @@ export default function CustomerDetailPage() {
             <h2 className="text-lg font-semibold text-slate-800 mb-4">Actions</h2>
             <div className="space-y-2">
               <Link
+                href={`/app/tasks/new?customerId=${customerId}`}
+                className="w-full inline-flex justify-center px-4 py-2.5 text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 rounded-lg transition-colors"
+              >
+                Create Task
+              </Link>
+              <Link
                 href={`/app/customers/${customerId}/edit`}
                 className="w-full inline-flex justify-center px-4 py-2.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors"
               >

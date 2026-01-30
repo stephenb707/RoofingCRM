@@ -258,6 +258,51 @@ export interface AttachmentDto {
   updatedAt?: string | null;
 }
 
+// Task-related types
+export type TaskStatus = "TODO" | "IN_PROGRESS" | "COMPLETED" | "CANCELED";
+export type TaskPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+
+export interface TaskDto {
+  taskId: string;
+  title: string;
+  description?: string | null;
+  status: TaskStatus;
+  priority: TaskPriority;
+  dueAt?: string | null;
+  completedAt?: string | null;
+  assignedToUserId?: string | null;
+  assignedToName?: string | null;
+  leadId?: string | null;
+  jobId?: string | null;
+  customerId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateTaskRequest {
+  title: string;
+  description?: string | null;
+  status?: TaskStatus;
+  priority?: TaskPriority;
+  dueAt?: string | null;
+  assignedToUserId?: string | null;
+  leadId?: string | null;
+  jobId?: string | null;
+  customerId?: string | null;
+}
+
+export interface UpdateTaskRequest {
+  title?: string;
+  description?: string | null;
+  status?: TaskStatus;
+  priority?: TaskPriority;
+  dueAt?: string | null;
+  assignedToUserId?: string | null;
+  leadId?: string | null;
+  jobId?: string | null;
+  customerId?: string | null;
+}
+
 // Communication log types (match backend channel/direction strings)
 export type CommunicationChannel = "CALL" | "SMS" | "EMAIL" | "NOTE";
 export type CommunicationDirection = "INBOUND" | "OUTBOUND";

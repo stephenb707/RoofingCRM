@@ -423,16 +423,16 @@ export default function EstimateDetailPage() {
             </h2>
             <div className="space-y-2">
               <Link
-                href={`/app/estimates/${estimateId}/edit`}
-                className="w-full inline-flex justify-center px-4 py-2.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors"
-              >
-                Edit Estimate
-              </Link>
-              <Link
                 href={`/app/jobs/${jobId}/estimates`}
                 className="w-full inline-flex justify-center px-4 py-2.5 text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 rounded-lg transition-colors"
               >
                 Back to Estimates
+              </Link>
+              <Link
+                href={`/app/estimates/${estimateId}/edit`}
+                className="w-full inline-flex justify-center px-4 py-2.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors"
+              >
+                Edit Estimate
               </Link>
             </div>
           </div>
