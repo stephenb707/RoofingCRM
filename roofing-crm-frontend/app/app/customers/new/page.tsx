@@ -4,7 +4,7 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@/lib/AuthContext";
+import { useAuthReady } from "@/lib/AuthContext";
 import { createCustomer } from "@/lib/customersApi";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { queryKeys } from "@/lib/queryKeys";
@@ -12,7 +12,7 @@ import type { AddressDto } from "@/lib/types";
 
 export default function NewCustomerPage() {
   const router = useRouter();
-  const { api, auth } = useAuth();
+  const { api, auth, ready } = useAuthReady();
   const queryClient = useQueryClient();
 
   const [firstName, setFirstName] = useState("");

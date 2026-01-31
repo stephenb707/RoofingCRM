@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@/lib/AuthContext";
+import { useAuthReady } from "@/lib/AuthContext";
 import { getTask, updateTask } from "@/lib/tasksApi";
 import { getApiErrorMessage } from "@/lib/apiError";
 import {
@@ -21,7 +21,7 @@ import type { TaskStatus } from "@/lib/types";
 export default function TaskDetailPage() {
   const params = useParams();
   const taskId = params.taskId as string;
-  const { api, auth } = useAuth();
+  const { api, auth, ready } = useAuthReady();
   const queryClient = useQueryClient();
 
   const [updateError, setUpdateError] = useState<string | null>(null);
@@ -31,7 +31,7 @@ export default function TaskDetailPage() {
   const { data: task, isLoading, isError, error } = useQuery({
     queryKey,
     queryFn: () => getTask(api, taskId),
-    enabled: !!auth.selectedTenantId && !!taskId,
+    enabled: ready && !!taskId,
   });
 
   const mutation = useMutation({

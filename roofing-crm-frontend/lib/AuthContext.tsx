@@ -39,8 +39,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const api = useMemo(() => createApiClient(() => authRef.current), []);
 
-  if(!hydrated) return null;
-
   const setAuthFromLogin = (response: AuthResponse) => {
     const next: AuthState = {
       token: response.token,
@@ -86,7 +84,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     logout,
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {!hydrated ? (
+        <div className="p-4 text-sm text-slate-500">Loading…</div>
+      ) : (
+        children
+      )}
+    </AuthContext.Provider>
+  );
 };
 
 export function useAuth() {
@@ -95,4 +101,10 @@ export function useAuth() {
     throw new Error("useAuth must be used within AuthProvider");
   }
   return ctx;
+}
+
+export function useAuthReady() {
+  const ctx = useAuth();
+  const ready = !!(ctx.auth.token && ctx.auth.selectedTenantId);
+  return { ...ctx, ready };
 }

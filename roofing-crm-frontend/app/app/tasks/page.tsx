@@ -3,7 +3,7 @@
 import { useState, useMemo, useCallback } from "react";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import Link from "next/link";
-import { useAuth } from "@/lib/AuthContext";
+import { useAuthReady } from "@/lib/AuthContext";
 import { listTasks } from "@/lib/tasksApi";
 import { getApiErrorMessage } from "@/lib/apiError";
 import {
@@ -16,7 +16,7 @@ import {
 import { queryKeys } from "@/lib/queryKeys";
 import { formatDateTime } from "@/lib/format";
 import { StatusBadge } from "@/components/StatusBadge";
-import type { TaskStatus } from "@/lib/types";
+import type { TaskStatus, TaskDto } from "@/lib/types";
 
 function TaskRelatedCell({ task }: { task: { leadId?: string | null; jobId?: string | null; customerId?: string | null } }) {
   if (task.leadId) {
@@ -44,7 +44,7 @@ function TaskRelatedCell({ task }: { task: { leadId?: string | null; jobId?: str
 }
 
 export default function TasksPage() {
-  const { api, auth } = useAuth();
+  const { api, auth, ready } = useAuthReady();
   const [statusFilter, setStatusFilter] = useState<TaskStatus | "">("");
   const [myTasksOnly, setMyTasksOnly] = useState(false);
   const [dueBefore, setDueBefore] = useState("");
@@ -75,7 +75,7 @@ export default function TasksPage() {
   const { data, isLoading, isError, error, isFetching } = useQuery({
     queryKey,
     queryFn: () => listTasks(api, { ...filters }),
-    enabled: !!(auth.token && auth.selectedTenantId),
+    enabled: ready,
     placeholderData: keepPreviousData,
   });
 
@@ -243,7 +243,7 @@ export default function TasksPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
-                {tasks.map((task) => (
+                {tasks.map((task: TaskDto) => (
                   <tr key={task.taskId} className="hover:bg-slate-50 transition-colors">
                     <td className="px-6 py-4">
                       <Link

@@ -21,5 +21,5 @@ public interface TaskService {
 
     Page<TaskDto> listTasks(@NonNull UUID tenantId, @NonNull UUID userId,
             TaskStatus status, UUID assignedToUserId, UUID leadId, UUID jobId, UUID customerId,
-            Instant dueBefore, Instant dueAfter, Pageable pageable);
+            Instant dueBefore, Instant dueAfter, @NonNull Pageable pageable);
 }

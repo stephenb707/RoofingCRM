@@ -10,6 +10,7 @@ com\roofingcrm\domain\entity\Lead.class
 com\roofingcrm\api\v1\lead\ConvertLeadToJobRequest.class
 com\roofingcrm\api\v1\job\UpdateJobStatusRequest.class
 com\roofingcrm\config\SecurityConfig.class
+com\roofingcrm\domain\repository\ActivityEventRepository.class
 com\roofingcrm\service\tenant\TenantAccessService.class
 com\roofingcrm\service\tenant\TenantAccessDeniedException.class
 com\roofingcrm\domain\entity\TenantAuditedEntity.class
@@ -22,9 +23,7 @@ com\roofingcrm\api\v1\lead\UpdateLeadStatusRequest.class
 com\roofingcrm\domain\repository\CommunicationLogRepository.class
 com\roofingcrm\api\v1\estimate\EstimateDto.class
 com\roofingcrm\domain\entity\Tenant.class
-com\roofingcrm\service\lead\LeadServiceImpl.class
 com\roofingcrm\domain\entity\BaseEntity.class
-com\roofingcrm\service\job\JobServiceImpl.class
 com\roofingcrm\security\AuthenticatedUser.class
 com\roofingcrm\service\auth\AuthService.class
 com\roofingcrm\api\v1\auth\TenantSummaryDto.class
@@ -38,6 +37,7 @@ com\roofingcrm\api\v1\communication\CreateCommunicationLogRequest.class
 com\roofingcrm\security\JwtAuthenticationFilter$1.class
 com\roofingcrm\service\task\TaskService.class
 com\roofingcrm\storage\AttachmentStorageService.class
+com\roofingcrm\api\v1\activity\CreateNoteRequest.class
 com\roofingcrm\api\v1\auth\AuthResponse.class
 com\roofingcrm\api\v1\lead\LeadController.class
 com\roofingcrm\api\v1\communication\CommunicationLogController.class
@@ -57,8 +57,8 @@ com\roofingcrm\api\v1\estimate\EstimateController.class
 com\roofingcrm\domain\repository\JobRepository.class
 com\roofingcrm\domain\entity\EstimateItem.class
 com\roofingcrm\storage\LocalStorageProperties.class
+com\roofingcrm\domain\repository\spec\TaskSpecifications.class
 com\roofingcrm\service\estimate\EstimateService.class
-com\roofingcrm\service\task\TaskServiceImpl.class
 com\roofingcrm\api\v1\attachment\AttachmentDto.class
 com\roofingcrm\service\auth\AuthServiceImpl.class
 com\roofingcrm\api\v1\estimate\EstimateItemRequest.class
@@ -68,15 +68,16 @@ com\roofingcrm\service\communication\CommunicationLogService.class
 com\roofingcrm\service\tenant\TenantAccessServiceImpl.class
 com\roofingcrm\api\v1\estimate\EstimateItemDto.class
 com\roofingcrm\api\v1\customer\UpdateCustomerRequest.class
+com\roofingcrm\domain\enums\ActivityEventType.class
 com\roofingcrm\domain\entity\Job.class
 com\roofingcrm\service\exception\ResourceNotFoundException.class
 com\roofingcrm\service\job\JobService.class
-com\roofingcrm\service\attachment\AttachmentServiceImpl.class
 com\roofingcrm\domain\enums\TaskStatus.class
 com\roofingcrm\api\v1\job\UpdateJobRequest.class
 com\roofingcrm\domain\repository\CustomerRepository.class
 com\roofingcrm\api\v1\auth\LoginRequest.class
 com\roofingcrm\domain\entity\Attachment.class
+com\roofingcrm\api\v1\activity\ActivityEventDto.class
 com\roofingcrm\domain\repository\TenantUserMembershipRepository.class
 com\roofingcrm\api\v1\task\TaskController.class
 com\roofingcrm\api\v1\job\JobDto.class
@@ -97,8 +98,10 @@ com\roofingcrm\domain\enums\LeadStatus.class
 com\roofingcrm\domain\enums\EstimateStatus.class
 com\roofingcrm\api\v1\auth\RegisterRequest.class
 com\roofingcrm\domain\entity\TenantUserMembership.class
+com\roofingcrm\domain\enums\ActivityEntityType.class
 com\roofingcrm\integration\package-info.class
 com\roofingcrm\api\v1\lead\NewLeadCustomerRequest.class
+com\roofingcrm\domain\entity\ActivityEvent.class
 com\roofingcrm\storage\LocalAttachmentStorageService.class
 com\roofingcrm\api\v1\task\CreateTaskRequest.class
 com\roofingcrm\api\v1\task\TaskDto.class

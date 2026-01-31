@@ -1,5 +1,10 @@
 import type { AxiosInstance } from "axios";
-import type { AttachmentDto } from "./types";
+import type { AttachmentDto, AttachmentTag } from "./types";
+
+export interface UploadAttachmentOptions {
+  tag?: AttachmentTag;
+  description?: string;
+}
 
 /**
  * List attachments for a lead.
@@ -19,10 +24,13 @@ export async function listLeadAttachments(
 export async function uploadLeadAttachment(
   api: AxiosInstance,
   leadId: string,
-  file: File
+  file: File,
+  options?: UploadAttachmentOptions
 ): Promise<AttachmentDto> {
   const form = new FormData();
   form.append("file", file);
+  if (options?.tag) form.append("tag", options.tag);
+  if (options?.description != null) form.append("description", options.description);
   const { data } = await api.post<AttachmentDto>(`/api/v1/leads/${leadId}/attachments`, form);
   return data;
 }
@@ -44,10 +52,13 @@ export async function listJobAttachments(
 export async function uploadJobAttachment(
   api: AxiosInstance,
   jobId: string,
-  file: File
+  file: File,
+  options?: UploadAttachmentOptions
 ): Promise<AttachmentDto> {
   const form = new FormData();
   form.append("file", file);
+  if (options?.tag) form.append("tag", options.tag);
+  if (options?.description != null) form.append("description", options.description);
   const { data } = await api.post<AttachmentDto>(`/api/v1/jobs/${jobId}/attachments`, form);
   return data;
 }

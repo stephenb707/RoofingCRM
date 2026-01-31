@@ -1,5 +1,6 @@
 package com.roofingcrm.domain.entity;
 
+import com.roofingcrm.domain.enums.AttachmentTag;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -49,4 +50,8 @@ public class Attachment extends TenantAuditedEntity {
     private String externalAssetId;    // asset ID in external system
 
     private String description;        // optional description/label
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 32)
+    private AttachmentTag tag = AttachmentTag.OTHER;
 }

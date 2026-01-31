@@ -50,7 +50,7 @@ public class TaskController {
             @RequestParam(value = "customerId", required = false) UUID customerId,
             @RequestParam(value = "dueBefore", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant dueBefore,
             @RequestParam(value = "dueAfter", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant dueAfter,
-            @PageableDefault(size = 20) Pageable pageable) {
+            @PageableDefault(size = 20) @NonNull Pageable pageable) {
 
         UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
         Page<TaskDto> page = taskService.listTasks(tenantId, userId, status, assignedToUserId,

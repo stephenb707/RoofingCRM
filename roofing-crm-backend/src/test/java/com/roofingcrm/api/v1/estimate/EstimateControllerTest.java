@@ -31,7 +31,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(controllers = EstimateController.class)
 @AutoConfigureMockMvc(addFilters = false)
-@SuppressWarnings("null") // Hamcrest matchers have nullable return types
 class EstimateControllerTest {
 
     @Autowired

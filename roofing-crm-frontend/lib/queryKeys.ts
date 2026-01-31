@@ -20,6 +20,12 @@ export const queryKeys = {
   lead: (tenantId: string | null, leadId: string) =>
     ["lead", tenantId, leadId] as const,
 
+  leadsPipeline: (tenantId: string | null) =>
+    ["leadsPipeline", tenantId] as const,
+
+  activityForEntity: (tenantId: string | null, entityType: string, entityId: string) =>
+    ["activity", tenantId, entityType, entityId] as const,
+
   jobsList: (tenantId: string | null, status: string | null, customerId: string | null, page: number) =>
     ["jobs", tenantId, status ?? "", customerId ?? "", page] as const,
 

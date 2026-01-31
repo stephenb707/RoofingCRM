@@ -1,13 +1,19 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { formatFileSize } from "@/lib/format";
-import type { AttachmentDto } from "@/lib/types";
+import { ATTACHMENT_TAGS, TAG_LABELS } from "@/lib/attachmentConstants";
+import type { AttachmentDto, AttachmentTag } from "@/lib/types";
+
+export interface UploadOptions {
+  tag?: AttachmentTag;
+  description?: string;
+}
 
 export interface AttachmentSectionProps {
   title: string;
   attachments: AttachmentDto[];
-  onUpload: (file: File) => void | Promise<void>;
+  onUpload: (file: File, options?: UploadOptions) => void | Promise<void>;
   onDownload: (attachmentId: string, fileName: string) => void | Promise<void>;
   isLoading?: boolean;
   isUploading?: boolean;
@@ -24,11 +30,17 @@ export function AttachmentSection({
   errorMessage = null,
 }: AttachmentSectionProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedTag, setSelectedTag] = useState<AttachmentTag>("OTHER");
+  const [description, setDescription] = useState("");
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      onUpload(file);
+      onUpload(file, {
+        tag: selectedTag,
+        description: description.trim() || undefined,
+      });
+      setDescription("");
       e.target.value = "";
     }
   };
@@ -43,13 +55,32 @@ export function AttachmentSection({
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-2 mb-4">
+      <div className="flex flex-wrap items-end gap-2 mb-4">
         <input
           ref={fileInputRef}
           type="file"
           onChange={handleFileChange}
           className="hidden"
           aria-label="Choose file to upload"
+        />
+        <select
+          value={selectedTag}
+          onChange={(e) => setSelectedTag(e.target.value as AttachmentTag)}
+          className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+          aria-label="Tag"
+        >
+          {ATTACHMENT_TAGS.map((t) => (
+            <option key={t} value={t}>
+              {TAG_LABELS[t]}
+            </option>
+          ))}
+        </select>
+        <input
+          type="text"
+          placeholder="Description (optional)"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          className="border border-slate-300 rounded-lg px-3 py-2 text-sm w-40 focus:outline-none focus:ring-2 focus:ring-sky-500"
         />
         <button
           type="button"
@@ -74,9 +105,16 @@ export function AttachmentSection({
               className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0"
             >
               <div className="min-w-0 flex-1">
-                <span className="text-sm font-medium text-slate-800 truncate block">
-                  {a.fileName ?? "Unnamed"}
-                </span>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-medium text-slate-800 truncate">
+                    {a.fileName ?? "Unnamed"}
+                  </span>
+                  {a.tag && (
+                    <span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600 shrink-0">
+                      {TAG_LABELS[a.tag] ?? a.tag}
+                    </span>
+                  )}
+                </div>
                 <span className="text-xs text-slate-500">
                   {formatFileSize(a.fileSize)}
                   {a.contentType ? ` · ${a.contentType}` : ""}

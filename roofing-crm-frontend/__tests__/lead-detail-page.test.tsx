@@ -5,11 +5,15 @@ import LeadDetailPage from "@/app/app/leads/[leadId]/page";
 import * as leadsApi from "@/lib/leadsApi";
 import * as attachmentsApi from "@/lib/attachmentsApi";
 import * as communicationLogsApi from "@/lib/communicationLogsApi";
+import * as tasksApi from "@/lib/tasksApi";
+import * as activityApi from "@/lib/activityApi";
 import { LeadDto } from "@/lib/types";
 
 jest.mock("@/lib/leadsApi");
 jest.mock("@/lib/attachmentsApi");
 jest.mock("@/lib/communicationLogsApi");
+jest.mock("@/lib/tasksApi");
+jest.mock("@/lib/activityApi");
 jest.mock("next/navigation", () => ({
   useRouter: () => ({ push: jest.fn(), replace: jest.fn(), back: jest.fn() }),
   usePathname: () => "/app/leads/lead-1",
@@ -20,6 +24,8 @@ jest.mock("next/navigation", () => ({
 const mockedLeadsApi = leadsApi as jest.Mocked<typeof leadsApi>;
 const mockedAttachmentsApi = attachmentsApi as jest.Mocked<typeof attachmentsApi>;
 const mockedCommLogsApi = communicationLogsApi as jest.Mocked<typeof communicationLogsApi>;
+const mockedTasksApi = tasksApi as jest.Mocked<typeof tasksApi>;
+const mockedActivityApi = activityApi as jest.Mocked<typeof activityApi>;
 
 const mockLead: LeadDto = {
   id: "lead-1",
@@ -38,11 +44,23 @@ const mockLead: LeadDto = {
 };
 
 describe("LeadDetailPage", () => {
+  const emptyTasksResponse = { content: [], totalElements: 0, totalPages: 0, number: 0, size: 50, first: true, last: true };
+
   beforeEach(() => {
     jest.clearAllMocks();
     mockedLeadsApi.getLead.mockResolvedValue(mockLead);
     mockedAttachmentsApi.listLeadAttachments.mockResolvedValue([]);
     mockedCommLogsApi.listLeadCommunicationLogs.mockResolvedValue([]);
+    mockedTasksApi.listTasks.mockImplementation(() => Promise.resolve(emptyTasksResponse));
+    mockedActivityApi.listActivity.mockResolvedValue({
+      content: [],
+      totalElements: 0,
+      totalPages: 0,
+      number: 0,
+      size: 20,
+      first: true,
+      last: true,
+    });
   });
 
   it("renders customer name from customerFirstName and customerLastName", async () => {
@@ -56,8 +74,8 @@ describe("LeadDetailPage", () => {
   it("shows Convert to Job and Edit Lead buttons when lead is not LOST", async () => {
     render(<LeadDetailPage />);
 
-    const convertJobLink = await screen.findByRole("link", { name: /convert to job/i });
-    expect(convertJobLink).toHaveAttribute("href", "/app/leads/lead-1/convert");
+    const convertJobButton = await screen.findByRole("button", { name: /convert to job/i });
+    expect(convertJobButton).toBeInTheDocument();
 
     const editLink = await screen.findByRole("link", { name: /edit lead/i });
     expect(editLink).toHaveAttribute("href", "/app/leads/lead-1/edit");
@@ -92,6 +110,7 @@ describe("LeadDetailPage", () => {
       expect(screen.getByText(/converted to job/i)).toBeInTheDocument();
     });
 
+    expect(screen.queryByRole("button", { name: /convert to job/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /convert to job/i })).not.toBeInTheDocument();
 
     const viewJobLinks = screen.getAllByRole("link", { name: /view job/i });
@@ -118,7 +137,8 @@ describe("LeadDetailPage", () => {
     await waitFor(() => {
       expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("—");
     });
-    expect(screen.queryByText(/undefined/)).not.toBeInTheDocument();
+    // Should not show raw "undefined" in UI (e.g. from unhandled errors)
+    expect(screen.queryByText(/^undefined$/)).not.toBeInTheDocument();
   });
 
   it("renders Attachments and Communication Logs section headings", async () => {

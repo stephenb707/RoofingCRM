@@ -1,5 +1,6 @@
 package com.roofingcrm.api.v1.attachment;
 
+import com.roofingcrm.domain.enums.AttachmentTag;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -23,6 +24,7 @@ public class AttachmentDto {
     private UUID jobId;
 
     private String description;
+    private AttachmentTag tag;
 
     private Instant createdAt;
     private Instant updatedAt;

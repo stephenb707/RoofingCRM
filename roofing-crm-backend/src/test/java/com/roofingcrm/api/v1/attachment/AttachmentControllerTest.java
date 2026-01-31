@@ -29,7 +29,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(controllers = AttachmentController.class)
 @AutoConfigureMockMvc(addFilters = false)
-@SuppressWarnings("null")
 class AttachmentControllerTest {
 
     @Autowired
@@ -63,7 +62,7 @@ class AttachmentControllerTest {
         responseDto.setLeadId(leadId);
         responseDto.setCreatedAt(Instant.now());
 
-        when(attachmentService.uploadForLead(eq(tenantId), eq(userId), eq(leadId), any()))
+        when(attachmentService.uploadForLead(eq(tenantId), eq(userId), eq(leadId), any(), any(), any()))
                 .thenReturn(responseDto);
 
         MockMultipartFile file = new MockMultipartFile(
@@ -91,7 +90,7 @@ class AttachmentControllerTest {
         responseDto.setJobId(jobId);
         responseDto.setCreatedAt(Instant.now());
 
-        when(attachmentService.uploadForJob(eq(tenantId), eq(userId), eq(jobId), any()))
+        when(attachmentService.uploadForJob(eq(tenantId), eq(userId), eq(jobId), any(), any(), any()))
                 .thenReturn(responseDto);
 
         MockMultipartFile file = new MockMultipartFile(

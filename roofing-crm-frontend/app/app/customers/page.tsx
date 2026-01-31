@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useAuth } from "@/lib/AuthContext";
+import { useAuthReady } from "@/lib/AuthContext";
 import { listCustomers } from "@/lib/customersApi";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { queryKeys } from "@/lib/queryKeys";
@@ -11,7 +11,7 @@ import Link from "next/link";
 import { keepPreviousData } from "@tanstack/react-query";
 
 export default function CustomersPage() {
-  const { api, auth } = useAuth();
+  const { api, auth, ready } = useAuthReady();
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [page, setPage] = useState(0);
@@ -29,7 +29,7 @@ export default function CustomersPage() {
   const { data, isLoading, isError, error } = useQuery({
     queryKey: queryKeys.customersList(auth.selectedTenantId, debouncedQuery || null, page),
     queryFn: () => listCustomers(api, { page, size: pageSize, q: debouncedQuery || null }),
-    enabled: !!auth.selectedTenantId,
+    enabled: ready,
     placeholderData: keepPreviousData,
   });
 

@@ -3,7 +3,7 @@
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { useAuth } from "@/lib/AuthContext";
+import { useAuthReady } from "@/lib/AuthContext";
 import { getCustomer } from "@/lib/customersApi";
 import { listJobs } from "@/lib/jobsApi";
 import { listLeads } from "@/lib/leadsApi";
@@ -17,24 +17,24 @@ import { STATUS_LABELS, STATUS_COLORS } from "@/lib/leadsConstants";
 export default function CustomerDetailPage() {
   const params = useParams();
   const customerId = params.customerId as string;
-  const { api, auth } = useAuth();
+  const { api, auth, ready } = useAuthReady();
 
   const { data: customer, isLoading, isError, error } = useQuery({
     queryKey: queryKeys.customer(auth.selectedTenantId, customerId),
     queryFn: () => getCustomer(api, customerId),
-    enabled: !!auth.selectedTenantId && !!customerId,
+    enabled: ready && !!customerId,
   });
 
   const { data: jobsData } = useQuery({
     queryKey: queryKeys.jobsList(auth.selectedTenantId, null, customerId, 0),
     queryFn: () => listJobs(api, { customerId, page: 0, size: 10 }),
-    enabled: !!auth.selectedTenantId && !!customerId,
+    enabled: ready && !!customerId,
   });
 
   const { data: leadsData } = useQuery({
     queryKey: queryKeys.leadsList(auth.selectedTenantId, null, customerId, 0),
     queryFn: () => listLeads(api, { customerId, page: 0, size: 10 }),
-    enabled: !!auth.selectedTenantId && !!customerId,
+    enabled: ready && !!customerId,
   });
 
   const jobs = jobsData?.content ?? [];

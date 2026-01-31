@@ -4,7 +4,7 @@ import { FormEvent, useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@/lib/AuthContext";
+import { useAuthReady } from "@/lib/AuthContext";
 import { getTask, updateTask } from "@/lib/tasksApi";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { TASK_STATUS_OPTIONS, TASK_PRIORITY_OPTIONS } from "@/lib/tasksConstants";
@@ -29,7 +29,7 @@ export default function EditTaskPage() {
   const params = useParams();
   const router = useRouter();
   const taskId = params.taskId as string;
-  const { api, auth } = useAuth();
+  const { api, auth, ready } = useAuthReady();
   const queryClient = useQueryClient();
 
   const [title, setTitle] = useState("");
@@ -44,7 +44,7 @@ export default function EditTaskPage() {
   const { data: task, isLoading, isError, error: queryError } = useQuery({
     queryKey,
     queryFn: () => getTask(api, taskId),
-    enabled: !!auth.selectedTenantId && !!taskId,
+    enabled: ready && !!taskId,
   });
 
   useEffect(() => {

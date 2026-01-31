@@ -11,7 +11,6 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @SpringBootTest
 @Testcontainers
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-@SuppressWarnings("resource") // Testcontainers manages container lifecycle via @Container
 public abstract class AbstractIntegrationTest {
 
     @Container

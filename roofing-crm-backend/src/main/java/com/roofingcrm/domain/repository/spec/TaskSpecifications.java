@@ -6,6 +6,7 @@ import com.roofingcrm.domain.enums.TaskStatus;
 import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.lang.NonNull;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -17,6 +18,7 @@ public final class TaskSpecifications {
     private TaskSpecifications() {
     }
 
+    @NonNull
     public static Specification<Task> forTenantAndFilters(
             Tenant tenant,
             TaskStatus status,

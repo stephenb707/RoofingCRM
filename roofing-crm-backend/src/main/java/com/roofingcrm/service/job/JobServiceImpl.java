@@ -8,6 +8,9 @@ import com.roofingcrm.domain.entity.Customer;
 import com.roofingcrm.domain.entity.Job;
 import com.roofingcrm.domain.entity.Lead;
 import com.roofingcrm.domain.entity.Tenant;
+import com.roofingcrm.domain.enums.ActivityEntityType;
+import com.roofingcrm.domain.enums.ActivityEventType;
+import com.roofingcrm.service.activity.ActivityEventService;
 import com.roofingcrm.domain.enums.JobStatus;
 import com.roofingcrm.domain.repository.CustomerRepository;
 import com.roofingcrm.domain.repository.JobRepository;
@@ -22,6 +25,8 @@ import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -32,16 +37,19 @@ public class JobServiceImpl implements JobService {
     private final JobRepository jobRepository;
     private final CustomerRepository customerRepository;
     private final LeadRepository leadRepository;
+    private final ActivityEventService activityEventService;
 
     @Autowired
     public JobServiceImpl(TenantAccessService tenantAccessService,
                           JobRepository jobRepository,
                           CustomerRepository customerRepository,
-                          LeadRepository leadRepository) {
+                          LeadRepository leadRepository,
+                          ActivityEventService activityEventService) {
         this.tenantAccessService = tenantAccessService;
         this.jobRepository = jobRepository;
         this.customerRepository = customerRepository;
         this.leadRepository = leadRepository;
+        this.activityEventService = activityEventService;
     }
 
     @Override
@@ -171,11 +179,22 @@ public class JobServiceImpl implements JobService {
         Job job = jobRepository.findByIdAndTenantAndArchivedFalse(jobId, tenant)
                 .orElseThrow(() -> new ResourceNotFoundException("Job not found"));
 
+        JobStatus prevStatus = job.getStatus();
         job.setStatus(newStatus);
         job.setUpdatedByUserId(userId);
 
-        Job saved = jobRepository.save(job);
-        return toDto(saved);
+        Job updated = jobRepository.save(job);
+
+        if (prevStatus != newStatus) {
+            Map<String, Object> meta = new HashMap<>();
+            meta.put("jobId", jobId);
+            meta.put("fromStatus", prevStatus.name());
+            meta.put("toStatus", newStatus.name());
+            activityEventService.recordEvent(tenant, userId, ActivityEntityType.JOB, jobId,
+                    ActivityEventType.JOB_STATUS_CHANGED, "Status: " + prevStatus + " → " + newStatus, meta);
+        }
+
+        return toDto(updated);
     }
 
     private void applyAddress(Address entity, AddressDto dto) {

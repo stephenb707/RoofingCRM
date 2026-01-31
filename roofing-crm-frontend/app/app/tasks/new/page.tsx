@@ -4,7 +4,7 @@ import { FormEvent, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@/lib/AuthContext";
+import { useAuthReady } from "@/lib/AuthContext";
 import { createTask } from "@/lib/tasksApi";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { TASK_STATUS_OPTIONS, TASK_PRIORITY_OPTIONS } from "@/lib/tasksConstants";
@@ -19,7 +19,7 @@ function toIsoString(value: string): string | null {
 export default function NewTaskPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { api, auth } = useAuth();
+  const { api, auth, ready } = useAuthReady();
   const queryClient = useQueryClient();
 
   const leadIdParam = searchParams.get("leadId") ?? "";
@@ -234,10 +234,7 @@ export default function NewTaskPage() {
           </div>
         )}
 
-        <div className="flex items-center justify-end gap-3">
-          <Link href="/app/tasks" className="px-4 py-2.5 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors">
-            Cancel
-          </Link>
+        <div className="flex gap-3">
           <button
             type="submit"
             disabled={mutation.isPending}
@@ -255,6 +252,9 @@ export default function NewTaskPage() {
               "Create Task"
             )}
           </button>
+          <Link href="/app/tasks" className="px-4 py-2.5 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors">
+            Cancel
+          </Link>
         </div>
       </form>
     </div>

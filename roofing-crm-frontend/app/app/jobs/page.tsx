@@ -2,9 +2,9 @@
 
 import { useState, useMemo, useCallback } from "react";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { useAuth } from "@/lib/AuthContext";
+import { useAuthReady } from "@/lib/AuthContext";
 import { listJobs } from "@/lib/jobsApi";
 import { getApiErrorMessage } from "@/lib/apiError";
 import {
@@ -18,7 +18,8 @@ import { formatAddress, formatDate } from "@/lib/format";
 import type { JobStatus } from "@/lib/types";
 
 export default function JobsPage() {
-  const { api, auth } = useAuth();
+  const router = useRouter();
+  const { api, auth, ready } = useAuthReady();
   const searchParams = useSearchParams();
   const customerIdFromQuery = searchParams.get("customerId");
   const [statusFilter, setStatusFilter] = useState<JobStatus | "">("");
@@ -39,7 +40,7 @@ export default function JobsPage() {
         page,
         size: pageSize,
       }),
-    enabled: !!auth.selectedTenantId,
+    enabled: ready,
     placeholderData: keepPreviousData,
   });
 
@@ -205,7 +206,11 @@ export default function JobsPage() {
               </thead>
               <tbody className="divide-y divide-slate-200">
                 {jobs.map((job) => (
-                  <tr key={job.id} className="hover:bg-slate-50 transition-colors">
+                  <tr
+                    key={job.id}
+                    className="hover:bg-slate-50 transition-colors cursor-pointer"
+                    onClick={() => router.push(`/app/jobs/${job.id}`)}
+                  >
                     <td className="px-6 py-4 text-sm text-slate-800">
                       {JOB_TYPE_LABELS[job.type]}
                     </td>
@@ -228,7 +233,7 @@ export default function JobsPage() {
                     <td className="px-6 py-4 text-sm text-slate-600">
                       {formatDate(job.updatedAt)}
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                       <Link
                         href={`/app/jobs/${job.id}`}
                         className="text-sm text-sky-600 hover:text-sky-700 font-medium"

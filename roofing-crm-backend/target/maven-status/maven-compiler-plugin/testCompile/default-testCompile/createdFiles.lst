@@ -1,8 +1,6 @@
-com\roofingcrm\api\v1\attachment\AttachmentControllerTest.class
 com\roofingcrm\AbstractIntegrationTest.class
 com\roofingcrm\api\v1\communication\CommunicationLogControllerTest.class
 com\roofingcrm\api\v1\auth\AuthControllerTest.class
-com\roofingcrm\service\attachment\AttachmentServiceImplTest.class
 com\roofingcrm\api\v1\estimate\EstimateControllerTest.class
 com\roofingcrm\service\estimate\EstimateServiceImplTest.class
 com\roofingcrm\api\v1\lead\LeadControllerTest.class

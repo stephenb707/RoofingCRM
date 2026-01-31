@@ -4,7 +4,7 @@ import { FormEvent, useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@/lib/AuthContext";
+import { useAuthReady } from "@/lib/AuthContext";
 import { getCustomer, updateCustomer } from "@/lib/customersApi";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { queryKeys } from "@/lib/queryKeys";
@@ -14,7 +14,7 @@ export default function EditCustomerPage() {
   const params = useParams();
   const router = useRouter();
   const customerId = params.customerId as string;
-  const { api, auth } = useAuth();
+  const { api, auth, ready } = useAuthReady();
   const queryClient = useQueryClient();
 
   const [firstName, setFirstName] = useState("");
@@ -32,7 +32,7 @@ export default function EditCustomerPage() {
   const { data: customer, isLoading, isError, error } = useQuery({
     queryKey: queryKeys.customer(auth.selectedTenantId, customerId),
     queryFn: () => getCustomer(api, customerId),
-    enabled: !!auth.selectedTenantId && !!customerId,
+    enabled: ready && !!customerId,
   });
 
   useEffect(() => {

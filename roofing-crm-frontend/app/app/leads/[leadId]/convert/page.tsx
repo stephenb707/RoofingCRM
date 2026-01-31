@@ -4,7 +4,7 @@ import { FormEvent, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@/lib/AuthContext";
+import { useAuthReady } from "@/lib/AuthContext";
 import { getLead, convertLeadToJob } from "@/lib/leadsApi";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { queryKeys } from "@/lib/queryKeys";
@@ -16,7 +16,7 @@ export default function ConvertLeadPage() {
   const params = useParams();
   const router = useRouter();
   const leadId = params.leadId as string;
-  const { api, auth } = useAuth();
+  const { api, auth, ready } = useAuthReady();
   const queryClient = useQueryClient();
 
   const [jobType, setJobType] = useState<JobType | "">("");
@@ -29,7 +29,7 @@ export default function ConvertLeadPage() {
   const { data: lead, isLoading, isError, error } = useQuery({
     queryKey: queryKeys.lead(auth.selectedTenantId, leadId),
     queryFn: () => getLead(api, leadId),
-    enabled: !!auth.selectedTenantId && !!leadId,
+    enabled: ready && !!leadId,
   });
 
   const mutation = useMutation({

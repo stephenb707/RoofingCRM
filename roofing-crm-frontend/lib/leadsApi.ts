@@ -96,7 +96,7 @@ export async function updateLeadStatus(
 }
 
 /**
- * Convert a lead to a job.
+ * Convert a lead to a job. Alias: convertLead.
  */
 export async function convertLeadToJob(
   api: AxiosInstance,

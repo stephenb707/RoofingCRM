@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@/lib/AuthContext";
+import { useAuthReady } from "@/lib/AuthContext";
 import { getEstimate, updateEstimate, updateEstimateStatus } from "@/lib/estimatesApi";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { queryKeys } from "@/lib/queryKeys";
@@ -34,7 +34,7 @@ function lineTotal(it: { quantity: number; unitPrice: number }): number {
 export default function EstimateDetailPage() {
   const params = useParams();
   const estimateId = params.estimateId as string;
-  const { api, auth } = useAuth();
+  const { api, auth, ready } = useAuthReady();
   const queryClient = useQueryClient();
 
   const [selectedStatus, setSelectedStatus] = useState<EstimateStatus | null>(null);
@@ -53,7 +53,7 @@ export default function EstimateDetailPage() {
   const { data: estimate, isLoading, isError, error } = useQuery({
     queryKey: queryKeys.estimate(auth.selectedTenantId, estimateId),
     queryFn: () => getEstimate(api, estimateId),
-    enabled: !!auth.selectedTenantId && !!estimateId,
+    enabled: ready && !!estimateId,
   });
 
   useEffect(() => {

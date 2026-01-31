@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@/lib/AuthContext";
+import { useAuthReady } from "@/lib/AuthContext";
 import { getJob, updateJobStatus } from "@/lib/jobsApi";
 import { getApiErrorMessage } from "@/lib/apiError";
 import {
@@ -22,12 +22,15 @@ import {
 } from "@/lib/communicationLogsApi";
 import { AttachmentSection } from "@/components/AttachmentSection";
 import { CommunicationLogSection } from "@/components/CommunicationLogSection";
-import type { JobStatus, CreateCommunicationLogRequest } from "@/lib/types";
+import { ActivitySection } from "@/components/ActivitySection";
+import { TasksSection } from "@/components/TasksSection";
+import { StatusBadge } from "@/components/StatusBadge";
+import type { JobStatus, CreateCommunicationLogRequest, AttachmentTag } from "@/lib/types";
 
 export default function JobDetailPage() {
   const params = useParams();
   const jobId = params.jobId as string;
-  const { api, auth } = useAuth();
+  const { api, auth, ready } = useAuthReady();
   const queryClient = useQueryClient();
 
   const [selectedStatus, setSelectedStatus] = useState<JobStatus | null>(null);
@@ -38,7 +41,7 @@ export default function JobDetailPage() {
   const { data: job, isLoading, isError, error } = useQuery({
     queryKey: queryKeys.job(auth.selectedTenantId, jobId),
     queryFn: () => getJob(api, jobId),
-    enabled: !!auth.selectedTenantId && !!jobId,
+    enabled: ready && !!jobId,
   });
 
   useEffect(() => {
@@ -70,11 +73,19 @@ export default function JobDetailPage() {
   const attachmentsQuery = useQuery({
     queryKey: queryKeys.jobAttachments(auth.selectedTenantId, jobId),
     queryFn: () => listJobAttachments(api, jobId),
-    enabled: !!auth.selectedTenantId && !!jobId,
+    enabled: ready && !!jobId,
   });
 
   const uploadAttachmentMutation = useMutation({
-    mutationFn: (file: File) => uploadJobAttachment(api, jobId, file),
+    mutationFn: ({
+      file,
+      tag,
+      description,
+    }: {
+      file: File;
+      tag?: AttachmentTag;
+      description?: string;
+    }) => uploadJobAttachment(api, jobId, file, { tag, description }),
     onSuccess: () => {
       setAttachmentError(null);
       queryClient.invalidateQueries({
@@ -105,7 +116,7 @@ export default function JobDetailPage() {
   const commLogsQuery = useQuery({
     queryKey: queryKeys.jobCommLogs(auth.selectedTenantId, jobId),
     queryFn: () => listJobCommunicationLogs(api, jobId),
-    enabled: !!auth.selectedTenantId && !!jobId,
+    enabled: ready && !!jobId,
   });
 
   const addCommLogMutation = useMutation({
@@ -239,11 +250,19 @@ export default function JobDetailPage() {
             )}
           </div>
 
+          {/* Activity */}
+          <ActivitySection entityType="JOB" entityId={jobId} />
+
+          {/* Tasks */}
+          <TasksSection entityType="job" entityId={jobId} />
+
           {/* Attachments */}
           <AttachmentSection
             title="Attachments"
             attachments={attachmentsQuery.data ?? []}
-            onUpload={(file) => uploadAttachmentMutation.mutate(file)}
+            onUpload={(file, options) =>
+              uploadAttachmentMutation.mutate({ file, tag: options?.tag, description: options?.description })
+            }
             onDownload={handleDownloadAttachment}
             isLoading={attachmentsQuery.isLoading}
             isUploading={uploadAttachmentMutation.isPending}

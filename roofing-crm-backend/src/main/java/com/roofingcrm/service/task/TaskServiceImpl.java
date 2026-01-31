@@ -8,6 +8,9 @@ import com.roofingcrm.domain.enums.TaskPriority;
 import com.roofingcrm.domain.enums.TaskStatus;
 import com.roofingcrm.domain.repository.*;
 import com.roofingcrm.domain.repository.spec.TaskSpecifications;
+import com.roofingcrm.domain.enums.ActivityEntityType;
+import com.roofingcrm.domain.enums.ActivityEventType;
+import com.roofingcrm.service.activity.ActivityEventService;
 import com.roofingcrm.service.exception.ResourceNotFoundException;
 import com.roofingcrm.service.tenant.TenantAccessService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +22,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -32,6 +37,7 @@ public class TaskServiceImpl implements TaskService {
     private final LeadRepository leadRepository;
     private final JobRepository jobRepository;
     private final CustomerRepository customerRepository;
+    private final ActivityEventService activityEventService;
 
     @Autowired
     public TaskServiceImpl(TenantAccessService tenantAccessService,
@@ -40,7 +46,8 @@ public class TaskServiceImpl implements TaskService {
                            TenantUserMembershipRepository tenantUserMembershipRepository,
                            LeadRepository leadRepository,
                            JobRepository jobRepository,
-                           CustomerRepository customerRepository) {
+                           CustomerRepository customerRepository,
+                           ActivityEventService activityEventService) {
         this.tenantAccessService = tenantAccessService;
         this.taskRepository = taskRepository;
         this.userRepository = userRepository;
@@ -48,6 +55,7 @@ public class TaskServiceImpl implements TaskService {
         this.leadRepository = leadRepository;
         this.jobRepository = jobRepository;
         this.customerRepository = customerRepository;
+        this.activityEventService = activityEventService;
     }
 
     @Override
@@ -75,6 +83,27 @@ public class TaskServiceImpl implements TaskService {
         }
 
         Task saved = taskRepository.save(task);
+
+        Map<String, Object> meta = new HashMap<>();
+        meta.put("taskId", saved.getId());
+        meta.put("title", saved.getTitle());
+        meta.put("status", saved.getStatus().name());
+        meta.put("priority", saved.getPriority().name());
+        if (saved.getDueAt() != null) meta.put("dueAt", saved.getDueAt().toString());
+        if (saved.getAssignedTo() != null) meta.put("assignedToUserId", saved.getAssignedTo().getId());
+        if (saved.getLead() != null) meta.put("leadId", saved.getLead().getId());
+        if (saved.getJob() != null) meta.put("jobId", saved.getJob().getId());
+        if (saved.getCustomer() != null) meta.put("customerId", saved.getCustomer().getId());
+
+        if (saved.getLead() != null) {
+            activityEventService.recordEvent(tenant, userId, ActivityEntityType.LEAD, saved.getLead().getId(),
+                    ActivityEventType.TASK_CREATED, "Task created: " + saved.getTitle(), meta);
+        }
+        if (saved.getJob() != null) {
+            activityEventService.recordEvent(tenant, userId, ActivityEntityType.JOB, saved.getJob().getId(),
+                    ActivityEventType.TASK_CREATED, "Task created: " + saved.getTitle(), meta);
+        }
+
         return toDto(saved);
     }
 
@@ -85,6 +114,7 @@ public class TaskServiceImpl implements TaskService {
         Task task = taskRepository.findByIdAndTenantAndArchivedFalse(taskId, tenant)
                 .orElseThrow(() -> new ResourceNotFoundException("Task not found"));
 
+        TaskStatus prevStatus = task.getStatus();
         task.setUpdatedByUserId(userId);
 
         if (request.getTitle() != null) {
@@ -103,6 +133,21 @@ public class TaskServiceImpl implements TaskService {
                 task.setCompletedAt(Instant.now());
             } else if (newStatus != TaskStatus.COMPLETED) {
                 task.setCompletedAt(null);
+            }
+
+            if (prevStatus != newStatus) {
+                Map<String, Object> meta = new HashMap<>();
+                meta.put("taskId", taskId);
+                meta.put("fromStatus", prevStatus.name());
+                meta.put("toStatus", newStatus.name());
+                if (task.getLead() != null) {
+                    activityEventService.recordEvent(tenant, userId, ActivityEntityType.LEAD, task.getLead().getId(),
+                            ActivityEventType.TASK_STATUS_CHANGED, "Task status: " + prevStatus + " → " + newStatus, meta);
+                }
+                if (task.getJob() != null) {
+                    activityEventService.recordEvent(tenant, userId, ActivityEntityType.JOB, task.getJob().getId(),
+                            ActivityEventType.TASK_STATUS_CHANGED, "Task status: " + prevStatus + " → " + newStatus, meta);
+                }
             }
         }
         if (request.getPriority() != null) {
@@ -144,7 +189,7 @@ public class TaskServiceImpl implements TaskService {
     @Transactional(readOnly = true)
     public Page<TaskDto> listTasks(@NonNull UUID tenantId, @NonNull UUID userId,
             TaskStatus status, UUID assignedToUserId, UUID leadId, UUID jobId, UUID customerId,
-            Instant dueBefore, Instant dueAfter, Pageable pageable) {
+            Instant dueBefore, Instant dueAfter, @NonNull Pageable pageable) {
         Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
 
         Specification<Task> spec = TaskSpecifications.forTenantAndFilters(
