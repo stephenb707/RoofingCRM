@@ -80,7 +80,7 @@ public class CustomerServiceImpl implements CustomerService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<CustomerDto> listCustomers(@NonNull UUID tenantId, @NonNull UUID userId, String q, Pageable pageable) {
+    public Page<CustomerDto> listCustomers(@NonNull UUID tenantId, @NonNull UUID userId, String q, @NonNull Pageable pageable) {
         Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
         
         String qNormalized = (q == null) ? null : q.trim().replaceAll("\\s+", " ");

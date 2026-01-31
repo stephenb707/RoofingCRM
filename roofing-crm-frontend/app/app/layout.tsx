@@ -4,15 +4,16 @@ import { useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@/lib/AuthContext";
+import { useAuthReady } from "@/lib/AuthContext";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { auth, logout } = useAuth();
+  const { auth, logout, ready } = useAuthReady();
   const router = useRouter();
   const queryClient = useQueryClient();
   const pathname = usePathname();
 
   useEffect(() => {
+    if (!ready) return;
     if (!auth.token) {
       router.replace("/auth/login");
       return;
@@ -21,9 +22,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       router.replace("/auth/select-tenant");
       return;
     }
-  }, [auth, router]);
+  }, [auth, ready, router]);
 
-  if (!auth.token || !auth.selectedTenantId) {
+  if (!ready || !auth.token || !auth.selectedTenantId) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-sky-600"></div>
@@ -129,6 +130,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             }`}
           >
             Tasks
+          </Link>
+          <Link
+            href="/app/reports"
+            className={`px-4 py-3 text-sm font-medium transition-colors ${
+              pathname.startsWith("/app/reports")
+                ? "text-sky-600 border-b-2 border-sky-600"
+                : "text-slate-600 hover:text-slate-800 border-b-2 border-transparent"
+            }`}
+          >
+            Reports
           </Link>
         </div>
       </nav>

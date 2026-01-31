@@ -30,6 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(controllers = LeadController.class)
 @AutoConfigureMockMvc(addFilters = false)
+@SuppressWarnings("null")
 class LeadControllerTest {
 
     @Autowired

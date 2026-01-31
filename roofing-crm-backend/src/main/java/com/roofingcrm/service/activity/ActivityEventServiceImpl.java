@@ -11,6 +11,7 @@ import com.roofingcrm.domain.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,13 +35,12 @@ public class ActivityEventServiceImpl implements ActivityEventService {
 
     @Override
     @Transactional
-    public ActivityEvent recordEventWithActor(Tenant tenant, User actor, ActivityEntityType entityType, UUID entityId,
+    public ActivityEvent recordEventWithActor(Tenant tenant, User actor, ActivityEntityType entityType, @NonNull UUID entityId,
                                              ActivityEventType type, String message, Map<String, Object> metadata) {
-        UUID safeEntityId = Objects.requireNonNull(entityId, "entityId must not be null");
         ActivityEvent event = new ActivityEvent();
         event.setTenant(tenant);
         event.setEntityType(entityType);
-        event.setEntityId(safeEntityId);
+        event.setEntityId(entityId);
         event.setEventType(type);
         event.setMessage(message != null ? message.trim() : "");
         event.setMetadata(metadata != null ? metadata : Collections.emptyMap());
@@ -50,17 +50,17 @@ public class ActivityEventServiceImpl implements ActivityEventService {
 
     @Override
     @Transactional
-    public void recordEvent(Tenant tenant, UUID userId, ActivityEntityType entityType, UUID entityId,
+    public void recordEvent(Tenant tenant, UUID userId, ActivityEntityType entityType, @NonNull UUID entityId,
                             ActivityEventType type, String message, Map<String, Object> metadata) {
-        User user = userRepository.findById(userId).orElse(null);
+        User user = userRepository.findById(Objects.requireNonNull(userId)).orElse(null);
         recordEventWithActor(tenant, user, entityType, entityId, type, message, metadata);
     }
 
     @Override
     @Transactional
-    public ActivityEventDto createNote(Tenant tenant, UUID userId, ActivityEntityType entityType, UUID entityId,
+    public ActivityEventDto createNote(Tenant tenant, UUID userId, ActivityEntityType entityType, @NonNull UUID entityId,
                                        String body) {
-        User user = userRepository.findById(userId)
+        User user = userRepository.findById(Objects.requireNonNull(userId))
                 .orElseThrow(() -> new com.roofingcrm.service.exception.ResourceNotFoundException("User not found"));
         String trimmed = body != null ? body.trim() : "";
         ActivityEvent event = recordEventWithActor(tenant, user, entityType, entityId, ActivityEventType.NOTE, trimmed,
@@ -70,12 +70,11 @@ public class ActivityEventServiceImpl implements ActivityEventService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<ActivityEventDto> listEvents(Tenant tenant, ActivityEntityType entityType, UUID entityId,
+    public Page<ActivityEventDto> listEvents(Tenant tenant, ActivityEntityType entityType, @NonNull UUID entityId,
                                              Pageable pageable) {
-        UUID safeEntityId = Objects.requireNonNull(entityId, "entityId must not be null");
         return activityEventRepository
                 .findByTenantAndEntityTypeAndEntityIdAndArchivedFalseOrderByCreatedAtDesc(
-                        tenant, entityType, safeEntityId, pageable)
+                        tenant, entityType, entityId, pageable)
                 .map(this::toDto);
     }
 

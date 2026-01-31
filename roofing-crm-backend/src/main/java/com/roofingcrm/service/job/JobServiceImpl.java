@@ -27,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -155,7 +156,7 @@ public class JobServiceImpl implements JobService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<JobDto> listJobs(@NonNull UUID tenantId, @NonNull UUID userId, JobStatus statusFilter, UUID customerIdFilter, Pageable pageable) {
+    public Page<JobDto> listJobs(@NonNull UUID tenantId, @NonNull UUID userId, JobStatus statusFilter, UUID customerIdFilter, @NonNull Pageable pageable) {
         Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
 
         Page<Job> page;
@@ -190,7 +191,8 @@ public class JobServiceImpl implements JobService {
             meta.put("jobId", jobId);
             meta.put("fromStatus", prevStatus.name());
             meta.put("toStatus", newStatus.name());
-            activityEventService.recordEvent(tenant, userId, ActivityEntityType.JOB, jobId,
+            activityEventService.recordEvent(tenant, userId, ActivityEntityType.JOB,
+                    Objects.requireNonNull(jobId),
                     ActivityEventType.JOB_STATUS_CHANGED, "Status: " + prevStatus + " → " + newStatus, meta);
         }
 

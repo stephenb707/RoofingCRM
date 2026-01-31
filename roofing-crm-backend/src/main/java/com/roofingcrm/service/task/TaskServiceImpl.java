@@ -24,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -96,11 +97,13 @@ public class TaskServiceImpl implements TaskService {
         if (saved.getCustomer() != null) meta.put("customerId", saved.getCustomer().getId());
 
         if (saved.getLead() != null) {
-            activityEventService.recordEvent(tenant, userId, ActivityEntityType.LEAD, saved.getLead().getId(),
+            activityEventService.recordEvent(tenant, userId, ActivityEntityType.LEAD,
+                    Objects.requireNonNull(saved.getLead().getId()),
                     ActivityEventType.TASK_CREATED, "Task created: " + saved.getTitle(), meta);
         }
         if (saved.getJob() != null) {
-            activityEventService.recordEvent(tenant, userId, ActivityEntityType.JOB, saved.getJob().getId(),
+            activityEventService.recordEvent(tenant, userId, ActivityEntityType.JOB,
+                    Objects.requireNonNull(saved.getJob().getId()),
                     ActivityEventType.TASK_CREATED, "Task created: " + saved.getTitle(), meta);
         }
 
@@ -141,11 +144,13 @@ public class TaskServiceImpl implements TaskService {
                 meta.put("fromStatus", prevStatus.name());
                 meta.put("toStatus", newStatus.name());
                 if (task.getLead() != null) {
-                    activityEventService.recordEvent(tenant, userId, ActivityEntityType.LEAD, task.getLead().getId(),
+                    activityEventService.recordEvent(tenant, userId, ActivityEntityType.LEAD,
+                            Objects.requireNonNull(task.getLead().getId()),
                             ActivityEventType.TASK_STATUS_CHANGED, "Task status: " + prevStatus + " → " + newStatus, meta);
                 }
                 if (task.getJob() != null) {
-                    activityEventService.recordEvent(tenant, userId, ActivityEntityType.JOB, task.getJob().getId(),
+                    activityEventService.recordEvent(tenant, userId, ActivityEntityType.JOB,
+                            Objects.requireNonNull(task.getJob().getId()),
                             ActivityEventType.TASK_STATUS_CHANGED, "Task status: " + prevStatus + " → " + newStatus, meta);
                 }
             }

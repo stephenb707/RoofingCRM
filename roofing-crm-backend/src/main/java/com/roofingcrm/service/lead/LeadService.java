@@ -20,7 +20,7 @@ public interface LeadService {
 
     LeadDto getLead(@NonNull UUID tenantId, @NonNull UUID userId, UUID leadId);
 
-    Page<LeadDto> listLeads(@NonNull UUID tenantId, @NonNull UUID userId, LeadStatus statusFilter, UUID customerId, Pageable pageable);
+    Page<LeadDto> listLeads(@NonNull UUID tenantId, @NonNull UUID userId, LeadStatus statusFilter, UUID customerId, @NonNull Pageable pageable);
 
     LeadDto updateLeadStatus(@NonNull UUID tenantId, @NonNull UUID userId, UUID leadId, LeadStatus newStatus);
 

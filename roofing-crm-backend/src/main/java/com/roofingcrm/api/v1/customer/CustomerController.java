@@ -62,7 +62,7 @@ public class CustomerController {
     public ResponseEntity<Page<CustomerDto>> listCustomers(
             @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
             @RequestParam(value = "q", required = false) String q,
-            @PageableDefault(size = 20) Pageable pageable) {
+            @PageableDefault(size = 20) @NonNull Pageable pageable) {
 
         UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
         Page<CustomerDto> page = customerService.listCustomers(tenantId, userId, q, pageable);

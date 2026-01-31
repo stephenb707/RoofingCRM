@@ -15,6 +15,7 @@ import org.springframework.lang.NonNull;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Objects;
 import java.util.UUID;
 
 @RestController
@@ -37,7 +38,7 @@ public class ActivityController {
             @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
             @RequestParam("entityType") ActivityEntityType entityType,
             @RequestParam("entityId") @NonNull UUID entityId,
-            @PageableDefault(size = 20) Pageable pageable) {
+            @PageableDefault(size = 20) @NonNull Pageable pageable) {
 
         UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
         var tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
@@ -55,7 +56,7 @@ public class ActivityController {
         var tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
 
         ActivityEventDto created = activityEventService.createNote(
-                tenant, userId, request.getEntityType(), request.getEntityId(), request.getBody());
+                tenant, userId, request.getEntityType(), Objects.requireNonNull(request.getEntityId()), request.getBody());
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 }

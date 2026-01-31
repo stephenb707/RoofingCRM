@@ -24,6 +24,7 @@ import java.io.InputStream;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -78,7 +79,8 @@ public class AttachmentServiceImpl implements AttachmentService {
         meta.put("contentType", attachment.getContentType());
         meta.put("fileSize", attachment.getFileSize());
         meta.put("tag", attachment.getTag().name());
-        activityEventService.recordEvent(tenant, userId, ActivityEntityType.LEAD, lead.getId(),
+        activityEventService.recordEvent(tenant, userId, ActivityEntityType.LEAD,
+                Objects.requireNonNull(lead.getId()),
                 ActivityEventType.ATTACHMENT_ADDED, "Added " + formatAttachmentLabel(attachment), meta);
 
         return toDto(attachment);
@@ -111,7 +113,8 @@ public class AttachmentServiceImpl implements AttachmentService {
         meta.put("contentType", attachment.getContentType());
         meta.put("fileSize", attachment.getFileSize());
         meta.put("tag", attachment.getTag().name());
-        activityEventService.recordEvent(tenant, userId, ActivityEntityType.JOB, job.getId(),
+        activityEventService.recordEvent(tenant, userId, ActivityEntityType.JOB,
+                Objects.requireNonNull(job.getId()),
                 ActivityEventType.ATTACHMENT_ADDED, "Added " + formatAttachmentLabel(attachment), meta);
 
         return toDto(attachment);

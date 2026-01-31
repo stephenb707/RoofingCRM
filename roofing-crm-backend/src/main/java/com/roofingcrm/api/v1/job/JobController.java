@@ -64,7 +64,7 @@ public class JobController {
             @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
             @RequestParam(value = "status", required = false) JobStatus status,
             @RequestParam(value = "customerId", required = false) UUID customerId,
-            @PageableDefault(size = 20) Pageable pageable) {
+            @PageableDefault(size = 20) @NonNull Pageable pageable) {
 
         UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
         Page<JobDto> page = jobService.listJobs(tenantId, userId, status, customerId, pageable);

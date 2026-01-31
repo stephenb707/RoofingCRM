@@ -33,6 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -132,7 +133,7 @@ public class LeadServiceImpl implements LeadService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<LeadDto> listLeads(@NonNull UUID tenantId, @NonNull UUID userId, LeadStatus statusFilter, UUID customerId, Pageable pageable) {
+    public Page<LeadDto> listLeads(@NonNull UUID tenantId, @NonNull UUID userId, LeadStatus statusFilter, UUID customerId, @NonNull Pageable pageable) {
         Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
 
         Page<Lead> page;
@@ -167,7 +168,8 @@ public class LeadServiceImpl implements LeadService {
             meta.put("leadId", leadId);
             meta.put("fromStatus", prevStatus.name());
             meta.put("toStatus", newStatus.name());
-            activityEventService.recordEvent(tenant, userId, ActivityEntityType.LEAD, lead.getId(),
+            activityEventService.recordEvent(tenant, userId, ActivityEntityType.LEAD,
+                    Objects.requireNonNull(lead.getId()),
                     ActivityEventType.LEAD_STATUS_CHANGED, "Lead status changed from " + prevStatus + " to " + newStatus, meta);
         }
 
@@ -227,7 +229,8 @@ public class LeadServiceImpl implements LeadService {
         Map<String, Object> meta = new HashMap<>();
         meta.put("leadId", leadId);
         meta.put("jobId", saved.getId());
-        activityEventService.recordEvent(tenant, userId, ActivityEntityType.LEAD, leadId,
+        activityEventService.recordEvent(tenant, userId, ActivityEntityType.LEAD,
+                Objects.requireNonNull(leadId),
                 ActivityEventType.LEAD_CONVERTED_TO_JOB, "Lead converted to job", meta);
 
         return toJobDto(saved);

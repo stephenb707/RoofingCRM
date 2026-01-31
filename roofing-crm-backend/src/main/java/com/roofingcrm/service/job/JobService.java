@@ -18,7 +18,7 @@ public interface JobService {
 
     JobDto getJob(@NonNull UUID tenantId, @NonNull UUID userId, UUID jobId);
 
-    Page<JobDto> listJobs(@NonNull UUID tenantId, @NonNull UUID userId, JobStatus statusFilter, UUID customerIdFilter, Pageable pageable);
+    Page<JobDto> listJobs(@NonNull UUID tenantId, @NonNull UUID userId, JobStatus statusFilter, UUID customerIdFilter, @NonNull Pageable pageable);
 
     JobDto updateJobStatus(@NonNull UUID tenantId, @NonNull UUID userId, UUID jobId, JobStatus newStatus);
 }

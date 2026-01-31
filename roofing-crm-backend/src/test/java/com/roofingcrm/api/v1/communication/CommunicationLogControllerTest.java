@@ -30,6 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(controllers = CommunicationLogController.class)
 @AutoConfigureMockMvc(addFilters = false)
+@SuppressWarnings("null")
 class CommunicationLogControllerTest {
 
     @Autowired

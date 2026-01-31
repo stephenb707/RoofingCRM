@@ -16,6 +16,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.io.ByteArrayInputStream;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.hasSize;
@@ -29,6 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(controllers = AttachmentController.class)
 @AutoConfigureMockMvc(addFilters = false)
+@SuppressWarnings("null")
 class AttachmentControllerTest {
 
     @Autowired
@@ -42,7 +44,7 @@ class AttachmentControllerTest {
     @BeforeEach
     void setUp() {
         userId = UUID.randomUUID();
-        AuthenticatedUser authUser = new AuthenticatedUser(userId, "test@example.com");
+        AuthenticatedUser authUser = new AuthenticatedUser(Objects.requireNonNull(userId), "test@example.com");
         TestingAuthenticationToken authentication = new TestingAuthenticationToken(authUser, null);
         authentication.setAuthenticated(true);
         SecurityContextHolder.getContext().setAuthentication(authentication);
@@ -62,7 +64,7 @@ class AttachmentControllerTest {
         responseDto.setLeadId(leadId);
         responseDto.setCreatedAt(Instant.now());
 
-        when(attachmentService.uploadForLead(eq(tenantId), eq(userId), eq(leadId), any(), any(), any()))
+        when(attachmentService.uploadForLead(eq(Objects.requireNonNull(tenantId)), eq(Objects.requireNonNull(userId)), eq(Objects.requireNonNull(leadId)), any(), any(), any()))
                 .thenReturn(responseDto);
 
         MockMultipartFile file = new MockMultipartFile(
@@ -72,8 +74,8 @@ class AttachmentControllerTest {
                         .file(file)
                         .header("X-Tenant-Id", tenantId.toString()))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.fileName", is("test-doc.pdf")))
-                .andExpect(jsonPath("$.storageProvider", is("LOCAL")));
+                .andExpect(jsonPath("$.fileName", Objects.requireNonNull(is("test-doc.pdf"))))
+                .andExpect(jsonPath("$.storageProvider", Objects.requireNonNull(is("LOCAL"))));
     }
 
     @Test
@@ -90,7 +92,7 @@ class AttachmentControllerTest {
         responseDto.setJobId(jobId);
         responseDto.setCreatedAt(Instant.now());
 
-        when(attachmentService.uploadForJob(eq(tenantId), eq(userId), eq(jobId), any(), any(), any()))
+        when(attachmentService.uploadForJob(eq(Objects.requireNonNull(tenantId)), eq(Objects.requireNonNull(userId)), eq(Objects.requireNonNull(jobId)), any(), any(), any()))
                 .thenReturn(responseDto);
 
         MockMultipartFile file = new MockMultipartFile(
@@ -100,7 +102,7 @@ class AttachmentControllerTest {
                         .file(file)
                         .header("X-Tenant-Id", tenantId.toString()))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.fileName", is("job-photo.jpg")));
+                .andExpect(jsonPath("$.fileName", Objects.requireNonNull(is("job-photo.jpg"))));
     }
 
     @Test
@@ -118,14 +120,14 @@ class AttachmentControllerTest {
         dto2.setFileName("doc2.pdf");
         dto2.setLeadId(leadId);
 
-        when(attachmentService.listForLead(eq(tenantId), eq(userId), eq(leadId)))
+        when(attachmentService.listForLead(eq(Objects.requireNonNull(tenantId)), eq(Objects.requireNonNull(userId)), eq(Objects.requireNonNull(leadId))))
                 .thenReturn(List.of(dto1, dto2));
 
         mockMvc.perform(get("/api/v1/leads/{leadId}/attachments", leadId)
                         .header("X-Tenant-Id", tenantId.toString()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(2)))
-                .andExpect(jsonPath("$[0].fileName", is("doc1.pdf")));
+                .andExpect(jsonPath("$", Objects.requireNonNull(hasSize(2))))
+                .andExpect(jsonPath("$[0].fileName", Objects.requireNonNull(is("doc1.pdf"))));
     }
 
     @Test
@@ -138,11 +140,11 @@ class AttachmentControllerTest {
         metadata.setFileName("download.pdf");
         metadata.setContentType("application/pdf");
 
-        when(attachmentService.getAttachment(eq(tenantId), eq(userId), eq(attachmentId)))
+        when(attachmentService.getAttachment(eq(Objects.requireNonNull(tenantId)), eq(Objects.requireNonNull(userId)), eq(Objects.requireNonNull(attachmentId))))
                 .thenReturn(metadata);
 
         byte[] fileContent = "PDF file content".getBytes();
-        when(attachmentService.loadAttachmentContent(eq(tenantId), eq(userId), eq(attachmentId)))
+        when(attachmentService.loadAttachmentContent(eq(Objects.requireNonNull(tenantId)), eq(Objects.requireNonNull(userId)), eq(Objects.requireNonNull(attachmentId))))
                 .thenReturn(new ByteArrayInputStream(fileContent));
 
         mockMvc.perform(get("/api/v1/attachments/{id}/download", attachmentId)
