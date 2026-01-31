@@ -1,6 +1,7 @@
 package com.roofingcrm.service.estimate;
 
 import com.roofingcrm.AbstractIntegrationTest;
+import com.roofingcrm.TestDatabaseCleaner;
 import com.roofingcrm.api.v1.estimate.CreateEstimateRequest;
 import com.roofingcrm.api.v1.estimate.EstimateDto;
 import com.roofingcrm.api.v1.estimate.EstimateItemRequest;
@@ -14,7 +15,6 @@ import com.roofingcrm.domain.enums.JobStatus;
 import com.roofingcrm.domain.enums.JobType;
 import com.roofingcrm.domain.enums.UserRole;
 import com.roofingcrm.domain.repository.CustomerRepository;
-import com.roofingcrm.domain.repository.EstimateRepository;
 import com.roofingcrm.domain.repository.JobRepository;
 import com.roofingcrm.domain.repository.TenantRepository;
 import com.roofingcrm.domain.repository.TenantUserMembershipRepository;
@@ -49,13 +49,13 @@ class EstimateServiceImplTest extends AbstractIntegrationTest {
     private JobRepository jobRepository;
 
     @Autowired
-    private EstimateRepository estimateRepository;
-
-    @Autowired
     private UserRepository userRepository;
 
     @Autowired
     private TenantUserMembershipRepository membershipRepository;
+
+    @Autowired
+    private TestDatabaseCleaner dbCleaner;
 
     @NonNull
     private UUID tenantId = Objects.requireNonNull(UUID.randomUUID());
@@ -67,12 +67,7 @@ class EstimateServiceImplTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        membershipRepository.deleteAll();
-        estimateRepository.deleteAll();
-        jobRepository.deleteAll();
-        customerRepository.deleteAll();
-        userRepository.deleteAll();
-        tenantRepository.deleteAll();
+        dbCleaner.reset();
 
         Tenant tenant = new Tenant();
         tenant.setName("Test Roofing");

@@ -1,13 +1,13 @@
 package com.roofingcrm.service.auth;
 
 import com.roofingcrm.AbstractIntegrationTest;
+import com.roofingcrm.TestDatabaseCleaner;
 import com.roofingcrm.api.v1.auth.AuthResponse;
 import com.roofingcrm.api.v1.auth.LoginRequest;
 import com.roofingcrm.api.v1.auth.RegisterRequest;
 import com.roofingcrm.domain.entity.TenantUserMembership;
 import com.roofingcrm.domain.entity.User;
 import com.roofingcrm.domain.enums.UserRole;
-import com.roofingcrm.domain.repository.TenantRepository;
 import com.roofingcrm.domain.repository.TenantUserMembershipRepository;
 import com.roofingcrm.domain.repository.UserRepository;
 import com.roofingcrm.service.exception.ResourceNotFoundException;
@@ -28,16 +28,14 @@ class AuthServiceImplTest extends AbstractIntegrationTest {
     private UserRepository userRepository;
 
     @Autowired
-    private TenantRepository tenantRepository;
+    private TenantUserMembershipRepository membershipRepository;
 
     @Autowired
-    private TenantUserMembershipRepository membershipRepository;
+    private TestDatabaseCleaner dbCleaner;
 
     @BeforeEach
     void setUp() {
-        membershipRepository.deleteAll();
-        userRepository.deleteAll();
-        tenantRepository.deleteAll();
+        dbCleaner.reset();
     }
 
     @Test

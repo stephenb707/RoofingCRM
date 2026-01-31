@@ -1,6 +1,7 @@
 package com.roofingcrm.service.lead;
 
 import com.roofingcrm.AbstractIntegrationTest;
+import com.roofingcrm.TestDatabaseCleaner;
 import com.roofingcrm.api.v1.common.AddressDto;
 import com.roofingcrm.api.v1.job.JobDto;
 import com.roofingcrm.api.v1.lead.ConvertLeadToJobRequest;
@@ -17,7 +18,6 @@ import com.roofingcrm.domain.enums.LeadStatus;
 import com.roofingcrm.domain.enums.UserRole;
 import com.roofingcrm.domain.repository.CustomerRepository;
 import com.roofingcrm.domain.repository.JobRepository;
-import com.roofingcrm.domain.repository.LeadRepository;
 import com.roofingcrm.domain.repository.TenantRepository;
 import com.roofingcrm.domain.repository.TenantUserMembershipRepository;
 import com.roofingcrm.domain.repository.UserRepository;
@@ -44,9 +44,6 @@ class LeadServiceImplTest extends AbstractIntegrationTest {
     private TenantRepository tenantRepository;
 
     @Autowired
-    private LeadRepository leadRepository;
-
-    @Autowired
     private CustomerRepository customerRepository;
 
     @Autowired
@@ -58,6 +55,9 @@ class LeadServiceImplTest extends AbstractIntegrationTest {
     @Autowired
     private TenantUserMembershipRepository membershipRepository;
 
+    @Autowired
+    private TestDatabaseCleaner dbCleaner;
+
     @NonNull
     private UUID tenantId = Objects.requireNonNull(UUID.randomUUID());
     @NonNull
@@ -65,12 +65,7 @@ class LeadServiceImplTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        membershipRepository.deleteAll();
-        jobRepository.deleteAll();
-        leadRepository.deleteAll();
-        customerRepository.deleteAll();
-        userRepository.deleteAll();
-        tenantRepository.deleteAll();
+        dbCleaner.reset();
 
         Tenant tenant = new Tenant();
         tenant.setName("Test Roofing");
