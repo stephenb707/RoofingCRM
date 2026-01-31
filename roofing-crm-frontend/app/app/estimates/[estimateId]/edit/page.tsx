@@ -4,7 +4,7 @@ import { FormEvent, useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@/lib/AuthContext";
+import { useAuthReady } from "@/lib/AuthContext";
 import { getEstimate, updateEstimate } from "@/lib/estimatesApi";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { queryKeys } from "@/lib/queryKeys";
@@ -33,7 +33,7 @@ export default function EditEstimatePage() {
   const params = useParams();
   const router = useRouter();
   const estimateId = params.estimateId as string;
-  const { api, auth } = useAuth();
+  const { api, auth, ready } = useAuthReady();
   const queryClient = useQueryClient();
 
   const [title, setTitle] = useState("");
@@ -45,7 +45,7 @@ export default function EditEstimatePage() {
   const { data: estimate, isLoading, isError, error } = useQuery({
     queryKey: queryKeys.estimate(auth.selectedTenantId, estimateId),
     queryFn: () => getEstimate(api, estimateId),
-    enabled: !!auth.selectedTenantId && !!estimateId,
+    enabled: ready && !!estimateId,
   });
 
   useEffect(() => {

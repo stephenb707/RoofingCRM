@@ -11,6 +11,9 @@ import com.roofingcrm.domain.entity.Customer;
 import com.roofingcrm.domain.entity.Job;
 import com.roofingcrm.domain.entity.Lead;
 import com.roofingcrm.domain.entity.Tenant;
+import com.roofingcrm.domain.enums.ActivityEntityType;
+import com.roofingcrm.domain.enums.ActivityEventType;
+import com.roofingcrm.service.activity.ActivityEventService;
 import com.roofingcrm.domain.enums.JobStatus;
 import com.roofingcrm.domain.enums.LeadSource;
 import com.roofingcrm.domain.enums.LeadStatus;
@@ -28,6 +31,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -39,16 +45,19 @@ public class LeadServiceImpl implements LeadService {
     private final LeadRepository leadRepository;
     private final CustomerRepository customerRepository;
     private final JobRepository jobRepository;
+    private final ActivityEventService activityEventService;
 
     @Autowired
     public LeadServiceImpl(TenantAccessService tenantAccessService,
                            LeadRepository leadRepository,
                            CustomerRepository customerRepository,
-                           JobRepository jobRepository) {
+                           JobRepository jobRepository,
+                           ActivityEventService activityEventService) {
         this.tenantAccessService = tenantAccessService;
         this.leadRepository = leadRepository;
         this.customerRepository = customerRepository;
         this.jobRepository = jobRepository;
+        this.activityEventService = activityEventService;
     }
 
     @Override
@@ -124,7 +133,7 @@ public class LeadServiceImpl implements LeadService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<LeadDto> listLeads(@NonNull UUID tenantId, @NonNull UUID userId, LeadStatus statusFilter, UUID customerId, Pageable pageable) {
+    public Page<LeadDto> listLeads(@NonNull UUID tenantId, @NonNull UUID userId, LeadStatus statusFilter, UUID customerId, @NonNull Pageable pageable) {
         Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
 
         Page<Lead> page;
@@ -148,10 +157,22 @@ public class LeadServiceImpl implements LeadService {
         Lead lead = leadRepository.findByIdAndTenantAndArchivedFalse(leadId, tenant)
                 .orElseThrow(() -> new ResourceNotFoundException("Lead not found"));
 
+        LeadStatus prevStatus = lead.getStatus();
         lead.setStatus(newStatus);
         lead.setUpdatedByUserId(userId);
 
         Lead saved = leadRepository.save(lead);
+
+        if (prevStatus != newStatus) {
+            Map<String, Object> meta = new HashMap<>();
+            meta.put("leadId", leadId);
+            meta.put("fromStatus", prevStatus.name());
+            meta.put("toStatus", newStatus.name());
+            activityEventService.recordEvent(tenant, userId, ActivityEntityType.LEAD,
+                    Objects.requireNonNull(lead.getId()),
+                    ActivityEventType.LEAD_STATUS_CHANGED, "Lead status changed from " + prevStatus + " to " + newStatus, meta);
+        }
+
         return toDto(saved);
     }
 
@@ -204,6 +225,13 @@ public class LeadServiceImpl implements LeadService {
         lead.setStatus(LeadStatus.WON);
         lead.setUpdatedByUserId(userId);
         leadRepository.save(lead);
+
+        Map<String, Object> meta = new HashMap<>();
+        meta.put("leadId", leadId);
+        meta.put("jobId", saved.getId());
+        activityEventService.recordEvent(tenant, userId, ActivityEntityType.LEAD,
+                Objects.requireNonNull(leadId),
+                ActivityEventType.LEAD_CONVERTED_TO_JOB, "Lead converted to job", meta);
 
         return toJobDto(saved);
     }

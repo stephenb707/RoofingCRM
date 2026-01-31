@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@/lib/AuthContext";
+import { useAuthReady } from "@/lib/AuthContext";
 import { getLead } from "@/lib/leadsApi";
 import { listCustomers, getCustomer } from "@/lib/customersApi";
 import { createJob } from "@/lib/jobsApi";
@@ -27,7 +27,7 @@ export default function NewJobPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const leadIdFromQuery = searchParams.get("leadId");
-  const { api, auth } = useAuth();
+  const { api, auth, ready } = useAuthReady();
   const queryClient = useQueryClient();
 
   const [jobType, setJobType] = useState<JobType | "">("");
@@ -48,7 +48,7 @@ export default function NewJobPage() {
   const { data: lead, isLoading: leadLoading } = useQuery({
     queryKey: ["lead", auth.selectedTenantId, leadIdFromQuery!],
     queryFn: () => getLead(api, leadIdFromQuery!),
-    enabled: !!auth.selectedTenantId && !!leadIdFromQuery,
+    enabled: ready && !!leadIdFromQuery,
   });
 
   // Debounce customer search
@@ -70,7 +70,7 @@ export default function NewJobPage() {
   const { data: selectedCustomer } = useQuery({
     queryKey: ["customer", auth.selectedTenantId, customerId],
     queryFn: () => getCustomer(api, customerId),
-    enabled: !!auth.selectedTenantId && !!customerId && !leadIdFromQuery,
+    enabled: ready && !!customerId && !leadIdFromQuery,
   });
 
   // Lead mode only: prefill address from lead (explicit lead flow; no auto-fill from customer billing)
@@ -395,13 +395,7 @@ export default function NewJobPage() {
           </div>
         )}
 
-        <div className="flex items-center justify-end gap-3">
-          <Link
-            href="/app/jobs"
-            className="px-4 py-2.5 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
-          >
-            Cancel
-          </Link>
+        <div className="flex gap-3">
           <button
             type="submit"
             disabled={createMutation.isPending || (isLeadMode && (leadLoading || !lead))}
@@ -409,6 +403,12 @@ export default function NewJobPage() {
           >
             {createMutation.isPending ? "Creating…" : "Create Job"}
           </button>
+          <Link
+            href="/app/jobs"
+            className="px-4 py-2.5 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+          >
+            Cancel
+          </Link>
         </div>
       </form>
     </div>

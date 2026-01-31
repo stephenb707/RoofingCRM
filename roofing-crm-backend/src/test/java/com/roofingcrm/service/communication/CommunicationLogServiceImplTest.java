@@ -1,6 +1,7 @@
 package com.roofingcrm.service.communication;
 
 import com.roofingcrm.AbstractIntegrationTest;
+import com.roofingcrm.TestDatabaseCleaner;
 import com.roofingcrm.api.v1.communication.CommunicationLogDto;
 import com.roofingcrm.api.v1.communication.CreateCommunicationLogRequest;
 import com.roofingcrm.domain.entity.Customer;
@@ -14,7 +15,6 @@ import com.roofingcrm.domain.enums.JobType;
 import com.roofingcrm.domain.enums.LeadSource;
 import com.roofingcrm.domain.enums.LeadStatus;
 import com.roofingcrm.domain.enums.UserRole;
-import com.roofingcrm.domain.repository.CommunicationLogRepository;
 import com.roofingcrm.domain.repository.CustomerRepository;
 import com.roofingcrm.domain.repository.JobRepository;
 import com.roofingcrm.domain.repository.LeadRepository;
@@ -58,7 +58,7 @@ class CommunicationLogServiceImplTest extends AbstractIntegrationTest {
     private JobRepository jobRepository;
 
     @Autowired
-    private CommunicationLogRepository communicationLogRepository;
+    private TestDatabaseCleaner dbCleaner;
 
     @NonNull
     private UUID tenantId = Objects.requireNonNull(UUID.randomUUID());
@@ -71,13 +71,7 @@ class CommunicationLogServiceImplTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        communicationLogRepository.deleteAll();
-        jobRepository.deleteAll();
-        leadRepository.deleteAll();
-        membershipRepository.deleteAll();
-        customerRepository.deleteAll();
-        userRepository.deleteAll();
-        tenantRepository.deleteAll();
+        dbCleaner.reset();
 
         Tenant tenant = new Tenant();
         tenant.setName("Test Roofing");

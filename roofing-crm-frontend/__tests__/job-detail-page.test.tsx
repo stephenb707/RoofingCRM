@@ -5,11 +5,15 @@ import JobDetailPage from "@/app/app/jobs/[jobId]/page";
 import * as jobsApi from "@/lib/jobsApi";
 import * as attachmentsApi from "@/lib/attachmentsApi";
 import * as communicationLogsApi from "@/lib/communicationLogsApi";
+import * as tasksApi from "@/lib/tasksApi";
+import * as activityApi from "@/lib/activityApi";
 import { JobDto } from "@/lib/types";
 
 jest.mock("@/lib/jobsApi");
 jest.mock("@/lib/attachmentsApi");
 jest.mock("@/lib/communicationLogsApi");
+jest.mock("@/lib/tasksApi");
+jest.mock("@/lib/activityApi");
 jest.mock("next/navigation", () => ({
   useRouter: () => ({ push: jest.fn(), replace: jest.fn(), back: jest.fn() }),
   usePathname: () => "/app/jobs/job-1",
@@ -20,6 +24,8 @@ jest.mock("next/navigation", () => ({
 const mockedJobsApi = jobsApi as jest.Mocked<typeof jobsApi>;
 const mockedAttachmentsApi = attachmentsApi as jest.Mocked<typeof attachmentsApi>;
 const mockedCommLogsApi = communicationLogsApi as jest.Mocked<typeof communicationLogsApi>;
+const mockedTasksApi = tasksApi as jest.Mocked<typeof tasksApi>;
+const mockedActivityApi = activityApi as jest.Mocked<typeof activityApi>;
 
 const mockJob: JobDto = {
   id: "job-1",
@@ -37,11 +43,23 @@ const mockJob: JobDto = {
 };
 
 describe("JobDetailPage", () => {
+  const emptyTasksResponse = { content: [], totalElements: 0, totalPages: 0, number: 0, size: 50, first: true, last: true };
+
   beforeEach(() => {
     jest.clearAllMocks();
     mockedJobsApi.getJob.mockResolvedValue(mockJob);
     mockedAttachmentsApi.listJobAttachments.mockResolvedValue([]);
     mockedCommLogsApi.listJobCommunicationLogs.mockResolvedValue([]);
+    mockedTasksApi.listTasks.mockImplementation(() => Promise.resolve(emptyTasksResponse));
+    mockedActivityApi.listActivity.mockResolvedValue({
+      content: [],
+      totalElements: 0,
+      totalPages: 0,
+      number: 0,
+      size: 20,
+      first: true,
+      last: true,
+    });
   });
 
   it("renders job overview and status", async () => {

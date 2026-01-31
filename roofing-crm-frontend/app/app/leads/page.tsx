@@ -2,9 +2,9 @@
 
 import { useState, useMemo, useCallback } from "react";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { useAuth } from "@/lib/AuthContext";
+import { useAuthReady } from "@/lib/AuthContext";
 import { listLeads } from "@/lib/leadsApi";
 import { getApiErrorMessage } from "@/lib/apiError";
 import {
@@ -18,7 +18,8 @@ import { formatAddress, formatDate, formatPhone } from "@/lib/format";
 import { LeadStatus } from "@/lib/types";
 
 export default function LeadsPage() {
-  const { api, auth } = useAuth();
+  const { api, auth, ready } = useAuthReady();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const customerIdFromQuery = searchParams.get("customerId");
   const [statusFilter, setStatusFilter] = useState<LeadStatus | "">("");
@@ -40,7 +41,7 @@ export default function LeadsPage() {
         size: pageSize,
       });
     },
-    enabled: !!auth.selectedTenantId,
+    enabled: ready,
     placeholderData: keepPreviousData,
   });
 
@@ -70,12 +71,20 @@ export default function LeadsPage() {
             Manage your sales pipeline
           </p>
         </div>
-        <Link
-          href="/app/leads/new"
-          className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
-        >
-          + New Lead
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            href="/app/leads/pipeline"
+            className="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+          >
+            Pipeline View
+          </Link>
+          <Link
+            href="/app/leads/new"
+            className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+          >
+            + New Lead
+          </Link>
+        </div>
       </div>
 
       {/* Filters */}
@@ -251,7 +260,7 @@ export default function LeadsPage() {
                     <td className="px-6 py-4 text-sm text-slate-600">
                       {formatDate(lead.createdAt)}
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                       <Link
                         href={`/app/leads/${lead.id}`}
                         className="text-sm text-sky-600 hover:text-sky-700 font-medium"

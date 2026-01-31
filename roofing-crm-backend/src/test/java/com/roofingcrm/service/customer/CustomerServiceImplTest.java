@@ -1,6 +1,7 @@
 package com.roofingcrm.service.customer;
 
 import com.roofingcrm.AbstractIntegrationTest;
+import com.roofingcrm.TestDatabaseCleaner;
 import com.roofingcrm.api.v1.common.AddressDto;
 import com.roofingcrm.api.v1.customer.CreateCustomerRequest;
 import com.roofingcrm.api.v1.customer.CustomerDto;
@@ -45,6 +46,9 @@ class CustomerServiceImplTest extends AbstractIntegrationTest {
     @Autowired
     private TenantUserMembershipRepository membershipRepository;
 
+    @Autowired
+    private TestDatabaseCleaner dbCleaner;
+
     @NonNull
     private UUID tenantId = Objects.requireNonNull(UUID.randomUUID());
     @NonNull
@@ -52,10 +56,7 @@ class CustomerServiceImplTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        membershipRepository.deleteAll();
-        customerRepository.deleteAll();
-        userRepository.deleteAll();
-        tenantRepository.deleteAll();
+        dbCleaner.reset();
 
         Tenant tenant = new Tenant();
         tenant.setName("Test Roofing");

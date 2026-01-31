@@ -4,7 +4,7 @@ import { FormEvent, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@/lib/AuthContext";
+import { useAuthReady } from "@/lib/AuthContext";
 import { createLead } from "@/lib/leadsApi";
 import { listCustomers, getCustomer } from "@/lib/customersApi";
 import { getApiErrorMessage } from "@/lib/apiError";
@@ -15,7 +15,7 @@ import { LeadSource, CreateLeadRequest, AddressDto } from "@/lib/types";
 
 export default function NewLeadPage() {
   const router = useRouter();
-  const { api, auth } = useAuth();
+  const { api, auth, ready } = useAuthReady();
   const queryClient = useQueryClient();
 
   // Customer selection: existing vs new
@@ -53,14 +53,14 @@ export default function NewLeadPage() {
   const { data: customersData } = useQuery({
     queryKey: ["customers", auth.selectedTenantId, debouncedCustomerSearch || null, 0],
     queryFn: () => listCustomers(api, { page: 0, size: 100, q: debouncedCustomerSearch || null }),
-    enabled: !!auth.selectedTenantId,
+    enabled: ready,
   });
   const customers = customersData?.content ?? [];
 
   const { data: selectedCustomer } = useQuery({
     queryKey: ["customer", auth.selectedTenantId, customerId],
     queryFn: () => getCustomer(api, customerId),
-    enabled: !!auth.selectedTenantId && !!customerId,
+    enabled: ready && !!customerId,
   });
 
   const handleUseBillingAddress = () => {
@@ -445,13 +445,7 @@ export default function NewLeadPage() {
         )}
 
         {/* Actions */}
-        <div className="flex items-center justify-end gap-3">
-          <Link
-            href="/app/leads"
-            className="px-4 py-2.5 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
-          >
-            Cancel
-          </Link>
+        <div className="flex gap-3">
           <button
             type="submit"
             disabled={mutation.isPending}
@@ -484,6 +478,12 @@ export default function NewLeadPage() {
               "Create Lead"
             )}
           </button>
+          <Link
+            href="/app/leads"
+            className="px-4 py-2.5 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+          >
+            Cancel
+          </Link>
         </div>
       </form>
     </div>

@@ -30,7 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(controllers = LeadController.class)
 @AutoConfigureMockMvc(addFilters = false)
-@SuppressWarnings("null") // Hamcrest matchers have nullable return types
+@SuppressWarnings("null")
 class LeadControllerTest {
 
     @Autowired

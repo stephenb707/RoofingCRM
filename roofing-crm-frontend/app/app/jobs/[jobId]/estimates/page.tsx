@@ -3,7 +3,7 @@
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { useAuth } from "@/lib/AuthContext";
+import { useAuthReady } from "@/lib/AuthContext";
 import { listEstimatesForJob } from "@/lib/estimatesApi";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { queryKeys } from "@/lib/queryKeys";
@@ -15,12 +15,12 @@ import { StatusBadge } from "@/components/StatusBadge";
 export default function JobEstimatesPage() {
   const params = useParams();
   const jobId = params.jobId as string;
-  const { api, auth } = useAuth();
+  const { api, auth, ready } = useAuthReady();
 
   const { data: estimates, isLoading, isError, error } = useQuery({
     queryKey: queryKeys.estimatesForJob(auth.selectedTenantId, jobId),
     queryFn: () => listEstimatesForJob(api, jobId),
-    enabled: !!auth.selectedTenantId && !!jobId,
+    enabled: ready && !!jobId,
   });
 
   const list = estimates ?? [];

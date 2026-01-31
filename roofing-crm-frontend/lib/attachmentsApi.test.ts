@@ -40,6 +40,7 @@ describe("attachmentsApi", () => {
         fileSize: 7,
         leadId: "lead-1",
         jobId: null,
+        tag: "OTHER",
         createdAt: "2024-01-01T00:00:00Z",
         updatedAt: "2024-01-01T00:00:00Z",
       };
@@ -54,6 +55,32 @@ describe("attachmentsApi", () => {
       );
       const formData = (mockApi.post as jest.Mock).mock.calls[0][1] as FormData;
       expect(formData.get("file")).toBe(file);
+    });
+
+    it("includes tag and description in FormData when provided", async () => {
+      const file = new File(["x"], "damage.jpg", { type: "image/jpeg" });
+      const created: AttachmentDto = {
+        id: "att-2",
+        fileName: "damage.jpg",
+        contentType: "image/jpeg",
+        fileSize: 1,
+        leadId: "lead-1",
+        jobId: null,
+        tag: "DAMAGE",
+        description: "Roof damage",
+        createdAt: "2024-01-01T00:00:00Z",
+        updatedAt: "2024-01-01T00:00:00Z",
+      };
+      (mockApi.post as jest.Mock).mockResolvedValue({ data: created });
+
+      await uploadLeadAttachment(mockApi, "lead-1", file, {
+        tag: "DAMAGE",
+        description: "Roof damage",
+      });
+
+      const formData = (mockApi.post as jest.Mock).mock.calls[0][1] as FormData;
+      expect(formData.get("tag")).toBe("DAMAGE");
+      expect(formData.get("description")).toBe("Roof damage");
     });
   });
 
@@ -79,6 +106,7 @@ describe("attachmentsApi", () => {
         fileSize: 1,
         leadId: null,
         jobId: "job-1",
+        tag: "OTHER",
         createdAt: "2024-01-01T00:00:00Z",
         updatedAt: "2024-01-01T00:00:00Z",
       };

@@ -20,6 +20,12 @@ export const queryKeys = {
   lead: (tenantId: string | null, leadId: string) =>
     ["lead", tenantId, leadId] as const,
 
+  leadsPipeline: (tenantId: string | null) =>
+    ["leadsPipeline", tenantId] as const,
+
+  activityForEntity: (tenantId: string | null, entityType: string, entityId: string) =>
+    ["activity", tenantId, entityType, entityId] as const,
+
   jobsList: (tenantId: string | null, status: string | null, customerId: string | null, page: number) =>
     ["jobs", tenantId, status ?? "", customerId ?? "", page] as const,
 
@@ -31,6 +37,21 @@ export const queryKeys = {
 
   estimate: (tenantId: string | null, estimateId: string) =>
     ["estimate", tenantId, estimateId] as const,
+
+  tasksList: (tenantId: string | null, filters: object) =>
+    ["tasks", tenantId, "list", filters] as const,
+
+  taskDetail: (tenantId: string | null, taskId: string) =>
+    ["tasks", tenantId, taskId] as const,
+
+  tasksForLead: (tenantId: string | null, leadId: string) =>
+    ["tasks", tenantId, "lead", leadId] as const,
+
+  tasksForJob: (tenantId: string | null, jobId: string) =>
+    ["tasks", tenantId, "job", jobId] as const,
+
+  tasksForCustomer: (tenantId: string | null, customerId: string) =>
+    ["tasks", tenantId, "customer", customerId] as const,
 
   leadAttachments: (tenantId: string | null, leadId: string) =>
     ["attachments", "lead", tenantId, leadId] as const,

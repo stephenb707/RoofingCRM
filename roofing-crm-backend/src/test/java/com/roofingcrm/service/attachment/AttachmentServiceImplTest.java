@@ -1,6 +1,7 @@
 package com.roofingcrm.service.attachment;
 
 import com.roofingcrm.AbstractIntegrationTest;
+import com.roofingcrm.TestDatabaseCleaner;
 import com.roofingcrm.api.v1.attachment.AttachmentDto;
 import com.roofingcrm.domain.entity.Customer;
 import com.roofingcrm.domain.entity.Job;
@@ -13,7 +14,6 @@ import com.roofingcrm.domain.enums.JobType;
 import com.roofingcrm.domain.enums.LeadSource;
 import com.roofingcrm.domain.enums.LeadStatus;
 import com.roofingcrm.domain.enums.UserRole;
-import com.roofingcrm.domain.repository.AttachmentRepository;
 import com.roofingcrm.domain.repository.CustomerRepository;
 import com.roofingcrm.domain.repository.JobRepository;
 import com.roofingcrm.domain.repository.LeadRepository;
@@ -57,7 +57,7 @@ class AttachmentServiceImplTest extends AbstractIntegrationTest {
     private JobRepository jobRepository;
 
     @Autowired
-    private AttachmentRepository attachmentRepository;
+    private TestDatabaseCleaner dbCleaner;
 
     @NonNull
     private UUID tenantId = Objects.requireNonNull(UUID.randomUUID());
@@ -70,13 +70,7 @@ class AttachmentServiceImplTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        attachmentRepository.deleteAll();
-        jobRepository.deleteAll();
-        leadRepository.deleteAll();
-        membershipRepository.deleteAll();
-        customerRepository.deleteAll();
-        userRepository.deleteAll();
-        tenantRepository.deleteAll();
+        dbCleaner.reset();
 
         Tenant tenant = new Tenant();
         tenant.setName("Test Roofing");
@@ -137,7 +131,7 @@ class AttachmentServiceImplTest extends AbstractIntegrationTest {
                 "Test PDF content".getBytes()
         );
 
-        AttachmentDto dto = attachmentService.uploadForLead(tenantId, userId, leadId, file);
+        AttachmentDto dto = attachmentService.uploadForLead(tenantId, userId, leadId, file, null, null);
 
         assertNotNull(dto.getId());
         assertEquals("test-doc.pdf", dto.getFileName());
@@ -157,7 +151,7 @@ class AttachmentServiceImplTest extends AbstractIntegrationTest {
                 "Fake image bytes".getBytes()
         );
 
-        AttachmentDto dto = attachmentService.uploadForJob(tenantId, userId, jobId, file);
+        AttachmentDto dto = attachmentService.uploadForJob(tenantId, userId, jobId, file, null, null);
 
         assertNotNull(dto.getId());
         assertEquals("job-photo.jpg", dto.getFileName());
@@ -172,8 +166,8 @@ class AttachmentServiceImplTest extends AbstractIntegrationTest {
         MockMultipartFile file1 = new MockMultipartFile("file", "doc1.pdf", "application/pdf", "content1".getBytes());
         MockMultipartFile file2 = new MockMultipartFile("file", "doc2.pdf", "application/pdf", "content2".getBytes());
 
-        attachmentService.uploadForLead(tenantId, userId, leadId, file1);
-        attachmentService.uploadForLead(tenantId, userId, leadId, file2);
+        attachmentService.uploadForLead(tenantId, userId, leadId, file1, null, null);
+        attachmentService.uploadForLead(tenantId, userId, leadId, file2, null, null);
 
         List<AttachmentDto> attachments = attachmentService.listForLead(tenantId, userId, leadId);
 
@@ -194,6 +188,6 @@ class AttachmentServiceImplTest extends AbstractIntegrationTest {
         MockMultipartFile file = new MockMultipartFile("file", "doc.pdf", "application/pdf", "content".getBytes());
 
         assertThrows(TenantAccessDeniedException.class,
-                () -> attachmentService.uploadForLead(tenantId, otherUserId, leadId, file));
+                () -> attachmentService.uploadForLead(tenantId, otherUserId, leadId, file, null, null));
     }
 }

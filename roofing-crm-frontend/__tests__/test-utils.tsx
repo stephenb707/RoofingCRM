@@ -37,6 +37,7 @@ const mockAuthValue = {
 // Mock the AuthContext module
 jest.mock("@/lib/AuthContext", () => ({
   useAuth: () => mockAuthValue,
+  useAuthReady: () => ({ ...mockAuthValue, ready: true }),
   AuthProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 

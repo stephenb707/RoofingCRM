@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@/lib/AuthContext";
-import { getLead, updateLeadStatus } from "@/lib/leadsApi";
+import { useAuthReady } from "@/lib/AuthContext";
+import { getLead, updateLeadStatus, convertLeadToJob } from "@/lib/leadsApi";
 import { getApiErrorMessage } from "@/lib/apiError";
 import {
   LEAD_STATUSES,
@@ -22,26 +22,62 @@ import {
 } from "@/lib/communicationLogsApi";
 import { AttachmentSection } from "@/components/AttachmentSection";
 import { CommunicationLogSection } from "@/components/CommunicationLogSection";
-import { LeadStatus, CreateCommunicationLogRequest } from "@/lib/types";
+import { ActivitySection } from "@/components/ActivitySection";
+import { TasksSection } from "@/components/TasksSection";
+import { StatusBadge } from "@/components/StatusBadge";
+import { JOB_TYPES, JOB_TYPE_LABELS } from "@/lib/jobsConstants";
+import {
+  LeadStatus,
+  CreateCommunicationLogRequest,
+  ConvertLeadToJobRequest,
+  JobType,
+  AttachmentTag,
+} from "@/lib/types";
 
 export default function LeadDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const leadId = params.leadId as string;
-  const { api, auth } = useAuth();
+  const { api, auth, ready } = useAuthReady();
   const queryClient = useQueryClient();
 
   const [selectedStatus, setSelectedStatus] = useState<LeadStatus | null>(null);
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [commLogError, setCommLogError] = useState<string | null>(null);
+  const [showConvertModal, setShowConvertModal] = useState(false);
+  const [convertJobType, setConvertJobType] = useState<JobType | "">("");
+  const [convertNotes, setConvertNotes] = useState("");
 
   const queryKey = queryKeys.lead(auth.selectedTenantId, leadId);
 
   const { data: lead, isLoading, isError, error } = useQuery({
     queryKey,
     queryFn: () => getLead(api, leadId),
-    enabled: !!auth.selectedTenantId && !!leadId,
+    enabled: ready && !!leadId,
   });
+
+  const convertMutation = useMutation({
+    mutationFn: (payload: ConvertLeadToJobRequest) => convertLeadToJob(api, leadId, payload),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey });
+      queryClient.invalidateQueries({ queryKey: ["leads", auth.selectedTenantId] });
+      queryClient.invalidateQueries({ queryKey: ["jobs", auth.selectedTenantId] });
+      router.push(`/app/jobs/${data.id}`);
+    },
+    onError: (err: unknown) => {
+      console.error("Failed to convert lead:", err);
+    },
+  });
+
+  const handleConvertSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!convertJobType) return;
+    convertMutation.mutate({
+      type: convertJobType,
+      internalNotes: convertNotes.trim() || null,
+    });
+  };
 
   useEffect(() => {
     if (lead) setSelectedStatus(lead.status);
@@ -54,11 +90,8 @@ export default function LeadDetailPage() {
     },
     onSuccess: () => {
       setUpdateError(null);
-      // Invalidate both the detail and list queries
       queryClient.invalidateQueries({ queryKey });
-      queryClient.invalidateQueries({
-        queryKey: ["leads", auth.selectedTenantId],
-      });
+      queryClient.invalidateQueries({ queryKey: ["leads", auth.selectedTenantId] });
     },
     onError: (err: unknown) => {
       console.error("Failed to update lead status:", err);
@@ -77,11 +110,19 @@ export default function LeadDetailPage() {
   const attachmentsQuery = useQuery({
     queryKey: queryKeys.leadAttachments(auth.selectedTenantId, leadId),
     queryFn: () => listLeadAttachments(api, leadId),
-    enabled: !!auth.selectedTenantId && !!leadId,
+    enabled: ready && !!leadId,
   });
 
   const uploadAttachmentMutation = useMutation({
-    mutationFn: (file: File) => uploadLeadAttachment(api, leadId, file),
+    mutationFn: ({
+      file,
+      tag,
+      description,
+    }: {
+      file: File;
+      tag?: AttachmentTag;
+      description?: string;
+    }) => uploadLeadAttachment(api, leadId, file, { tag, description }),
     onSuccess: () => {
       setAttachmentError(null);
       queryClient.invalidateQueries({
@@ -112,7 +153,7 @@ export default function LeadDetailPage() {
   const commLogsQuery = useQuery({
     queryKey: queryKeys.leadCommLogs(auth.selectedTenantId, leadId),
     queryFn: () => listLeadCommunicationLogs(api, leadId),
-    enabled: !!auth.selectedTenantId && !!leadId,
+    enabled: ready && !!leadId,
   });
 
   const addCommLogMutation = useMutation({
@@ -344,6 +385,12 @@ export default function LeadDetailPage() {
             <p className="text-sm text-slate-800">{formatAddress(lead.propertyAddress)}</p>
           </div>
 
+          {/* Activity */}
+          <ActivitySection entityType="LEAD" entityId={leadId} />
+
+          {/* Tasks */}
+          <TasksSection entityType="lead" entityId={leadId} />
+
           {/* Notes */}
           {lead.leadNotes && (
             <div className="bg-white rounded-xl border border-slate-200 p-6">
@@ -373,7 +420,9 @@ export default function LeadDetailPage() {
           <AttachmentSection
             title="Attachments"
             attachments={attachmentsQuery.data ?? []}
-            onUpload={(file) => uploadAttachmentMutation.mutate(file)}
+            onUpload={(file, options) =>
+              uploadAttachmentMutation.mutate({ file, tag: options?.tag, description: options?.description })
+            }
             onDownload={handleDownloadAttachment}
             isLoading={attachmentsQuery.isLoading}
             isUploading={uploadAttachmentMutation.isPending}
@@ -502,28 +551,35 @@ export default function LeadDetailPage() {
               Actions
             </h2>
             <div className="space-y-2">
+              <Link
+                href={`/app/tasks/new?leadId=${leadId}`}
+                className="w-full inline-flex justify-center px-4 py-2.5 text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 rounded-lg transition-colors"
+              >
+                Create Task
+              </Link>
               {lead.convertedJobId ? (
                 <>
-                  <Link
-                    href={`/app/jobs/${lead.convertedJobId}`}
-                    className="w-full inline-flex justify-center px-4 py-2.5 text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 rounded-lg transition-colors"
-                  >
-                    View Job
-                  </Link>
                   <Link
                     href={`/app/jobs/${lead.convertedJobId}/estimates/new`}
                     className="w-full inline-flex justify-center px-4 py-2.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors"
                   >
                     Create Estimate
                   </Link>
+                  <Link
+                    href={`/app/jobs/${lead.convertedJobId}`}
+                    className="w-full inline-flex justify-center px-4 py-2.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors"
+                  >
+                    View Job
+                  </Link>
                 </>
               ) : lead.status !== "LOST" ? (
-                <Link
-                  href={`/app/leads/${leadId}/convert`}
+                <button
+                  type="button"
+                  onClick={() => setShowConvertModal(true)}
                   className="w-full inline-flex justify-center px-4 py-2.5 text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 rounded-lg transition-colors"
                 >
                   Convert to Job
-                </Link>
+                </button>
               ) : null}
               <Link
                 href={`/app/leads/${leadId}/edit`}
@@ -533,6 +589,63 @@ export default function LeadDetailPage() {
               </Link>
             </div>
           </div>
+
+          {/* Convert to Job Modal */}
+          {showConvertModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => !convertMutation.isPending && setShowConvertModal(false)}>
+              <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+                <h3 className="text-lg font-semibold text-slate-800 mb-4">Convert to Job</h3>
+                <form onSubmit={handleConvertSubmit} className="space-y-4">
+                  {convertMutation.isError && (
+                    <p className="text-sm text-red-600">{getApiErrorMessage(convertMutation.error, "Failed to convert")}</p>
+                  )}
+                  <div>
+                    <label htmlFor="convertJobType" className="block text-sm font-medium text-slate-700 mb-1">Job Type *</label>
+                    <select
+                      id="convertJobType"
+                      value={convertJobType}
+                      onChange={(e) => setConvertJobType(e.target.value as JobType)}
+                      required
+                      className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+                    >
+                      <option value="">Select type</option>
+                      {JOB_TYPES.map((t) => (
+                        <option key={t} value={t}>{JOB_TYPE_LABELS[t]}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="convertNotes" className="block text-sm font-medium text-slate-700 mb-1">Notes (optional)</label>
+                    <textarea
+                      id="convertNotes"
+                      value={convertNotes}
+                      onChange={(e) => setConvertNotes(e.target.value)}
+                      rows={2}
+                      placeholder="Internal notes for the job"
+                      className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+                    />
+                  </div>
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      type="submit"
+                      disabled={!convertJobType || convertMutation.isPending}
+                      className="px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white text-sm font-medium rounded-lg disabled:opacity-60"
+                    >
+                      {convertMutation.isPending ? "Converting…" : "Convert"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowConvertModal(false)}
+                      disabled={convertMutation.isPending}
+                      className="px-4 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

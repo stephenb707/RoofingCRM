@@ -2,6 +2,7 @@ package com.roofingcrm.domain.repository;
 
 import com.roofingcrm.domain.entity.Lead;
 import com.roofingcrm.domain.entity.Tenant;
+import com.roofingcrm.domain.enums.LeadSource;
 import com.roofingcrm.domain.enums.LeadStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -24,6 +25,12 @@ public interface LeadRepository extends JpaRepository<Lead, UUID> {
 
     @EntityGraph(attributePaths = {"customer"})
     Page<Lead> findByTenantAndStatusAndCustomerIdAndArchivedFalse(Tenant tenant, LeadStatus status, UUID customerId, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"customer"})
+    Page<Lead> findByTenantAndSourceAndArchivedFalse(Tenant tenant, LeadSource source, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"customer"})
+    Page<Lead> findByTenantAndStatusAndSourceAndArchivedFalse(Tenant tenant, LeadStatus status, LeadSource source, Pageable pageable);
 
     @EntityGraph(attributePaths = {"customer"})
     Optional<Lead> findByIdAndTenantAndArchivedFalse(UUID id, Tenant tenant);

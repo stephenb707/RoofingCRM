@@ -4,7 +4,7 @@ import { FormEvent, useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@/lib/AuthContext";
+import { useAuthReady } from "@/lib/AuthContext";
 import { getJob, updateJob } from "@/lib/jobsApi";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { queryKeys } from "@/lib/queryKeys";
@@ -25,7 +25,7 @@ export default function EditJobPage() {
   const params = useParams();
   const router = useRouter();
   const jobId = params.jobId as string;
-  const { api, auth } = useAuth();
+  const { api, auth, ready } = useAuthReady();
   const queryClient = useQueryClient();
 
   const [type, setType] = useState<JobType>("REPLACEMENT");
@@ -43,7 +43,7 @@ export default function EditJobPage() {
   const { data: job, isLoading, isError, error } = useQuery({
     queryKey: queryKeys.job(auth.selectedTenantId, jobId),
     queryFn: () => getJob(api, jobId),
-    enabled: !!auth.selectedTenantId && !!jobId,
+    enabled: ready && !!jobId,
   });
 
   useEffect(() => {

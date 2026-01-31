@@ -1,5 +1,6 @@
 package com.roofingcrm.api.v1.attachment;
 
+import com.roofingcrm.domain.enums.AttachmentTag;
 import com.roofingcrm.security.SecurityUtils;
 import com.roofingcrm.service.attachment.AttachmentService;
 import org.springframework.core.io.InputStreamResource;
@@ -32,10 +33,12 @@ public class AttachmentController {
     public ResponseEntity<AttachmentDto> uploadForLead(
             @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
             @PathVariable("leadId") @NonNull UUID leadId,
-            @RequestParam("file") MultipartFile file) {
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "tag", required = false) AttachmentTag tag,
+            @RequestParam(value = "description", required = false) String description) {
 
         UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
-        AttachmentDto dto = attachmentService.uploadForLead(tenantId, userId, leadId, file);
+        AttachmentDto dto = attachmentService.uploadForLead(tenantId, userId, leadId, file, tag, description);
         return ResponseEntity.status(HttpStatus.CREATED).body(dto);
     }
 
@@ -43,10 +46,12 @@ public class AttachmentController {
     public ResponseEntity<AttachmentDto> uploadForJob(
             @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
             @PathVariable("jobId") @NonNull UUID jobId,
-            @RequestParam("file") MultipartFile file) {
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "tag", required = false) AttachmentTag tag,
+            @RequestParam(value = "description", required = false) String description) {
 
         UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
-        AttachmentDto dto = attachmentService.uploadForJob(tenantId, userId, jobId, file);
+        AttachmentDto dto = attachmentService.uploadForJob(tenantId, userId, jobId, file, tag, description);
         return ResponseEntity.status(HttpStatus.CREATED).body(dto);
     }
 

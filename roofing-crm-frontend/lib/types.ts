@@ -244,6 +244,14 @@ export interface UpdateEstimateStatusRequest {
 }
 
 // Attachment types
+export type AttachmentTag =
+  | "BEFORE"
+  | "DAMAGE"
+  | "AFTER"
+  | "INVOICE"
+  | "DOCUMENT"
+  | "OTHER";
+
 export interface AttachmentDto {
   id: string;
   fileName: string | null;
@@ -254,8 +262,54 @@ export interface AttachmentDto {
   leadId?: string | null;
   jobId?: string | null;
   description?: string | null;
+  tag?: AttachmentTag | null;
   createdAt?: string | null;
   updatedAt?: string | null;
+}
+
+// Task-related types
+export type TaskStatus = "TODO" | "IN_PROGRESS" | "COMPLETED" | "CANCELED";
+export type TaskPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+
+export interface TaskDto {
+  taskId: string;
+  title: string;
+  description?: string | null;
+  status: TaskStatus;
+  priority: TaskPriority;
+  dueAt?: string | null;
+  completedAt?: string | null;
+  assignedToUserId?: string | null;
+  assignedToName?: string | null;
+  leadId?: string | null;
+  jobId?: string | null;
+  customerId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateTaskRequest {
+  title: string;
+  description?: string | null;
+  status?: TaskStatus;
+  priority?: TaskPriority;
+  dueAt?: string | null;
+  assignedToUserId?: string | null;
+  leadId?: string | null;
+  jobId?: string | null;
+  customerId?: string | null;
+}
+
+export interface UpdateTaskRequest {
+  title?: string;
+  description?: string | null;
+  status?: TaskStatus;
+  priority?: TaskPriority;
+  dueAt?: string | null;
+  assignedToUserId?: string | null;
+  leadId?: string | null;
+  jobId?: string | null;
+  customerId?: string | null;
 }
 
 // Communication log types (match backend channel/direction strings)
@@ -281,4 +335,33 @@ export interface CreateCommunicationLogRequest {
   subject: string;
   body?: string | null;
   occurredAt?: string | null;
+}
+
+// Activity timeline types
+export type ActivityEntityType = "LEAD" | "JOB";
+export type ActivityEventType =
+  | "NOTE"
+  | "LEAD_STATUS_CHANGED"
+  | "JOB_STATUS_CHANGED"
+  | "TASK_CREATED"
+  | "TASK_STATUS_CHANGED"
+  | "LEAD_CONVERTED_TO_JOB"
+  | "ATTACHMENT_ADDED";
+
+export interface ActivityEventDto {
+  activityId: string;
+  entityType: ActivityEntityType;
+  entityId: string;
+  eventType: ActivityEventType;
+  message: string;
+  createdAt: string;
+  createdByUserId?: string | null;
+  createdByName?: string | null;
+  metadata?: Record<string, unknown> | null;
+}
+
+export interface CreateNoteRequest {
+  entityType: ActivityEntityType;
+  entityId: string;
+  body: string;
 }
