@@ -4,8 +4,7 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuthReady } from "@/lib/AuthContext";
-import { listScheduleJobs } from "@/lib/scheduleApi";
-import { updateJob } from "@/lib/jobsApi";
+import { listJobSchedule, updateJob } from "@/lib/jobsApi";
 import { getApiErrorMessage } from "@/lib/apiError";
 import {
   JOB_STATUSES,
@@ -14,7 +13,6 @@ import {
 } from "@/lib/jobsConstants";
 import { queryKeys } from "@/lib/queryKeys";
 import {
-  formatAddress,
   formatDate,
   formatLocalDateInput,
   parseLocalDateOnly,
@@ -57,14 +55,14 @@ export default function SchedulePage() {
   const [endDate, setEndDate] = useState(defaultEnd);
   const [statusFilter, setStatusFilter] = useState<JobStatus | "">("");
   const [crewFilter, setCrewFilter] = useState("");
-  const [includeUnscheduled, setIncludeUnscheduled] = useState(false);
+  const [includeUnscheduled, setIncludeUnscheduled] = useState(true);
 
-  const [rescheduleJob, setRescheduleJob] = useState<JobDto | null>(null);
-  const [rescheduleStart, setRescheduleStart] = useState("");
-  const [rescheduleEnd, setRescheduleEnd] = useState("");
-  const [rescheduleCrew, setRescheduleCrew] = useState("");
+  const [editingJobId, setEditingJobId] = useState<string | null>(null);
+  const [editStart, setEditStart] = useState("");
+  const [editEnd, setEditEnd] = useState("");
+  const [editCrew, setEditCrew] = useState("");
 
-  const scheduleKey = queryKeys.scheduleJobs(
+  const scheduleKey = queryKeys.jobSchedule(
     auth.selectedTenantId,
     startDate,
     endDate,
@@ -73,17 +71,15 @@ export default function SchedulePage() {
     includeUnscheduled
   );
 
-  const { data, isLoading, isError, error } = useQuery({
+  const { data: jobs = [], isLoading, isError, error } = useQuery({
     queryKey: scheduleKey,
     queryFn: () =>
-      listScheduleJobs(api, {
-        startDate,
-        endDate,
+      listJobSchedule(api, {
+        from: startDate,
+        to: endDate,
         status: statusFilter || undefined,
         crewName: crewFilter || undefined,
         includeUnscheduled,
-        page: 0,
-        size: 200,
       }),
     enabled: ready && !!auth.selectedTenantId,
   });
@@ -103,7 +99,7 @@ export default function SchedulePage() {
         crewName: args.crewName ?? undefined,
       }),
     onSuccess: (_, variables) => {
-      setRescheduleJob(null);
+      setEditingJobId(null);
       queryClient.invalidateQueries({ queryKey: scheduleKey });
       queryClient.invalidateQueries({
         queryKey: queryKeys.job(auth.selectedTenantId, variables.jobId),
@@ -111,27 +107,52 @@ export default function SchedulePage() {
     },
   });
 
-  const openReschedule = (job: JobDto) => {
-    setRescheduleJob(job);
-    setRescheduleStart(job.scheduledStartDate ?? "");
-    setRescheduleEnd(job.scheduledEndDate ?? "");
-    setRescheduleCrew(job.crewName ?? "");
+  const openEdit = (job: JobDto) => {
+    setEditingJobId(job.id);
+    setEditStart(job.scheduledStartDate ?? "");
+    setEditEnd(job.scheduledEndDate ?? "");
+    setEditCrew(job.crewName ?? "");
   };
 
-  const handleRescheduleSave = (e: React.FormEvent) => {
+  const handleSaveEdit = (e: React.FormEvent, jobId: string) => {
     e.preventDefault();
-    if (!rescheduleJob) return;
-    const clearSchedule = !rescheduleStart && !rescheduleEnd;
+    const clearSchedule = !editStart && !editEnd;
     updateJobMutation.mutate({
-      jobId: rescheduleJob.id,
-      scheduledStartDate: rescheduleStart || null,
-      scheduledEndDate: rescheduleEnd || null,
+      jobId,
+      scheduledStartDate: editStart || null,
+      scheduledEndDate: editEnd || null,
       clearSchedule,
-      crewName: rescheduleCrew || null,
+      crewName: editCrew || null,
     });
   };
 
-  const jobs = data?.content ?? [];
+  const goPrevWeek = () => {
+    const m = parseLocalDateOnly(startDate);
+    m.setDate(m.getDate() - 7);
+    const newStart = formatLocalDateInput(m);
+    const newEnd = getSundayOfWeek(m);
+    setStartDate(newStart);
+    setEndDate(newEnd);
+  };
+
+  const goNextWeek = () => {
+    const m = parseLocalDateOnly(startDate);
+    m.setDate(m.getDate() + 7);
+    const newStart = formatLocalDateInput(m);
+    const newEnd = getSundayOfWeek(m);
+    setStartDate(newStart);
+    setEndDate(newEnd);
+  };
+
+  const jumpToWeek = (dateStr: string) => {
+    if (!dateStr) return;
+    const d = parseLocalDateOnly(dateStr);
+    const newStart = getMondayOfWeek(d);
+    const newEnd = getSundayOfWeek(d);
+    setStartDate(newStart);
+    setEndDate(newEnd);
+  };
+
   const datesInRange = useMemo(
     () => getDatesInRange(startDate, endDate),
     [startDate, endDate]
@@ -140,7 +161,7 @@ export default function SchedulePage() {
   const hasActiveFilters =
     statusFilter !== "" ||
     crewFilter !== "" ||
-    includeUnscheduled ||
+    !includeUnscheduled ||
     startDate !== defaultStart ||
     endDate !== defaultEnd;
 
@@ -149,7 +170,7 @@ export default function SchedulePage() {
     setEndDate(defaultEnd);
     setStatusFilter("");
     setCrewFilter("");
-    setIncludeUnscheduled(false);
+    setIncludeUnscheduled(true);
   };
 
   const jobsByDate = useMemo(() => {
@@ -203,6 +224,37 @@ export default function SchedulePage() {
               }}
               placeholder="Select date range…"
             />
+          </div>
+          <div>
+            <label
+              htmlFor="schedule-jump-date"
+              className="block text-sm font-medium text-slate-700 mb-1"
+            >
+              Jump to week
+            </label>
+            <input
+              id="schedule-jump-date"
+              type="date"
+              value={startDate}
+              onChange={(e) => jumpToWeek(e.target.value)}
+              className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={goPrevWeek}
+              className="px-3 py-2 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50"
+            >
+              ← Prev
+            </button>
+            <button
+              type="button"
+              onClick={goNextWeek}
+              className="px-3 py-2 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50"
+            >
+              Next →
+            </button>
           </div>
           <div>
             <label
@@ -296,7 +348,18 @@ export default function SchedulePage() {
                     <JobScheduleCard
                       key={job.id}
                       job={job}
-                      onReschedule={() => openReschedule(job)}
+                      isEditing={editingJobId === job.id}
+                      editStart={editStart}
+                      editEnd={editEnd}
+                      editCrew={editCrew}
+                      onEditStartChange={setEditStart}
+                      onEditEndChange={setEditEnd}
+                      onEditCrewChange={setEditCrew}
+                      onEdit={() => openEdit(job)}
+                      onSave={(e) => handleSaveEdit(e, job.id)}
+                      onCancel={() => setEditingJobId(null)}
+                      isSaving={updateJobMutation.isPending}
+                      saveError={updateJobMutation.isError ? getApiErrorMessage(updateJobMutation.error, "Failed to update") : null}
                     />
                   ))}
                 </ul>
@@ -314,7 +377,18 @@ export default function SchedulePage() {
                   <JobScheduleCard
                     key={job.id}
                     job={job}
-                    onReschedule={() => openReschedule(job)}
+                    isEditing={editingJobId === job.id}
+                    editStart={editStart}
+                    editEnd={editEnd}
+                    editCrew={editCrew}
+                    onEditStartChange={setEditStart}
+                    onEditEndChange={setEditEnd}
+                    onEditCrewChange={setEditCrew}
+                    onEdit={() => openEdit(job)}
+                    onSave={(e) => handleSaveEdit(e, job.id)}
+                    onCancel={() => setEditingJobId(null)}
+                    isSaving={updateJobMutation.isPending}
+                    saveError={updateJobMutation.isError ? getApiErrorMessage(updateJobMutation.error, "Failed to update") : null}
                   />
                 ))}
               </ul>
@@ -329,141 +403,151 @@ export default function SchedulePage() {
           )}
         </div>
       )}
-
-      {/* Reschedule Modal */}
-      {rescheduleJob && (
-        <div
-          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
-          onClick={() => setRescheduleJob(null)}
-        >
-          <div
-            className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="text-lg font-semibold text-slate-800 mb-4">
-              Reschedule
-            </h3>
-            <form onSubmit={handleRescheduleSave} className="space-y-4">
-              <div>
-                <label
-                  htmlFor="reschedule-dates"
-                  className="block text-sm font-medium text-slate-700 mb-1"
-                >
-                  Scheduled dates
-                </label>
-                <DateRangePicker
-                  id="reschedule-dates"
-                  startDate={rescheduleStart}
-                  endDate={rescheduleEnd}
-                  onChange={(start, end) => {
-                    setRescheduleStart(start);
-                    setRescheduleEnd(end);
-                  }}
-                  placeholder="Select date range…"
-                />
-              </div>
-              <div>
-                <label
-                  htmlFor="reschedule-crew"
-                  className="block text-sm font-medium text-slate-700 mb-1"
-                >
-                  Crew
-                </label>
-                <input
-                  id="reschedule-crew"
-                  type="text"
-                  value={rescheduleCrew}
-                  onChange={(e) => setRescheduleCrew(e.target.value)}
-                  placeholder="Crew name"
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-                />
-              </div>
-              <div className="flex gap-2 pt-2">
-              <button
-                  type="submit"
-                  disabled={updateJobMutation.isPending}
-                  className="px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white text-sm font-medium rounded-lg disabled:opacity-60"
-                >
-                  {updateJobMutation.isPending ? "Saving…" : "Save"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRescheduleJob(null)}
-                  className="px-4 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-            {updateJobMutation.isError && (
-              <p className="mt-2 text-sm text-red-600">
-                {getApiErrorMessage(updateJobMutation.error, "Failed to update")}
-              </p>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
 
 function JobScheduleCard({
   job,
-  onReschedule,
+  isEditing,
+  editStart,
+  editEnd,
+  editCrew,
+  onEditStartChange,
+  onEditEndChange,
+  onEditCrewChange,
+  onEdit,
+  onSave,
+  onCancel,
+  isSaving,
+  saveError,
 }: {
   job: JobDto;
-  onReschedule: () => void;
+  isEditing: boolean;
+  editStart: string;
+  editEnd: string;
+  editCrew: string;
+  onEditStartChange: (v: string) => void;
+  onEditEndChange: (v: string) => void;
+  onEditCrewChange: (v: string) => void;
+  onEdit: () => void;
+  onSave: (e: React.FormEvent) => void;
+  onCancel: () => void;
+  isSaving: boolean;
+  saveError: string | null;
 }) {
   const addr = job.propertyAddress;
   const cityState = [addr?.city, addr?.state].filter(Boolean).join(", ");
+  const customerName = [job.customerFirstName, job.customerLastName].filter(Boolean).join(" ").trim() || "—";
 
   return (
-    <li className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100">
-      <div className="min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-slate-500">
-            {JOB_TYPE_LABELS[job.type]}
-          </span>
-          <span className="text-xs text-slate-400">·</span>
-          <span className="text-xs text-slate-500">{job.status}</span>
-        </div>
-        <p className="text-sm font-medium text-slate-800 truncate">
-          {addr?.line1 ?? "—"}
-          {cityState ? `, ${cityState}` : ""}
-        </p>
-        <div className="flex items-center gap-3 text-xs text-slate-500 mt-1">
-          {job.scheduledStartDate ? (
-            <span>
-              {formatDate(job.scheduledStartDate)}
-              {job.scheduledEndDate &&
-                job.scheduledEndDate !== job.scheduledStartDate &&
-                ` – ${formatDate(job.scheduledEndDate)}`}
+    <li className="flex flex-col p-3 bg-slate-50 rounded-lg border border-slate-100">
+      <div className="flex items-center justify-between">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium text-slate-500">
+              {JOB_TYPE_LABELS[job.type]}
             </span>
-          ) : (
-            <span className="inline-flex px-2 py-0.5 text-xs font-medium rounded bg-slate-100 text-slate-600 border border-slate-200">
-              Unscheduled
-            </span>
-          )}
-          {job.crewName && (
-            <span className="font-medium">{job.crewName}</span>
-          )}
+            <span className="text-xs text-slate-400">·</span>
+            <span className="text-xs text-slate-500">{job.status}</span>
+          </div>
+          <p className="text-sm font-medium text-slate-800 truncate">
+            {customerName}
+            {addr ? ` — ${addr.line1 ?? ""}${cityState ? `, ${cityState}` : ""}` : ""}
+          </p>
+          <div className="flex items-center gap-3 text-xs text-slate-500 mt-1">
+            {job.scheduledStartDate ? (
+              <span>
+                {formatDate(job.scheduledStartDate)}
+                {job.scheduledEndDate &&
+                  job.scheduledEndDate !== job.scheduledStartDate &&
+                  ` – ${formatDate(job.scheduledEndDate)}`}
+              </span>
+            ) : (
+              <span className="inline-flex px-2 py-0.5 text-xs font-medium rounded bg-slate-100 text-slate-600 border border-slate-200">
+                Unscheduled
+              </span>
+            )}
+            {job.crewName && (
+              <span className="font-medium">{job.crewName}</span>
+            )}
+          </div>
         </div>
+        {!isEditing && (
+          <div className="flex items-center gap-2 shrink-0">
+            <Link
+              href={`/app/jobs/${job.id}`}
+              className="px-3 py-1.5 text-sm font-medium text-sky-600 hover:bg-sky-50 rounded-lg"
+            >
+              Open
+            </Link>
+            <button
+              type="button"
+              onClick={onEdit}
+              className="px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 rounded-lg border border-slate-200"
+            >
+              Edit
+            </button>
+          </div>
+        )}
       </div>
-      <div className="flex items-center gap-2 shrink-0">
-        <Link
-          href={`/app/jobs/${job.id}`}
-          className="px-3 py-1.5 text-sm font-medium text-sky-600 hover:bg-sky-50 rounded-lg"
-        >
-          Open
-        </Link>
-        <button
-          type="button"
-          onClick={onReschedule}
-          className="px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 rounded-lg border border-slate-200"
-        >
-          Reschedule
-        </button>
-      </div>
+
+      {isEditing && (
+        <form onSubmit={onSave} className="mt-3 pt-3 border-t border-slate-200 space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label htmlFor="edit-start-date" className="block text-xs font-medium text-slate-600 mb-1">Start date</label>
+              <input
+                id="edit-start-date"
+                type="date"
+                value={editStart}
+                onChange={(e) => onEditStartChange(e.target.value)}
+                className="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm"
+              />
+            </div>
+            <div>
+              <label htmlFor="edit-end-date" className="block text-xs font-medium text-slate-600 mb-1">End date</label>
+              <input
+                id="edit-end-date"
+                type="date"
+                value={editEnd}
+                onChange={(e) => onEditEndChange(e.target.value)}
+                className="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm"
+              />
+            </div>
+            <div>
+              <label htmlFor="edit-crew" className="block text-xs font-medium text-slate-600 mb-1">Crew</label>
+              <input
+                id="edit-crew"
+                type="text"
+                value={editCrew}
+                onChange={(e) => onEditCrewChange(e.target.value)}
+                placeholder="Crew name"
+                className="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm"
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="submit"
+              disabled={isSaving}
+              className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-sm font-medium rounded-lg disabled:opacity-60"
+            >
+              {isSaving ? "Saving…" : "Save"}
+            </button>
+            <button
+              type="button"
+              onClick={onCancel}
+              className="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Cancel
+            </button>
+            {saveError && (
+              <span className="text-sm text-red-600">{saveError}</span>
+            )}
+          </div>
+        </form>
+      )}
     </li>
   );
 }

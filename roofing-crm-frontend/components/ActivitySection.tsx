@@ -31,7 +31,7 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   NOTE: "Note",
   LEAD_STATUS_CHANGED: "Status changed",
   JOB_STATUS_CHANGED: "Status changed",
-  JOB_SCHEDULE_CHANGED: "Schedule changed",
+  JOB_SCHEDULE_CHANGED: "Schedule updated",
   TASK_CREATED: "Task created",
   TASK_STATUS_CHANGED: "Task updated",
   LEAD_CONVERTED_TO_JOB: "Converted to job",

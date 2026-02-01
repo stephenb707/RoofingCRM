@@ -1,13 +1,15 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/AuthContext";
 import { getApiErrorMessage } from "@/lib/apiError";
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextUrl = searchParams.get("next");
   const { api, auth, setAuthFromLogin } = useAuth();
 
   const [email, setEmail] = useState("");
@@ -17,9 +19,13 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (!auth.token) return;
+    if (nextUrl && nextUrl.startsWith("/")) {
+      router.replace(nextUrl);
+      return;
+    }
     if (auth.selectedTenantId) router.replace("/app/customers");
     else router.replace("/auth/select-tenant");
-  }, [auth.token, auth.selectedTenantId, router]);
+  }, [auth.token, auth.selectedTenantId, nextUrl, router]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -32,9 +38,10 @@ export default function LoginPage() {
         password,
       });
       setAuthFromLogin(res.data);
-      // If exactly one tenant, go straight to /app/customers
       const tenants = res.data.tenants ?? [];
-      if (tenants.length === 1) {
+      if (nextUrl && nextUrl.startsWith("/")) {
+        router.push(nextUrl);
+      } else if (tenants.length === 1) {
         router.push("/app/customers");
       } else {
         router.push("/auth/select-tenant");
@@ -66,7 +73,7 @@ export default function LoginPage() {
               />
             </svg>
           </div>
-          <h1 className="text-2xl font-bold text-slate-800">Roofing CRM</h1>
+          <h1 className="text-2xl font-bold text-slate-800">Viva Roofing</h1>
           <p className="text-sm text-slate-500 mt-1">Sign in to your account</p>
         </div>
 

@@ -1,5 +1,6 @@
 package com.roofingcrm.api;
 
+import com.roofingcrm.service.exception.InviteConflictException;
 import com.roofingcrm.service.exception.LeadConversionNotAllowedException;
 import com.roofingcrm.service.exception.ResourceNotFoundException;
 import com.roofingcrm.service.tenant.TenantAccessDeniedException;
@@ -76,6 +77,19 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(LeadConversionNotAllowedException.class)
     public ResponseEntity<ApiErrorResponse> handleLeadConversionNotAllowed(LeadConversionNotAllowedException ex,
                                                                            HttpServletRequest request) {
+        ApiErrorResponse body = new ApiErrorResponse(
+                Instant.now(),
+                HttpStatus.CONFLICT.value(),
+                HttpStatus.CONFLICT.getReasonPhrase(),
+                ex.getMessage(),
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+    }
+
+    @ExceptionHandler(InviteConflictException.class)
+    public ResponseEntity<ApiErrorResponse> handleInviteConflict(InviteConflictException ex,
+                                                                HttpServletRequest request) {
         ApiErrorResponse body = new ApiErrorResponse(
                 Instant.now(),
                 HttpStatus.CONFLICT.value(),

@@ -6,8 +6,8 @@ import Providers from "./providers";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Roofing CRM",
-  description: "CRM for roofing companies",
+  title: "Viva Roofing",
+  description: "Viva Roofing is a CRM for roofing companies",
 };
 
 export default function RootLayout({

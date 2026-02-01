@@ -88,7 +88,7 @@ public class AuthServiceImpl implements AuthService {
     private AuthResponse buildAuthResponse(User user) {
         String token = jwtService.generateToken(user.getId(), user.getEmail());
 
-        List<TenantUserMembership> memberships = membershipRepository.findByUser(user);
+        List<TenantUserMembership> memberships = membershipRepository.findByUserAndArchivedFalse(user);
 
         List<TenantSummaryDto> tenantDtos = memberships.stream()
                 .map(m -> {

@@ -32,6 +32,24 @@ export const queryKeys = {
   job: (tenantId: string | null, jobId: string) =>
     ["job", tenantId, jobId] as const,
 
+  jobSchedule: (
+    tenantId: string | null,
+    from: string,
+    to: string,
+    status: string | null,
+    crewName: string | null,
+    includeUnscheduled: boolean
+  ) =>
+    [
+      "jobSchedule",
+      tenantId,
+      from,
+      to,
+      status ?? null,
+      crewName ?? null,
+      includeUnscheduled ?? true,
+    ] as const,
+
   scheduleJobs: (
     tenantId: string | null,
     startDate: string,
@@ -70,6 +88,11 @@ export const queryKeys = {
 
   tasksForCustomer: (tenantId: string | null, customerId: string) =>
     ["tasks", tenantId, "customer", customerId] as const,
+
+  teamMembers: (tenantId: string | null) =>
+    ["teamMembers", tenantId] as const,
+  teamInvites: (tenantId: string | null) =>
+    ["teamInvites", tenantId] as const,
 
   leadAttachments: (tenantId: string | null, leadId: string) =>
     ["attachments", "lead", tenantId, leadId] as const,

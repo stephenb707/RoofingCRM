@@ -1,8 +1,35 @@
+export type UserRole = "OWNER" | "ADMIN" | "SALES" | "FIELD_TECH";
+
 export interface TenantSummary {
   tenantId: string;
   tenantName: string;
   tenantSlug: string;
   role: string; // UserRole string from backend
+}
+
+export interface TeamMember {
+  userId: string;
+  email: string;
+  fullName?: string | null;
+  role: UserRole;
+}
+
+export interface TenantInvite {
+  inviteId: string;
+  email: string;
+  role: UserRole;
+  token: string;
+  expiresAt: string;
+  acceptedAt?: string | null;
+  createdAt: string;
+  createdByName?: string | null;
+}
+
+export interface AcceptInviteResponse {
+  tenantId: string;
+  tenantName: string;
+  tenantSlug?: string | null;
+  role: UserRole;
 }
 
 export interface AuthResponse {

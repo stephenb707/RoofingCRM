@@ -13,8 +13,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.lang.NonNull;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -59,6 +61,20 @@ public class JobController {
         UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
         JobDto dto = jobService.getJob(tenantId, userId, jobId);
         return ResponseEntity.ok(dto);
+    }
+
+    @GetMapping("/schedule")
+    public ResponseEntity<List<JobDto>> listSchedule(
+            @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
+            @RequestParam("from") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) @NonNull LocalDate from,
+            @RequestParam("to") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) @NonNull LocalDate to,
+            @RequestParam(value = "status", required = false) JobStatus status,
+            @RequestParam(value = "crewName", required = false) String crewName,
+            @RequestParam(value = "includeUnscheduled", defaultValue = "true") boolean includeUnscheduled) {
+
+        UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
+        List<JobDto> jobs = jobService.listSchedule(tenantId, userId, from, to, status, crewName, includeUnscheduled);
+        return ResponseEntity.ok(jobs);
     }
 
     @GetMapping("/picker")

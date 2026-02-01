@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useMemo, useEffect, useState, useRef } from "react";
-import { AuthResponse } from "./types";
+import { AuthResponse, TenantSummary } from "./types";
 import {
   AuthState,
   loadAuthStateFromStorage,
@@ -16,6 +16,7 @@ type AuthContextValue = {
   api: ReturnType<typeof createApiClient>;
   setAuthFromLogin: (response: AuthResponse) => void;
   selectTenant: (tenantId: string) => void;
+  addTenant: (tenantSummary: TenantSummary) => void;
   logout: () => void;
 };
 
@@ -64,6 +65,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     saveAuthStateToStorage(next);
   };
 
+  const addTenant = (tenantSummary: TenantSummary) => {
+    const exists = auth.tenants.some(
+      (t) => t.tenantId === tenantSummary.tenantId
+    );
+    if (exists) return;
+    const next: AuthState = {
+      ...auth,
+      tenants: [...auth.tenants, tenantSummary],
+    };
+    setAuth(next);
+    saveAuthStateToStorage(next);
+  };
+
   const logout = () => {
     setAuth({
       token: null,
@@ -81,6 +95,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     api,
     setAuthFromLogin,
     selectTenant,
+    addTenant,
     logout,
   };
 

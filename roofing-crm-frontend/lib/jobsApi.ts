@@ -102,6 +102,40 @@ export async function updateJob(
 }
 
 /**
+ * Fetch jobs for schedule view (GET /api/v1/jobs/schedule).
+ * Returns non-paged list sorted by scheduledStartDate asc nulls last, createdAt desc.
+ */
+export async function listJobSchedule(
+  api: AxiosInstance,
+  params: {
+    from: string;
+    to: string;
+    status?: JobStatus | null;
+    crewName?: string | null;
+    includeUnscheduled?: boolean;
+  }
+): Promise<JobDto[]> {
+  const queryParams: Record<string, string | number | boolean> = {
+    from: params.from,
+    to: params.to,
+  };
+  if (params.status != null && String(params.status) !== "") {
+    queryParams.status = params.status;
+  }
+  if (params.crewName != null && params.crewName !== "") {
+    queryParams.crewName = params.crewName;
+  }
+  if (params.includeUnscheduled !== undefined) {
+    queryParams.includeUnscheduled = params.includeUnscheduled;
+  }
+
+  const res = await api.get<JobDto[]>("/api/v1/jobs/schedule", {
+    params: queryParams,
+  });
+  return res.data;
+}
+
+/**
  * Update job status via POST /api/v1/jobs/{id}/status.
  */
 export async function updateJobStatus(

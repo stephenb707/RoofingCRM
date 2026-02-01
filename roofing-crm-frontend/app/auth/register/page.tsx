@@ -74,7 +74,7 @@ export default function RegisterPage() {
           </div>
           <h1 className="text-2xl font-bold text-slate-800">Create account</h1>
           <p className="text-sm text-slate-500 mt-1">
-            Set up Roofing CRM for your roofing business
+            Set up Viva Roofing for your roofing business
           </p>
         </div>
 

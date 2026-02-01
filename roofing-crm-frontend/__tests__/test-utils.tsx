@@ -31,6 +31,7 @@ const mockAuthValue = {
   },
   setAuthFromLogin: jest.fn(),
   selectTenant: jest.fn(),
+  addTenant: jest.fn(),
   logout: jest.fn(),
 };
 

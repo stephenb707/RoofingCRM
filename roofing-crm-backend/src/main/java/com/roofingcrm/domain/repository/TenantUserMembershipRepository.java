@@ -17,7 +17,15 @@ public interface TenantUserMembershipRepository extends JpaRepository<TenantUser
 
     List<TenantUserMembership> findByUser(User user);
 
+    List<TenantUserMembership> findByUserAndArchivedFalse(User user);
+
     Optional<TenantUserMembership> findByTenantAndUser(Tenant tenant, User user);
+
+    Optional<TenantUserMembership> findByTenantAndUserAndArchivedFalse(Tenant tenant, User user);
+
+    long countByTenantAndRoleAndArchivedFalse(Tenant tenant, UserRole role);
+
+    List<TenantUserMembership> findByTenantAndArchivedFalse(Tenant tenant);
 
     List<TenantUserMembership> findByTenantAndRole(Tenant tenant, UserRole role);
 
