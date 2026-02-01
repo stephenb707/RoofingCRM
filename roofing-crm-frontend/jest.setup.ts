@@ -1,5 +1,18 @@
 import "@testing-library/jest-dom";
 
+// Mock STOMP client to avoid real WebSocket/SockJS and TextEncoder in JSDOM
+jest.mock("@/lib/stompClient", () => ({
+  createStompClient: jest.fn(() => ({
+    activate: jest.fn(),
+    deactivate: jest.fn(),
+    subscribe: jest.fn(() => ({ unsubscribe: jest.fn() })),
+  })),
+  activityTopic: jest.fn(
+    (tenantId: string, entityType: string, entityId: string) =>
+      `/topic/tenants/${tenantId}/activity/${entityType}/${entityId}`
+  ),
+}));
+
 // Suppress console.error for act() warnings during React Query tests
 const originalError = console.error;
 beforeAll(() => {

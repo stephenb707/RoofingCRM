@@ -5,6 +5,7 @@ import com.roofingcrm.api.v1.customer.CreateCustomerRequest;
 import com.roofingcrm.api.v1.customer.CustomerDto;
 import com.roofingcrm.api.v1.customer.UpdateCustomerRequest;
 import com.roofingcrm.domain.entity.Customer;
+import com.roofingcrm.domain.enums.PreferredContactMethod;
 import com.roofingcrm.domain.entity.Tenant;
 import com.roofingcrm.domain.repository.CustomerRepository;
 import com.roofingcrm.domain.value.Address;
@@ -44,6 +45,7 @@ public class CustomerServiceImpl implements CustomerService {
 
         applyCustomerData(customer, request.getFirstName(), request.getLastName(),
                 request.getPrimaryPhone(), request.getEmail(),
+                request.getPreferredContactMethod(),
                 request.getBillingAddress(), request.getNotes());
 
         Customer saved = customerRepository.save(customer);
@@ -61,6 +63,7 @@ public class CustomerServiceImpl implements CustomerService {
 
         applyCustomerData(customer, request.getFirstName(), request.getLastName(),
                 request.getPrimaryPhone(), request.getEmail(),
+                request.getPreferredContactMethod(),
                 request.getBillingAddress(), request.getNotes());
 
         Customer saved = customerRepository.save(customer);
@@ -100,12 +103,14 @@ public class CustomerServiceImpl implements CustomerService {
                                    String lastName,
                                    String primaryPhone,
                                    String email,
+                                   PreferredContactMethod preferredContactMethod,
                                    AddressDto billingAddressDto,
                                    String notes) {
         customer.setFirstName(firstName);
         customer.setLastName(lastName);
         customer.setPrimaryPhone(primaryPhone);
         customer.setEmail(email);
+        customer.setPreferredContactMethod(preferredContactMethod);
         customer.setNotes(notes);
 
         if (billingAddressDto != null) {
@@ -132,6 +137,7 @@ public class CustomerServiceImpl implements CustomerService {
         dto.setLastName(entity.getLastName());
         dto.setPrimaryPhone(entity.getPrimaryPhone());
         dto.setEmail(entity.getEmail());
+        dto.setPreferredContactMethod(entity.getPreferredContactMethod());
         dto.setNotes(entity.getNotes());
         dto.setCreatedAt(entity.getCreatedAt());
         dto.setUpdatedAt(entity.getUpdatedAt());

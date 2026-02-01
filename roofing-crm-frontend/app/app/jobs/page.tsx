@@ -225,10 +225,18 @@ export default function JobsPage() {
                       {formatAddress(job.propertyAddress)}
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-600">
-                      {formatDate(job.scheduledStartDate)}
-                      {job.scheduledEndDate &&
-                        job.scheduledEndDate !== job.scheduledStartDate &&
-                        ` – ${formatDate(job.scheduledEndDate)}`}
+                      {job.scheduledStartDate ? (
+                        <>
+                          {formatDate(job.scheduledStartDate)}
+                          {job.scheduledEndDate &&
+                            job.scheduledEndDate !== job.scheduledStartDate &&
+                            ` – ${formatDate(job.scheduledEndDate)}`}
+                        </>
+                      ) : (
+                        <span className="inline-flex px-2 py-0.5 text-xs font-medium rounded bg-slate-100 text-slate-600 border border-slate-200">
+                          Unscheduled
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-600">
                       {formatDate(job.updatedAt)}

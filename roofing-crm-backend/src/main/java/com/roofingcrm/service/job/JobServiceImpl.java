@@ -1,6 +1,7 @@
 package com.roofingcrm.service.job;
 
 import com.roofingcrm.api.v1.common.AddressDto;
+import com.roofingcrm.api.v1.common.PickerItemDto;
 import com.roofingcrm.api.v1.job.CreateJobRequest;
 import com.roofingcrm.api.v1.job.JobDto;
 import com.roofingcrm.api.v1.job.UpdateJobRequest;
@@ -20,12 +21,15 @@ import com.roofingcrm.service.exception.ResourceNotFoundException;
 import com.roofingcrm.service.tenant.TenantAccessService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -84,7 +88,7 @@ public class JobServiceImpl implements JobService {
         job.setUpdatedByUserId(userId);
 
         job.setJobType(request.getType());
-        job.setStatus(JobStatus.SCHEDULED);
+        job.setStatus(request.getScheduledStartDate() != null ? JobStatus.SCHEDULED : JobStatus.UNSCHEDULED);
 
         if (request.getPropertyAddress() != null) {
             Address address = new Address();
@@ -108,6 +112,10 @@ public class JobServiceImpl implements JobService {
         Job job = jobRepository.findByIdAndTenantAndArchivedFalse(jobId, tenant)
                 .orElseThrow(() -> new ResourceNotFoundException("Job not found"));
 
+        LocalDate prevStart = job.getScheduledStartDate();
+        LocalDate prevEnd = job.getScheduledEndDate();
+        String prevCrew = job.getAssignedCrew();
+
         job.setUpdatedByUserId(userId);
 
         if (request.getType() != null) {
@@ -123,12 +131,22 @@ public class JobServiceImpl implements JobService {
             job.setPropertyAddress(address);
         }
 
-        if (request.getScheduledStartDate() != null) {
-            job.setScheduledStartDate(request.getScheduledStartDate());
+        if (request.getClearSchedule() != null && request.getClearSchedule()) {
+            job.setScheduledStartDate(null);
+            job.setScheduledEndDate(null);
+        } else {
+            if (request.getScheduledStartDate() != null) {
+                job.setScheduledStartDate(request.getScheduledStartDate());
+            }
+            if (request.getScheduledEndDate() != null) {
+                job.setScheduledEndDate(request.getScheduledEndDate());
+            }
         }
 
-        if (request.getScheduledEndDate() != null) {
-            job.setScheduledEndDate(request.getScheduledEndDate());
+        LocalDate newStart = job.getScheduledStartDate();
+        LocalDate newEnd = job.getScheduledEndDate();
+        if (newStart != null && newEnd != null && newStart.isAfter(newEnd)) {
+            throw new IllegalArgumentException("scheduledStartDate must be before or equal to scheduledEndDate");
         }
 
         if (request.getInternalNotes() != null) {
@@ -139,8 +157,74 @@ public class JobServiceImpl implements JobService {
             job.setAssignedCrew(request.getCrewName());
         }
 
+        // Sync status with schedule: UNSCHEDULED <-> SCHEDULED based on dates
+        JobStatus currentStatus = job.getStatus();
+        if (currentStatus == JobStatus.SCHEDULED && newStart == null) {
+            job.setStatus(JobStatus.UNSCHEDULED);
+        } else if (currentStatus == JobStatus.UNSCHEDULED && newStart != null) {
+            job.setStatus(JobStatus.SCHEDULED);
+        }
+
         Job saved = jobRepository.save(job);
+
+        boolean scheduleChanged = !Objects.equals(prevStart, saved.getScheduledStartDate())
+                || !Objects.equals(prevEnd, saved.getScheduledEndDate())
+                || !Objects.equals(prevCrew, saved.getAssignedCrew());
+
+        if (scheduleChanged) {
+            String message = buildScheduleChangeMessage(prevStart, prevEnd, prevCrew,
+                    saved.getScheduledStartDate(), saved.getScheduledEndDate(), saved.getAssignedCrew());
+            Map<String, Object> metadata = new HashMap<>();
+            metadata.put("fromStart", prevStart);
+            metadata.put("fromEnd", prevEnd);
+            metadata.put("fromCrew", prevCrew);
+            metadata.put("toStart", saved.getScheduledStartDate());
+            metadata.put("toEnd", saved.getScheduledEndDate());
+            metadata.put("toCrew", saved.getAssignedCrew());
+            activityEventService.recordEvent(tenant, userId, ActivityEntityType.JOB,
+                    Objects.requireNonNull(saved.getId()),
+                    ActivityEventType.JOB_SCHEDULE_CHANGED, message, metadata);
+        }
+
         return toDto(saved);
+    }
+
+    private static String buildScheduleChangeMessage(LocalDate prevStart, LocalDate prevEnd, String prevCrew,
+                                                    LocalDate newStart, LocalDate newEnd, String newCrew) {
+        boolean hadSchedule = prevStart != null;
+        boolean hasSchedule = newStart != null;
+        boolean crewChanged = !Objects.equals(prevCrew, newCrew);
+
+        if (!hadSchedule && hasSchedule) {
+            String range = formatRange(newStart, newEnd);
+            return "Schedule set to " + range + (newCrew != null && !newCrew.isBlank() ? " (Crew: " + newCrew + ")" : "");
+        }
+        if (hadSchedule && !hasSchedule) {
+            String oldRange = formatRange(prevStart, prevEnd);
+            return "Schedule cleared (was " + oldRange + ")";
+        }
+        if (crewChanged && !hasSchedule) {
+            return "Crew changed: " + orBlank(prevCrew) + " → " + orBlank(newCrew);
+        }
+        if (crewChanged && hasSchedule) {
+            if (Objects.equals(prevStart, newStart) && Objects.equals(prevEnd, newEnd)) {
+                return "Crew changed: " + orBlank(prevCrew) + " → " + orBlank(newCrew);
+            }
+            String range = formatRange(newStart, newEnd);
+            return "Schedule updated: " + range + "; Crew: " + orBlank(prevCrew) + " → " + orBlank(newCrew);
+        }
+        String range = formatRange(newStart, newEnd);
+        return "Schedule updated to " + range + (newCrew != null && !newCrew.isBlank() ? " (Crew: " + newCrew + ")" : "");
+    }
+
+    private static String formatRange(LocalDate start, LocalDate end) {
+        if (start == null) return "";
+        if (end == null || start.equals(end)) return start.toString();
+        return start + " → " + end;
+    }
+
+    private static String orBlank(String s) {
+        return (s != null && !s.isBlank()) ? s : "(none)";
     }
 
     @Override
@@ -171,6 +255,45 @@ public class JobServiceImpl implements JobService {
         }
 
         return page.map(this::toDto);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<JobDto> listScheduleJobs(@NonNull UUID tenantId, @NonNull UUID userId,
+                                         @NonNull LocalDate startDate, @NonNull LocalDate endDate,
+                                         JobStatus status, String crewName, boolean includeUnscheduled,
+                                         @NonNull Pageable pageable) {
+        if (startDate.isAfter(endDate)) {
+            throw new IllegalArgumentException("startDate must be before or equal to endDate");
+        }
+        Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
+        Page<Job> page = jobRepository.searchSchedule(
+                tenant, status, crewName != null ? crewName : "", startDate, endDate, includeUnscheduled, pageable);
+        return page.map(this::toDto);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PickerItemDto> searchJobsForPicker(@NonNull UUID tenantId, @NonNull UUID userId, String q, int limit) {
+        Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
+        int capped = Math.min(Math.max(limit, 1), 50);
+        String qNorm = (q == null || q.isBlank()) ? null : q.trim();
+        List<Job> jobs = jobRepository.searchForPicker(tenant, qNorm, PageRequest.of(0, capped));
+        return jobs.stream().map(this::jobToPickerItem).toList();
+    }
+
+    private PickerItemDto jobToPickerItem(Job j) {
+        String jobTypeStr = j.getJobType() != null ? j.getJobType().name() : "";
+        String addr = j.getPropertyAddress() != null && j.getPropertyAddress().getLine1() != null
+                ? j.getPropertyAddress().getLine1()
+                : "";
+        String customerName = j.getCustomer() != null
+                ? (j.getCustomer().getFirstName() + " " + j.getCustomer().getLastName()).trim()
+                : "";
+        String label = !addr.isEmpty() ? jobTypeStr + " – " + addr : customerName;
+        if (label.isEmpty()) label = "—";
+        String subLabel = !addr.isEmpty() ? customerName : jobTypeStr;
+        return new PickerItemDto(j.getId(), label, subLabel);
     }
 
     @Override

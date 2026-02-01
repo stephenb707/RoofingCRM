@@ -19,6 +19,8 @@ public class UpdateJobRequest {
 
     private LocalDate scheduledStartDate;
     private LocalDate scheduledEndDate;
+    /** When true, clears scheduled dates. */
+    private Boolean clearSchedule;
 
     private String internalNotes;
     private String crewName;

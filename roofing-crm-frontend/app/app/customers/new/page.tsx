@@ -8,7 +8,8 @@ import { useAuthReady } from "@/lib/AuthContext";
 import { createCustomer } from "@/lib/customersApi";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { queryKeys } from "@/lib/queryKeys";
-import type { AddressDto } from "@/lib/types";
+import { PREFERRED_CONTACT_METHODS, PREFERRED_CONTACT_LABELS } from "@/lib/preferredContactConstants";
+import type { AddressDto, PreferredContactMethod } from "@/lib/types";
 
 export default function NewCustomerPage() {
   const router = useRouter();
@@ -25,6 +26,7 @@ export default function NewCustomerPage() {
   const [state, setState] = useState("");
   const [zip, setZip] = useState("");
   const [notes, setNotes] = useState("");
+  const [preferredContactMethod, setPreferredContactMethod] = useState<PreferredContactMethod | "">("");
   const [formError, setFormError] = useState<string | null>(null);
 
   const mutation = useMutation({
@@ -33,6 +35,7 @@ export default function NewCustomerPage() {
       lastName: string;
       primaryPhone: string;
       email?: string | null;
+      preferredContactMethod?: PreferredContactMethod | null;
       billingAddress?: AddressDto | null;
       notes?: string | null;
     }) => createCustomer(api, payload),
@@ -70,6 +73,7 @@ export default function NewCustomerPage() {
       lastName: lastName.trim(),
       primaryPhone: primaryPhone.trim(),
       email: email.trim() || null,
+      preferredContactMethod: preferredContactMethod || null,
       billingAddress,
       notes: notes.trim() || null,
     });
@@ -140,6 +144,21 @@ export default function NewCustomerPage() {
                 className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
                 placeholder="john@example.com"
               />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Preferred contact method</label>
+              <select
+                value={preferredContactMethod}
+                onChange={(e) => setPreferredContactMethod(e.target.value as PreferredContactMethod | "")}
+                className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+              >
+                <option value="">Select…</option>
+                {PREFERRED_CONTACT_METHODS.map((m) => (
+                  <option key={m} value={m}>
+                    {PREFERRED_CONTACT_LABELS[m]}
+                  </option>
+                ))}
+              </select>
             </div>
             <div>
               <label htmlFor="notes" className="block text-sm font-medium text-slate-700 mb-1.5">Notes</label>

@@ -1,13 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuthReady } from "@/lib/AuthContext";
 import { listActivity, createNote } from "@/lib/activityApi";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { queryKeys } from "@/lib/queryKeys";
 import { formatDateTime } from "@/lib/format";
-import type { ActivityEntityType, ActivityEventDto } from "@/lib/types";
+import {
+  createStompClient,
+  activityTopic,
+} from "@/lib/stompClient";
+import type {
+  ActivityEntityType,
+  ActivityEventDto,
+  PageResponse,
+} from "@/lib/types";
 
 function getActorLabel(
   evt: ActivityEventDto,
@@ -23,6 +31,7 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   NOTE: "Note",
   LEAD_STATUS_CHANGED: "Status changed",
   JOB_STATUS_CHANGED: "Status changed",
+  JOB_SCHEDULE_CHANGED: "Schedule changed",
   TASK_CREATED: "Task created",
   TASK_STATUS_CHANGED: "Task updated",
   LEAD_CONVERTED_TO_JOB: "Converted to job",
@@ -46,11 +55,56 @@ export function ActivitySection({ entityType, entityId }: ActivitySectionProps) 
     entityId
   );
 
+  // Subscribe to real-time activity updates for this entity
+  const subRef = useRef<{ unsubscribe: () => void } | null>(null);
+  useEffect(() => {
+    if (
+      typeof window === "undefined" ||
+      !auth.token ||
+      !auth.selectedTenantId ||
+      !entityType ||
+      !entityId
+    ) {
+      return;
+    }
+    const token = auth.token;
+    const tenantId = auth.selectedTenantId;
+    const topic = activityTopic(tenantId, entityType, entityId);
+    const keyToInvalidate = queryKeys.activityForEntity(
+      tenantId,
+      entityType,
+      entityId
+    );
+    subRef.current = null;
+
+    const client = createStompClient(
+      token,
+      (c) => {
+        subRef.current = c.subscribe(topic, () => {
+          queryClient.invalidateQueries({ queryKey: keyToInvalidate });
+        });
+      },
+      (err) => {
+        console.error("[ActivitySection] STOMP error:", err);
+      }
+    );
+    client.activate();
+
+    return () => {
+      if (subRef.current) {
+        subRef.current.unsubscribe();
+        subRef.current = null;
+      }
+      client.deactivate();
+    };
+  }, [auth.token, auth.selectedTenantId, entityType, entityId, queryClient]);
+
   const { data, isLoading, isError, error } = useQuery({
     queryKey: activityKey,
     queryFn: () =>
       listActivity(api, { entityType, entityId, page: 0, size: 20 }),
     enabled: ready && !!entityId,
+    refetchOnWindowFocus: false,
   });
 
   const createNoteMutation = useMutation({
@@ -71,7 +125,17 @@ export function ActivitySection({ entityType, entityId }: ActivitySectionProps) 
         metadata: null,
       };
       queryClient.setQueryData(activityKey, (old: typeof data) => {
-        if (!old) return old;
+        if (!old) {
+          return {
+            content: [optimisticEvent],
+            totalElements: 1,
+            totalPages: 1,
+            number: 0,
+            size: 20,
+            first: true,
+            last: true,
+          } as PageResponse<ActivityEventDto>;
+        }
         return {
           ...old,
           content: [optimisticEvent, ...old.content],

@@ -3,11 +3,17 @@
 import { FormEvent, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuthReady } from "@/lib/AuthContext";
 import { createTask } from "@/lib/tasksApi";
+import { listUsers } from "@/lib/usersApi";
+import { searchLeadsPicker, getLead } from "@/lib/leadsApi";
+import { searchJobsPicker, getJob } from "@/lib/jobsApi";
+import { listCustomers, getCustomer } from "@/lib/customersApi";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { TASK_STATUS_OPTIONS, TASK_PRIORITY_OPTIONS } from "@/lib/tasksConstants";
+import { Combobox } from "@/components/Combobox";
+import { DateTimePicker } from "@/components/DateTimePicker";
 import type { TaskStatus, TaskPriority, CreateTaskRequest } from "@/lib/types";
 
 function toIsoString(value: string): string | null {
@@ -32,10 +38,19 @@ export default function NewTaskPage() {
   const [priority, setPriority] = useState<TaskPriority>("MEDIUM");
   const [dueAtLocal, setDueAtLocal] = useState("");
   const [assignToMe, setAssignToMe] = useState(false);
-  const [assignedToUserIdManual, setAssignedToUserIdManual] = useState("");
+  const [assignedToUserId, setAssignedToUserId] = useState("");
+  const [assignedToDisplayName, setAssignedToDisplayName] = useState("");
+  const [assigneeSearch, setAssigneeSearch] = useState("");
+  const [debouncedAssigneeSearch, setDebouncedAssigneeSearch] = useState("");
   const [leadId, setLeadId] = useState(leadIdParam);
+  const [leadSearch, setLeadSearch] = useState("");
+  const [debouncedLeadSearch, setDebouncedLeadSearch] = useState("");
   const [jobId, setJobId] = useState(jobIdParam);
+  const [jobSearch, setJobSearch] = useState("");
+  const [debouncedJobSearch, setDebouncedJobSearch] = useState("");
   const [customerId, setCustomerId] = useState(customerIdParam);
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [debouncedCustomerSearch, setDebouncedCustomerSearch] = useState("");
 
   const [error, setError] = useState<string | null>(null);
 
@@ -44,6 +59,66 @@ export default function NewTaskPage() {
     setJobId(jobIdParam);
     setCustomerId(customerIdParam);
   }, [leadIdParam, jobIdParam, customerIdParam]);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedAssigneeSearch(assigneeSearch), 300);
+    return () => clearTimeout(t);
+  }, [assigneeSearch]);
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedLeadSearch(leadSearch), 300);
+    return () => clearTimeout(t);
+  }, [leadSearch]);
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedJobSearch(jobSearch), 300);
+    return () => clearTimeout(t);
+  }, [jobSearch]);
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedCustomerSearch(customerSearch), 300);
+    return () => clearTimeout(t);
+  }, [customerSearch]);
+
+  const { data: users = [] } = useQuery({
+    queryKey: ["users", auth.selectedTenantId, debouncedAssigneeSearch],
+    queryFn: () => listUsers(api, { q: debouncedAssigneeSearch || null, limit: 20 }),
+    enabled: ready && !!auth.selectedTenantId && !assignToMe,
+  });
+
+  const { data: leads = [] } = useQuery({
+    queryKey: ["leadsPicker", auth.selectedTenantId, debouncedLeadSearch],
+    queryFn: () => searchLeadsPicker(api, { q: debouncedLeadSearch || null, limit: 20 }),
+    enabled: ready && !!auth.selectedTenantId && !leadId,
+  });
+
+  const { data: jobs = [] } = useQuery({
+    queryKey: ["jobsPicker", auth.selectedTenantId, debouncedJobSearch],
+    queryFn: () => searchJobsPicker(api, { q: debouncedJobSearch || null, limit: 20 }),
+    enabled: ready && !!auth.selectedTenantId && !jobId,
+  });
+
+  const { data: customersData } = useQuery({
+    queryKey: ["customers", auth.selectedTenantId, debouncedCustomerSearch || null, 0],
+    queryFn: () => listCustomers(api, { page: 0, size: 20, q: debouncedCustomerSearch || null }),
+    enabled: ready && !!auth.selectedTenantId && !customerId,
+  });
+  const customers = customersData?.content ?? [];
+
+  const { data: selectedLead } = useQuery({
+    queryKey: ["lead", auth.selectedTenantId, leadId],
+    queryFn: () => getLead(api, leadId),
+    enabled: ready && !!leadId,
+  });
+
+  const { data: selectedJob } = useQuery({
+    queryKey: ["job", auth.selectedTenantId, jobId],
+    queryFn: () => getJob(api, jobId),
+    enabled: ready && !!jobId,
+  });
+
+  const { data: selectedCustomer } = useQuery({
+    queryKey: ["customer", auth.selectedTenantId, customerId],
+    queryFn: () => getCustomer(api, customerId),
+    enabled: ready && !!customerId,
+  });
 
   const mutation = useMutation({
     mutationFn: async (payload: CreateTaskRequest) => createTask(api, payload),
@@ -66,9 +141,9 @@ export default function NewTaskPage() {
       return;
     }
 
-    const assignedToUserId = assignToMe && auth.userId
+    const resolvedAssignee = assignToMe && auth.userId
       ? auth.userId
-      : assignedToUserIdManual.trim() || null;
+      : assignedToUserId || null;
 
     const payload: CreateTaskRequest = {
       title: title.trim(),
@@ -76,10 +151,10 @@ export default function NewTaskPage() {
       status,
       priority,
       dueAt: toIsoString(dueAtLocal),
-      assignedToUserId,
-      leadId: leadId.trim() || null,
-      jobId: jobId.trim() || null,
-      customerId: customerId.trim() || null,
+      assignedToUserId: resolvedAssignee,
+      leadId: leadId || null,
+      jobId: jobId || null,
+      customerId: customerId || null,
     };
 
     mutation.mutate(payload);
@@ -104,7 +179,6 @@ export default function NewTaskPage() {
       <form onSubmit={handleSubmit}>
         <div className="bg-white rounded-xl border border-slate-200 p-6 mb-6">
           <h2 className="text-lg font-semibold text-slate-800 mb-4">Task Details</h2>
-
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">
@@ -161,11 +235,10 @@ export default function NewTaskPage() {
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Due Date & Time</label>
-              <input
-                type="datetime-local"
+              <DateTimePicker
                 value={dueAtLocal}
-                onChange={(e) => setDueAtLocal(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+                onChange={setDueAtLocal}
+                placeholder="Select date and time…"
               />
             </div>
 
@@ -174,53 +247,152 @@ export default function NewTaskPage() {
                 <input
                   type="checkbox"
                   checked={assignToMe}
-                  onChange={(e) => setAssignToMe(e.target.checked)}
+                  onChange={(e) => {
+                    setAssignToMe(e.target.checked);
+                    if (e.target.checked) setAssignedToUserId("");
+                  }}
                   className="rounded border-slate-300 text-sky-600 focus:ring-sky-500"
                 />
                 <span className="text-sm font-medium text-slate-700">Assign to me</span>
               </label>
               {!assignToMe && (
-                <input
-                  type="text"
-                  value={assignedToUserIdManual}
-                  onChange={(e) => setAssignedToUserIdManual(e.target.value)}
-                  placeholder="User ID (optional)"
-                  className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent font-mono text-xs"
+                assignedToUserId ? (
+                  <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
+                    <span className="text-sm font-medium text-slate-800">
+                      {(assignedToDisplayName || users.find((u) => u.id === assignedToUserId)?.name) ?? assignedToUserId}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => { setAssignedToUserId(""); setAssignedToDisplayName(""); }}
+                      className="text-sm font-medium text-sky-600 hover:text-sky-700"
+                    >
+                      Change
+                    </button>
+                  </div>
+                ) : (
+                  <Combobox
+                    items={users}
+                    getItemLabel={(u) => u.name || u.email}
+                    getItemKey={(u) => u.id}
+                    onSelect={(u) => {
+                      setAssignedToUserId(u.id);
+                      setAssignedToDisplayName(u.name || u.email);
+                      setAssigneeSearch("");
+                    }}
+                    onSearchChange={setAssigneeSearch}
+                    value={assigneeSearch}
+                    placeholder="Search by name or email…"
+                    renderItem={(u) => `${u.name || u.email}${u.email ? ` — ${u.email}` : ""}`}
+                  />
+                )
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Related Lead</label>
+              {leadId && selectedLead ? (
+                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
+                  <span className="text-sm font-medium text-slate-800">
+                    {selectedLead.customerFirstName} {selectedLead.customerLastName}
+                    {selectedLead.propertyAddress?.line1 ? ` — ${selectedLead.propertyAddress.line1}` : ""}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => { setLeadId(""); setLeadSearch(""); }}
+                    className="text-sm font-medium text-sky-600 hover:text-sky-700"
+                  >
+                    Change
+                  </button>
+                </div>
+              ) : (
+                <Combobox
+                  items={leads}
+                  getItemLabel={(l) => l.label}
+                  getItemKey={(l) => l.id}
+                  onSelect={(l) => {
+                    setLeadId(l.id);
+                    setLeadSearch("");
+                  }}
+                  onSearchChange={setLeadSearch}
+                  value={leadSearch}
+                  placeholder="Search leads…"
+                  renderItem={(l) => (
+                    <>
+                      {l.label}
+                      {l.subLabel ? <span className="text-slate-500"> — {l.subLabel}</span> : null}
+                    </>
+                  )}
                 />
               )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Lead ID</label>
-                <input
-                  type="text"
-                  value={leadId}
-                  onChange={(e) => setLeadId(e.target.value)}
-                  placeholder="UUID (optional)"
-                  className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent font-mono text-xs"
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Related Job</label>
+              {jobId && selectedJob ? (
+                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
+                  <span className="text-sm font-medium text-slate-800">
+                    {selectedJob.type} — {selectedJob.propertyAddress?.line1 ?? selectedJob.customerFirstName}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => { setJobId(""); setJobSearch(""); }}
+                    className="text-sm font-medium text-sky-600 hover:text-sky-700"
+                  >
+                    Change
+                  </button>
+                </div>
+              ) : (
+                <Combobox
+                  items={jobs}
+                  getItemLabel={(j) => j.label}
+                  getItemKey={(j) => j.id}
+                  onSelect={(j) => {
+                    setJobId(j.id);
+                    setJobSearch("");
+                  }}
+                  onSearchChange={setJobSearch}
+                  value={jobSearch}
+                  placeholder="Search jobs…"
+                  renderItem={(j) => (
+                    <>
+                      {j.label}
+                      {j.subLabel ? <span className="text-slate-500"> — {j.subLabel}</span> : null}
+                    </>
+                  )}
                 />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Job ID</label>
-                <input
-                  type="text"
-                  value={jobId}
-                  onChange={(e) => setJobId(e.target.value)}
-                  placeholder="UUID (optional)"
-                  className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent font-mono text-xs"
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Related Customer</label>
+              {customerId && selectedCustomer ? (
+                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
+                  <span className="text-sm font-medium text-slate-800">
+                    {selectedCustomer.firstName} {selectedCustomer.lastName}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => { setCustomerId(""); setCustomerSearch(""); }}
+                    className="text-sm font-medium text-sky-600 hover:text-sky-700"
+                  >
+                    Change
+                  </button>
+                </div>
+              ) : (
+                <Combobox
+                  items={customers}
+                  getItemLabel={(c) => `${c.firstName} ${c.lastName}`}
+                  getItemKey={(c) => c.id}
+                  onSelect={(c) => {
+                    setCustomerId(c.id);
+                    setCustomerSearch("");
+                  }}
+                  onSearchChange={setCustomerSearch}
+                  value={customerSearch}
+                  placeholder="Search customers…"
+                  renderItem={(c) => `${c.firstName} ${c.lastName}${c.email ? ` — ${c.email}` : ""}`}
                 />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Customer ID</label>
-                <input
-                  type="text"
-                  value={customerId}
-                  onChange={(e) => setCustomerId(e.target.value)}
-                  placeholder="UUID (optional)"
-                  className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent font-mono text-xs"
-                />
-              </div>
+              )}
             </div>
           </div>
         </div>

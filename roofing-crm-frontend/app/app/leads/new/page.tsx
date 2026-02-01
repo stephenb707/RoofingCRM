@@ -10,8 +10,10 @@ import { listCustomers, getCustomer } from "@/lib/customersApi";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { formatPhone } from "@/lib/format";
 import { BillingAddressAssist } from "@/components/BillingAddressAssist";
+import { Combobox } from "@/components/Combobox";
 import { LEAD_SOURCES, SOURCE_LABELS } from "@/lib/leadsConstants";
-import { LeadSource, CreateLeadRequest, AddressDto } from "@/lib/types";
+import { PREFERRED_CONTACT_METHODS, PREFERRED_CONTACT_LABELS } from "@/lib/preferredContactConstants";
+import { LeadSource, CreateLeadRequest, AddressDto, PreferredContactMethod } from "@/lib/types";
 
 export default function NewLeadPage() {
   const router = useRouter();
@@ -39,7 +41,7 @@ export default function NewLeadPage() {
   // Lead fields
   const [source, setSource] = useState<LeadSource | "">("");
   const [notes, setNotes] = useState("");
-  const [preferredContact, setPreferredContact] = useState("");
+  const [preferredContact, setPreferredContact] = useState<PreferredContactMethod | "">("");
 
   const [error, setError] = useState<string | null>(null);
 
@@ -125,7 +127,6 @@ export default function NewLeadPage() {
         source: source || null,
         leadNotes: notes.trim() || null,
         propertyAddress,
-        preferredContactMethod: preferredContact.trim() || null,
       });
       return;
     }
@@ -142,12 +143,12 @@ export default function NewLeadPage() {
         lastName: lastName.trim(),
         primaryPhone: phone.trim(),
         email: email.trim() || null,
+        preferredContactMethod: preferredContact || null,
         billingAddress: null,
       },
       source: source || null,
       leadNotes: notes.trim() || null,
       propertyAddress,
-      preferredContactMethod: preferredContact.trim() || null,
     });
   };
 
@@ -183,47 +184,54 @@ export default function NewLeadPage() {
       <form onSubmit={handleSubmit}>
         {/* Select existing customer (optional) */}
         <div className="bg-white rounded-xl border border-slate-200 p-6 mb-6">
-          <div className="flex items-center justify-between gap-2 mb-4">
-            <h2 className="text-lg font-semibold text-slate-800">
-              Select existing customer (optional)
-            </h2>
-            {customerId && (
+          <h2 className="text-lg font-semibold text-slate-800 mb-4">
+            Select existing customer (optional)
+          </h2>
+          {customerId && selectedCustomer ? (
+            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-200">
+              <div className="text-sm">
+                <p className="font-medium text-slate-800">
+                  {selectedCustomer.firstName} {selectedCustomer.lastName}
+                </p>
+                {(selectedCustomer.email || selectedCustomer.primaryPhone) && (
+                  <p className="text-slate-600 mt-0.5">
+                    {selectedCustomer.email ?? formatPhone(selectedCustomer.primaryPhone ?? null)}
+                  </p>
+                )}
+              </div>
               <button
                 type="button"
-                onClick={() => setCustomerId("")}
-                className="text-sm text-slate-600 hover:text-slate-800 hover:underline"
+                onClick={() => {
+                  setCustomerId("");
+                  setCustomerSearch("");
+                }}
+                className="text-sm font-medium text-sky-600 hover:text-sky-700"
               >
-                Clear
+                Change
               </button>
-            )}
-          </div>
-          <div className="space-y-3">
-            <input
-              type="text"
+            </div>
+          ) : (
+            <Combobox
+              items={customers}
+              getItemLabel={(c) => `${c.firstName} ${c.lastName}`}
+              getItemKey={(c) => c.id}
+              onSelect={(c) => {
+                setCustomerId(c.id);
+                setCustomerSearch("");
+              }}
+              onSearchChange={setCustomerSearch}
               value={customerSearch}
-              onChange={(e) => setCustomerSearch(e.target.value)}
               placeholder="Search by name, email, or phone…"
-              className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
-              aria-label="Search customers"
+              renderItem={(c) => {
+                const extra = formatPhone(c.primaryPhone ?? null) !== "—"
+                  ? ` — ${formatPhone(c.primaryPhone ?? null)}`
+                  : c.email
+                    ? ` — ${c.email}`
+                    : "";
+                return `${c.firstName} ${c.lastName}${extra}`;
+              }}
             />
-            <select
-              value={customerId}
-              onChange={(e) => setCustomerId(e.target.value)}
-              className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
-              aria-label="Select customer"
-            >
-              <option value="">Select customer</option>
-              {customers.map((c) => {
-                const phoneFormatted = formatPhone(c.primaryPhone ?? null);
-                const displayExtra = phoneFormatted !== "—" ? ` — ${phoneFormatted}` : c.email ? ` — ${c.email}` : "";
-                return (
-                  <option key={c.id} value={c.id}>
-                    {c.firstName} {c.lastName}{displayExtra}
-                  </option>
-                );
-              })}
-            </select>
-          </div>
+          )}
         </div>
 
         {/* Customer Information (manual entry when no customer selected) */}
@@ -283,6 +291,23 @@ export default function NewLeadPage() {
                   className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
                   placeholder="john@example.com"
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                  Preferred contact method
+                </label>
+                <select
+                  value={preferredContact}
+                  onChange={(e) => setPreferredContact((e.target.value || "") as PreferredContactMethod | "")}
+                  className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+                >
+                  <option value="">Select…</option>
+                  {PREFERRED_CONTACT_METHODS.map((m) => (
+                    <option key={m} value={m}>
+                      {PREFERRED_CONTACT_LABELS[m]}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
         </div>
@@ -380,36 +405,22 @@ export default function NewLeadPage() {
           </h2>
 
           <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                  Lead Source
-                </label>
-                <select
-                  value={source}
-                  onChange={(e) => setSource(e.target.value as LeadSource | "")}
-                  className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
-                >
-                  <option value="">Select a source</option>
-                  {LEAD_SOURCES.map((s) => (
-                    <option key={s} value={s}>
-                      {SOURCE_LABELS[s]}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                  Preferred Contact Method
-                </label>
-                <input
-                  type="text"
-                  value={preferredContact}
-                  onChange={(e) => setPreferredContact(e.target.value)}
-                  className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
-                  placeholder="Phone, Email, Text, etc."
-                />
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                Lead Source
+              </label>
+              <select
+                value={source}
+                onChange={(e) => setSource(e.target.value as LeadSource | "")}
+                className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+              >
+                <option value="">Select a source</option>
+                {LEAD_SOURCES.map((s) => (
+                  <option key={s} value={s}>
+                    {SOURCE_LABELS[s]}
+                  </option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">

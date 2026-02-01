@@ -3,6 +3,7 @@ import { render, screen, waitFor, fireEvent } from "./test-utils";
 import userEvent from "@testing-library/user-event";
 import LeadDetailPage from "@/app/app/leads/[leadId]/page";
 import * as leadsApi from "@/lib/leadsApi";
+import * as customersApi from "@/lib/customersApi";
 import * as attachmentsApi from "@/lib/attachmentsApi";
 import * as communicationLogsApi from "@/lib/communicationLogsApi";
 import * as tasksApi from "@/lib/tasksApi";
@@ -10,6 +11,7 @@ import * as activityApi from "@/lib/activityApi";
 import { LeadDto } from "@/lib/types";
 
 jest.mock("@/lib/leadsApi");
+jest.mock("@/lib/customersApi");
 jest.mock("@/lib/attachmentsApi");
 jest.mock("@/lib/communicationLogsApi");
 jest.mock("@/lib/tasksApi");
@@ -22,6 +24,7 @@ jest.mock("next/navigation", () => ({
 }));
 
 const mockedLeadsApi = leadsApi as jest.Mocked<typeof leadsApi>;
+const mockedCustomersApi = customersApi as jest.Mocked<typeof customersApi>;
 const mockedAttachmentsApi = attachmentsApi as jest.Mocked<typeof attachmentsApi>;
 const mockedCommLogsApi = communicationLogsApi as jest.Mocked<typeof communicationLogsApi>;
 const mockedTasksApi = tasksApi as jest.Mocked<typeof tasksApi>;
@@ -49,6 +52,18 @@ describe("LeadDetailPage", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockedLeadsApi.getLead.mockResolvedValue(mockLead);
+    mockedCustomersApi.getCustomer.mockResolvedValue({
+      id: "cust-1",
+      firstName: "John",
+      lastName: "Doe",
+      primaryPhone: "555-123-4567",
+      email: "john@example.com",
+      preferredContactMethod: "PHONE",
+      billingAddress: null,
+      notes: null,
+      createdAt: "2024-01-01T00:00:00Z",
+      updatedAt: "2024-01-01T00:00:00Z",
+    });
     mockedAttachmentsApi.listLeadAttachments.mockResolvedValue([]);
     mockedCommLogsApi.listLeadCommunicationLogs.mockResolvedValue([]);
     mockedTasksApi.listTasks.mockImplementation(() => Promise.resolve(emptyTasksResponse));

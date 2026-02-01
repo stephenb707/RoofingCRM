@@ -32,6 +32,24 @@ export const queryKeys = {
   job: (tenantId: string | null, jobId: string) =>
     ["job", tenantId, jobId] as const,
 
+  scheduleJobs: (
+    tenantId: string | null,
+    startDate: string,
+    endDate: string,
+    status: string | null,
+    crewName: string | null,
+    includeUnscheduled: boolean
+  ) =>
+    [
+      "scheduleJobs",
+      tenantId,
+      startDate,
+      endDate,
+      status ?? "",
+      crewName ?? "",
+      includeUnscheduled,
+    ] as const,
+
   estimatesForJob: (tenantId: string | null, jobId: string) =>
     ["estimates", tenantId, jobId] as const,
 

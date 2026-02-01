@@ -1,6 +1,7 @@
 package com.roofingcrm.api.v1.customer;
 
 import com.roofingcrm.api.v1.common.AddressDto;
+import com.roofingcrm.domain.enums.PreferredContactMethod;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -22,6 +23,8 @@ public class UpdateCustomerRequest {
 
     @Email
     private String email;
+
+    private PreferredContactMethod preferredContactMethod;
 
     @Valid
     private AddressDto billingAddress;

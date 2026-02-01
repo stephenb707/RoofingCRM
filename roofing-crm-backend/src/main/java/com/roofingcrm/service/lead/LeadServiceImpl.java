@@ -1,6 +1,7 @@
 package com.roofingcrm.service.lead;
 
 import com.roofingcrm.api.v1.common.AddressDto;
+import com.roofingcrm.api.v1.common.PickerItemDto;
 import com.roofingcrm.api.v1.job.JobDto;
 import com.roofingcrm.api.v1.lead.CreateLeadRequest;
 import com.roofingcrm.api.v1.lead.LeadDto;
@@ -25,6 +26,7 @@ import com.roofingcrm.service.exception.LeadConversionNotAllowedException;
 import com.roofingcrm.service.exception.ResourceNotFoundException;
 import com.roofingcrm.service.tenant.TenantAccessService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.lang.NonNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -32,6 +34,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -75,7 +78,6 @@ public class LeadServiceImpl implements LeadService {
         lead.setStatus(LeadStatus.NEW);
         lead.setSource(request.getSource() != null ? request.getSource() : LeadSource.OTHER);
         lead.setLeadNotes(request.getLeadNotes());
-        lead.setPreferredContactMethod(request.getPreferredContactMethod());
 
         Address propertyAddress = new Address();
         applyAddress(propertyAddress, request.getPropertyAddress());
@@ -100,10 +102,6 @@ public class LeadServiceImpl implements LeadService {
 
         if (request.getLeadNotes() != null) {
             lead.setLeadNotes(request.getLeadNotes());
-        }
-
-        if (request.getPreferredContactMethod() != null) {
-            lead.setPreferredContactMethod(request.getPreferredContactMethod());
         }
 
         if (request.getPropertyAddress() != null) {
@@ -205,10 +203,10 @@ public class LeadServiceImpl implements LeadService {
         job.setLead(lead);
         job.setCreatedByUserId(userId);
         job.setUpdatedByUserId(userId);
-        job.setStatus(JobStatus.SCHEDULED);
         job.setJobType(request.getType());
         job.setScheduledStartDate(request.getScheduledStartDate());
         job.setScheduledEndDate(request.getScheduledEndDate());
+        job.setStatus(request.getScheduledStartDate() != null ? JobStatus.SCHEDULED : JobStatus.UNSCHEDULED);
         job.setAssignedCrew(request.getCrewName());
         job.setJobNotes(request.getInternalNotes());
 
@@ -236,6 +234,26 @@ public class LeadServiceImpl implements LeadService {
         return toJobDto(saved);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<PickerItemDto> searchLeadsForPicker(@NonNull UUID tenantId, @NonNull UUID userId, String q, int limit) {
+        Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
+        int capped = Math.min(Math.max(limit, 1), 50);
+        String qNorm = (q == null || q.isBlank()) ? null : q.trim();
+        List<Lead> leads = leadRepository.searchForPicker(tenant, qNorm, PageRequest.of(0, capped));
+        return leads.stream().map(this::leadToPickerItem).toList();
+    }
+
+    private PickerItemDto leadToPickerItem(Lead l) {
+        String label = l.getCustomer() != null
+                ? (l.getCustomer().getFirstName() + " " + l.getCustomer().getLastName()).trim()
+                : "—";
+        String subLabel = l.getPropertyAddress() != null && l.getPropertyAddress().getLine1() != null
+                ? l.getPropertyAddress().getLine1()
+                : "";
+        return new PickerItemDto(l.getId(), label, subLabel);
+    }
+
     private Customer resolveCustomerForLead(Tenant tenant, UUID userId, CreateLeadRequest request) {
         if (request.getCustomerId() != null) {
             return customerRepository.findByIdAndTenantAndArchivedFalse(request.getCustomerId(), tenant)
@@ -252,6 +270,10 @@ public class LeadServiceImpl implements LeadService {
             customer.setLastName(newCustomer.getLastName());
             customer.setPrimaryPhone(newCustomer.getPrimaryPhone());
             customer.setEmail(newCustomer.getEmail());
+
+            if (newCustomer.getPreferredContactMethod() != null) {
+                customer.setPreferredContactMethod(newCustomer.getPreferredContactMethod());
+            }
 
             if (newCustomer.getBillingAddress() != null) {
                 Address billing = new Address();
@@ -284,7 +306,6 @@ public class LeadServiceImpl implements LeadService {
         dto.setStatus(entity.getStatus());
         dto.setSource(entity.getSource());
         dto.setLeadNotes(entity.getLeadNotes());
-        dto.setPreferredContactMethod(entity.getPreferredContactMethod());
         dto.setCreatedAt(entity.getCreatedAt());
         dto.setUpdatedAt(entity.getUpdatedAt());
         dto.setConvertedJobId(convertedJobId);

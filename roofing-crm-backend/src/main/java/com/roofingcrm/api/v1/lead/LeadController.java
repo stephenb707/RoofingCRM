@@ -1,5 +1,6 @@
 package com.roofingcrm.api.v1.lead;
 
+import com.roofingcrm.api.v1.common.PickerItemDto;
 import com.roofingcrm.api.v1.job.JobDto;
 import com.roofingcrm.domain.enums.LeadStatus;
 import com.roofingcrm.security.SecurityUtils;
@@ -15,6 +16,7 @@ import org.springframework.lang.NonNull;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -58,6 +60,17 @@ public class LeadController {
         UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
         LeadDto dto = leadService.getLead(tenantId, userId, leadId);
         return ResponseEntity.ok(dto);
+    }
+
+    @GetMapping("/picker")
+    public ResponseEntity<List<PickerItemDto>> searchLeadsPicker(
+            @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
+            @RequestParam(value = "q", required = false) String q,
+            @RequestParam(value = "limit", defaultValue = "20") int limit) {
+
+        UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
+        List<PickerItemDto> items = leadService.searchLeadsForPicker(tenantId, userId, q, Math.min(Math.max(limit, 1), 50));
+        return ResponseEntity.ok(items);
     }
 
     @GetMapping

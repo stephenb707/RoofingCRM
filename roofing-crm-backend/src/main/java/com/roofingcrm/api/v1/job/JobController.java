@@ -1,5 +1,6 @@
 package com.roofingcrm.api.v1.job;
 
+import com.roofingcrm.api.v1.common.PickerItemDto;
 import com.roofingcrm.domain.enums.JobStatus;
 import com.roofingcrm.security.SecurityUtils;
 import com.roofingcrm.service.job.JobService;
@@ -14,6 +15,7 @@ import org.springframework.lang.NonNull;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -57,6 +59,17 @@ public class JobController {
         UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
         JobDto dto = jobService.getJob(tenantId, userId, jobId);
         return ResponseEntity.ok(dto);
+    }
+
+    @GetMapping("/picker")
+    public ResponseEntity<List<PickerItemDto>> searchJobsPicker(
+            @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
+            @RequestParam(value = "q", required = false) String q,
+            @RequestParam(value = "limit", defaultValue = "20") int limit) {
+
+        UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
+        List<PickerItemDto> items = jobService.searchJobsForPicker(tenantId, userId, q, Math.min(Math.max(limit, 1), 50));
+        return ResponseEntity.ok(items);
     }
 
     @GetMapping

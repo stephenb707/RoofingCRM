@@ -51,6 +51,4 @@ public class Lead extends TenantAuditedEntity {
             @AttributeOverride(name = "countryCode", column = @Column(name = "property_country_code"))
     })
     private Address propertyAddress;
-
-    private String preferredContactMethod;
 }

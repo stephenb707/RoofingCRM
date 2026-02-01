@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuthReady } from "@/lib/AuthContext";
 import { getJob, updateJobStatus } from "@/lib/jobsApi";
+import { getCustomer } from "@/lib/customersApi";
 import { getApiErrorMessage } from "@/lib/apiError";
 import {
   JOB_STATUSES,
@@ -14,7 +15,7 @@ import {
   JOB_TYPE_LABELS,
 } from "@/lib/jobsConstants";
 import { queryKeys } from "@/lib/queryKeys";
-import { formatAddress, formatDate, formatDateTime } from "@/lib/format";
+import { formatAddress, formatDate, formatDateTime, formatPhone } from "@/lib/format";
 import { listJobAttachments, uploadJobAttachment, downloadAttachment } from "@/lib/attachmentsApi";
 import {
   listJobCommunicationLogs,
@@ -26,6 +27,7 @@ import { ActivitySection } from "@/components/ActivitySection";
 import { TasksSection } from "@/components/TasksSection";
 import { StatusBadge } from "@/components/StatusBadge";
 import type { JobStatus, CreateCommunicationLogRequest, AttachmentTag } from "@/lib/types";
+import { PREFERRED_CONTACT_LABELS } from "@/lib/preferredContactConstants";
 
 export default function JobDetailPage() {
   const params = useParams();
@@ -42,6 +44,12 @@ export default function JobDetailPage() {
     queryKey: queryKeys.job(auth.selectedTenantId, jobId),
     queryFn: () => getJob(api, jobId),
     enabled: ready && !!jobId,
+  });
+
+  const { data: customer } = useQuery({
+    queryKey: queryKeys.customer(auth.selectedTenantId, job?.customerId ?? ""),
+    queryFn: () => getCustomer(api, job!.customerId!),
+    enabled: ready && !!job?.customerId,
   });
 
   useEffect(() => {
@@ -200,6 +208,52 @@ export default function JobDetailPage() {
         </div>
       )}
 
+      {job.customerId && (
+        <div className="mb-6 bg-white rounded-xl border border-slate-200 p-6">
+          <h2 className="text-lg font-semibold text-slate-800 mb-4">Customer Information</h2>
+          {customer ? (
+            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <dt className="text-xs font-medium text-slate-500 uppercase tracking-wider">Name</dt>
+                <dd className="mt-1 text-sm text-slate-800">
+                  {customer.firstName} {customer.lastName}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium text-slate-500 uppercase tracking-wider">Phone</dt>
+                <dd className="mt-1 text-sm text-slate-800">{formatPhone(customer.primaryPhone)}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium text-slate-500 uppercase tracking-wider">Email</dt>
+                <dd className="mt-1 text-sm text-slate-800">{customer.email || "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium text-slate-500 uppercase tracking-wider">Preferred contact</dt>
+                <dd className="mt-1 text-sm text-slate-800">
+                  {customer.preferredContactMethod
+                    ? PREFERRED_CONTACT_LABELS[customer.preferredContactMethod]
+                    : "—"}
+                </dd>
+              </div>
+              {customer.billingAddress && (
+                <div className="sm:col-span-2">
+                  <dt className="text-xs font-medium text-slate-500 uppercase tracking-wider">Billing Address</dt>
+                  <dd className="mt-1 text-sm text-slate-800">{formatAddress(customer.billingAddress)}</dd>
+                </div>
+              )}
+            </dl>
+          ) : (
+            <p className="text-sm text-slate-500">Loading customer…</p>
+          )}
+          <Link
+            href={`/app/customers/${job.customerId}`}
+            className="mt-4 inline-block text-sm font-medium text-sky-600 hover:text-sky-700"
+          >
+            View Customer
+          </Link>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-white rounded-xl border border-slate-200 p-6">
@@ -223,11 +277,27 @@ export default function JobDetailPage() {
               </div>
               <div>
                 <dt className="text-xs font-medium text-slate-500 uppercase tracking-wider">Scheduled start</dt>
-                <dd className="mt-1 text-sm text-slate-800">{formatDate(job.scheduledStartDate)}</dd>
+                <dd className="mt-1 text-sm text-slate-800">
+                  {job.scheduledStartDate ? (
+                    formatDate(job.scheduledStartDate)
+                  ) : (
+                    <span className="inline-flex px-2 py-0.5 text-xs font-medium rounded bg-slate-100 text-slate-600 border border-slate-200">
+                      Unscheduled
+                    </span>
+                  )}
+                </dd>
               </div>
               <div>
                 <dt className="text-xs font-medium text-slate-500 uppercase tracking-wider">Scheduled end</dt>
-                <dd className="mt-1 text-sm text-slate-800">{formatDate(job.scheduledEndDate)}</dd>
+                <dd className="mt-1 text-sm text-slate-800">
+                  {job.scheduledEndDate ? (
+                    formatDate(job.scheduledEndDate)
+                  ) : (
+                    <span className="inline-flex px-2 py-0.5 text-xs font-medium rounded bg-slate-100 text-slate-600 border border-slate-200">
+                      Unscheduled
+                    </span>
+                  )}
+                </dd>
               </div>
               <div>
                 <dt className="text-xs font-medium text-slate-500 uppercase tracking-wider">Crew</dt>
