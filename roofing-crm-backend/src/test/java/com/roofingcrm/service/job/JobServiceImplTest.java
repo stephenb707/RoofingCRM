@@ -28,6 +28,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.lang.NonNull;
 
+import java.time.LocalDate;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -105,6 +106,11 @@ class JobServiceImplTest extends AbstractIntegrationTest {
         this.leadId = Objects.requireNonNull(lead.getId());
     }
 
+    private void setScheduledDates(CreateJobRequest request) {
+        request.setScheduledStartDate(LocalDate.of(2026, 1, 27));
+        request.setScheduledEndDate(LocalDate.of(2026, 1, 30));
+    }
+
     private AddressDto createPropertyAddress() {
         AddressDto address = new AddressDto();
         address.setLine1("123 Main St");
@@ -123,6 +129,7 @@ class JobServiceImplTest extends AbstractIntegrationTest {
         request.setPropertyAddress(createPropertyAddress());
         request.setInternalNotes("Test job notes");
         request.setCrewName("Team Alpha");
+        setScheduledDates(request);
 
         JobDto dto = jobService.createJob(tenantId, userId, request);
 
@@ -147,6 +154,7 @@ class JobServiceImplTest extends AbstractIntegrationTest {
         request.setCustomerId(customerId);
         request.setType(JobType.REPAIR);
         request.setPropertyAddress(createPropertyAddress());
+        setScheduledDates(request);
 
         JobDto dto = jobService.createJob(tenantId, userId, request);
 
@@ -178,6 +186,7 @@ class JobServiceImplTest extends AbstractIntegrationTest {
         request1.setCustomerId(customerId);
         request1.setType(JobType.REPLACEMENT);
         request1.setPropertyAddress(createPropertyAddress());
+        setScheduledDates(request1);
         JobDto job1 = jobService.createJob(tenantId, userId, request1);
 
         CreateJobRequest request2 = new CreateJobRequest();
@@ -234,6 +243,7 @@ class JobServiceImplTest extends AbstractIntegrationTest {
         request.setCustomerId(customerId);
         request.setType(JobType.REPLACEMENT);
         request.setPropertyAddress(createPropertyAddress());
+        setScheduledDates(request);
         JobDto job = jobService.createJob(tenantId, userId, request);
 
         assertEquals(JobStatus.SCHEDULED, job.getStatus());
@@ -299,6 +309,7 @@ class JobServiceImplTest extends AbstractIntegrationTest {
         request1.setCustomerId(customerId);
         request1.setType(JobType.REPLACEMENT);
         request1.setPropertyAddress(createPropertyAddress());
+        setScheduledDates(request1);
         JobDto job1 = jobService.createJob(tenantId, userId, request1);
 
         CreateJobRequest request2 = new CreateJobRequest();
