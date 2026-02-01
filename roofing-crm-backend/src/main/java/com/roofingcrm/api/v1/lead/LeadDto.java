@@ -30,8 +30,6 @@ public class LeadDto {
 
     private AddressDto propertyAddress;
 
-    private String preferredContactMethod;
-
     private Instant createdAt;
     private Instant updatedAt;
 

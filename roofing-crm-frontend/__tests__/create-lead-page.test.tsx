@@ -80,7 +80,6 @@ const mockCreatedLead: LeadDto = {
     state: "CO",
     zip: "80202",
   },
-  preferredContactMethod: "Phone",
   createdAt: "2024-01-15T10:00:00Z",
   updatedAt: "2024-01-15T10:00:00Z",
   customerFirstName: "John",
@@ -201,12 +200,14 @@ describe("NewLeadPage", () => {
 
     render(<NewLeadPage />);
 
+    const user = userEvent.setup();
+    await user.click(screen.getByPlaceholderText("Search by name, email, or phone…"));
+
     await waitFor(() => {
       expect(screen.getByRole("option", { name: /Jane Doe/ })).toBeInTheDocument();
     });
 
-    const user = userEvent.setup();
-    await user.selectOptions(screen.getByLabelText("Select customer"), "cust-456");
+    await user.click(screen.getByRole("option", { name: /Jane Doe/ }));
     await user.type(screen.getByPlaceholderText("123 Main Street"), "123 Main St");
 
     await user.click(screen.getByRole("button", { name: "Create Lead" }));
@@ -230,12 +231,14 @@ describe("NewLeadPage", () => {
 
     render(<NewLeadPage />);
 
+    const user = userEvent.setup();
+    await user.click(screen.getByPlaceholderText("Search by name, email, or phone…"));
+
     await waitFor(() => {
       expect(screen.getByRole("option", { name: /Jane Doe/ })).toBeInTheDocument();
     });
 
-    const user = userEvent.setup();
-    await user.selectOptions(screen.getByLabelText("Select customer"), "cust-456");
+    await user.click(screen.getByRole("option", { name: /Jane Doe/ }));
 
     await waitFor(() => {
       expect(mockedCustomersApi.getCustomer).toHaveBeenCalledWith(expect.anything(), "cust-456");
@@ -253,12 +256,14 @@ describe("NewLeadPage", () => {
 
     render(<NewLeadPage />);
 
+    const user = userEvent.setup();
+    await user.click(screen.getByPlaceholderText("Search by name, email, or phone…"));
+
     await waitFor(() => {
       expect(screen.getByRole("option", { name: /Jane Doe/ })).toBeInTheDocument();
     });
 
-    const user = userEvent.setup();
-    await user.selectOptions(screen.getByLabelText("Select customer"), "cust-456");
+    await user.click(screen.getByRole("option", { name: /Jane Doe/ }));
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Use billing address" })).toBeInTheDocument();
     });
@@ -271,23 +276,25 @@ describe("NewLeadPage", () => {
     expect(screen.getByDisplayValue("80202")).toBeInTheDocument();
   });
 
-  it("when customer is selected, Clear is visible and clicking it shows Customer Information again", async () => {
+  it("when customer is selected, Change is visible and clicking it shows combobox again", async () => {
     mockedCustomersApi.listCustomers.mockResolvedValue(customersPage);
     mockedCustomersApi.getCustomer.mockResolvedValue(mockCustomer);
 
     render(<NewLeadPage />);
 
+    const user = userEvent.setup();
+    await user.click(screen.getByPlaceholderText("Search by name, email, or phone…"));
+
     await waitFor(() => {
       expect(screen.getByRole("option", { name: /Jane Doe/ })).toBeInTheDocument();
     });
 
-    const user = userEvent.setup();
-    await user.selectOptions(screen.getByLabelText("Select customer"), "cust-456");
+    await user.click(screen.getByRole("option", { name: /Jane Doe/ }));
 
-    expect(screen.getByRole("button", { name: "Clear" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Change" })).toBeInTheDocument();
     expect(screen.queryByText("Customer Information")).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Clear" }));
+    await user.click(screen.getByRole("button", { name: "Change" }));
 
     expect(screen.getByText("Customer Information")).toBeInTheDocument();
     expect(screen.getByPlaceholderText("John")).toBeInTheDocument();
@@ -299,12 +306,14 @@ describe("NewLeadPage", () => {
 
     render(<NewLeadPage />);
 
+    const user = userEvent.setup();
+    await user.click(screen.getByPlaceholderText("Search by name, email, or phone…"));
+
     await waitFor(() => {
       expect(screen.getByRole("option", { name: /Jane Doe/ })).toBeInTheDocument();
     });
 
-    const user = userEvent.setup();
-    await user.selectOptions(screen.getByLabelText("Select customer"), "cust-456");
+    await user.click(screen.getByRole("option", { name: /Jane Doe/ }));
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Use billing address" })).toBeInTheDocument();
     });
@@ -375,9 +384,13 @@ describe("NewLeadPage", () => {
     render(<NewLeadPage />);
 
     await waitFor(() => {
-      expect(screen.getByText(/\(312\)\s*111-2222/)).toBeInTheDocument();
+      expect(mockedCustomersApi.listCustomers).toHaveBeenCalled();
     });
-    const option = screen.getByRole("option", { name: /John Smith/ });
+
+    const user = userEvent.setup();
+    await user.click(await screen.findByPlaceholderText("Search by name, email, or phone…"));
+
+    const option = await screen.findByRole("option", { name: /John Smith/ });
     expect(option).toHaveTextContent(/\(312\)\s*111-2222/);
   });
 });

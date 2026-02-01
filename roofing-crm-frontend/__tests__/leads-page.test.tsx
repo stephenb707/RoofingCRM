@@ -20,7 +20,6 @@ const mockLead: LeadDto = {
     state: "CO",
     zip: "80202",
   },
-  preferredContactMethod: "Phone",
   createdAt: "2024-01-15T10:00:00Z",
   updatedAt: "2024-01-15T10:00:00Z",
   customerFirstName: "John",

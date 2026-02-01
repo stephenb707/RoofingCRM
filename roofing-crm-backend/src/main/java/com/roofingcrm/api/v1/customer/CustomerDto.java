@@ -1,6 +1,7 @@
 package com.roofingcrm.api.v1.customer;
 
 import com.roofingcrm.api.v1.common.AddressDto;
+import com.roofingcrm.domain.enums.PreferredContactMethod;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -17,6 +18,8 @@ public class CustomerDto {
     private String lastName;
     private String primaryPhone;
     private String email;
+
+    private PreferredContactMethod preferredContactMethod;
 
     private AddressDto billingAddress;
 

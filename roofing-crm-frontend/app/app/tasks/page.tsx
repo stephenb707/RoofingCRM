@@ -16,6 +16,7 @@ import {
 import { queryKeys } from "@/lib/queryKeys";
 import { formatDateTime } from "@/lib/format";
 import { StatusBadge } from "@/components/StatusBadge";
+import { DatePicker } from "@/components/DatePicker";
 import type { TaskStatus, TaskDto } from "@/lib/types";
 
 function TaskRelatedCell({ task }: { task: { leadId?: string | null; jobId?: string | null; customerId?: string | null } }) {
@@ -147,19 +148,18 @@ export default function TasksPage() {
             <span className="text-sm font-medium text-slate-700">My tasks</span>
           </label>
 
-          <div className="flex items-center gap-2">
-            <label htmlFor="due-before" className="text-sm font-medium text-slate-700">
+          <div className="flex items-center gap-2 min-w-[200px]">
+            <label htmlFor="due-before" className="text-sm font-medium text-slate-700 shrink-0">
               Due before:
             </label>
-            <input
+            <DatePicker
               id="due-before"
-              type="date"
               value={dueBefore}
-              onChange={(e) => {
-                setDueBefore(e.target.value);
+              onChange={(v) => {
+                setDueBefore(v);
                 setPage(0);
               }}
-              className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+              placeholder="Any date"
             />
           </div>
 

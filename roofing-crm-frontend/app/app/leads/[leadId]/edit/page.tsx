@@ -20,7 +20,6 @@ export default function EditLeadPage() {
 
   const [source, setSource] = useState<LeadSource | "">("");
   const [leadNotes, setLeadNotes] = useState("");
-  const [preferredContactMethod, setPreferredContactMethod] = useState("");
   const [line1, setLine1] = useState("");
   const [line2, setLine2] = useState("");
   const [city, setCity] = useState("");
@@ -38,7 +37,6 @@ export default function EditLeadPage() {
     if (lead) {
       setSource((lead.source as LeadSource) ?? "");
       setLeadNotes(lead.leadNotes ?? "");
-      setPreferredContactMethod(lead.preferredContactMethod ?? "");
       const addr = lead.propertyAddress;
       setLine1(addr?.line1 ?? "");
       setLine2(addr?.line2 ?? "");
@@ -52,7 +50,6 @@ export default function EditLeadPage() {
     mutationFn: (payload: {
       source?: LeadSource | null;
       leadNotes?: string | null;
-      preferredContactMethod?: string | null;
       propertyAddress?: AddressDto | null;
     }) => updateLead(api, leadId, payload),
     onSuccess: () => {
@@ -83,7 +80,6 @@ export default function EditLeadPage() {
     mutation.mutate({
       source: source || null,
       leadNotes: leadNotes.trim() || null,
-      preferredContactMethod: preferredContactMethod.trim() || null,
       propertyAddress,
     });
   };
@@ -145,16 +141,6 @@ export default function EditLeadPage() {
                   <option key={s} value={s}>{SOURCE_LABELS[s]}</option>
                 ))}
               </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Preferred contact method</label>
-              <input
-                type="text"
-                value={preferredContactMethod}
-                onChange={(e) => setPreferredContactMethod(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-                placeholder="e.g. Phone, Email"
-              />
             </div>
             <div>
               <label htmlFor="notes" className="block text-sm font-medium text-slate-700 mb-1.5">Notes</label>

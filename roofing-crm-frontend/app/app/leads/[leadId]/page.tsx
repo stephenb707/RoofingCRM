@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuthReady } from "@/lib/AuthContext";
 import { getLead, updateLeadStatus, convertLeadToJob } from "@/lib/leadsApi";
+import { getCustomer } from "@/lib/customersApi";
 import { getApiErrorMessage } from "@/lib/apiError";
 import {
   LEAD_STATUSES,
@@ -33,6 +34,7 @@ import {
   JobType,
   AttachmentTag,
 } from "@/lib/types";
+import { PREFERRED_CONTACT_LABELS } from "@/lib/preferredContactConstants";
 
 export default function LeadDetailPage() {
   const params = useParams();
@@ -55,6 +57,12 @@ export default function LeadDetailPage() {
     queryKey,
     queryFn: () => getLead(api, leadId),
     enabled: ready && !!leadId,
+  });
+
+  const { data: customer } = useQuery({
+    queryKey: queryKeys.customer(auth.selectedTenantId, lead?.customerId ?? ""),
+    queryFn: () => getCustomer(api, lead!.customerId!),
+    enabled: ready && !!lead?.customerId,
   });
 
   const convertMutation = useMutation({
@@ -352,7 +360,11 @@ export default function LeadDetailPage() {
                   Preferred Contact
                 </dt>
                 <dd className="mt-1 text-sm text-slate-800">
-                  {lead.preferredContactMethod || "—"}
+                  {customer?.preferredContactMethod
+                    ? PREFERRED_CONTACT_LABELS[customer.preferredContactMethod]
+                    : customer === undefined
+                      ? "…"
+                      : "—"}
                 </dd>
               </div>
             </dl>

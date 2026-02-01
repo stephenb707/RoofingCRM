@@ -1,5 +1,18 @@
 import type { AddressDto } from "./types";
 
+function isDateOnlyString(iso: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(iso);
+}
+
+/** Parse YYYY-MM-DD as local date (avoids UTC midnight shift). */
+export function parseLocalDateOnly(iso: string): Date {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+/** Alias for parseLocalDateOnly. */
+export const parseDateOnly = parseLocalDateOnly;
+
 /**
  * Format an address for display.
  * e.g. "123 Main St, City, ST 12345"
@@ -16,13 +29,29 @@ export function formatAddress(address?: AddressDto | null): string {
 }
 
 /**
+ * Format YYYY-MM-DD as "Tue Jan 27" (weekday + short date).
+ */
+export function formatDateShortWeekday(iso: string): string {
+  if (!iso || !isDateOnlyString(iso)) return "";
+  const dt = parseLocalDateOnly(iso);
+  return dt.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+/**
  * Format an ISO date string for display (short: "Jan 1, 2024").
+ * For date-only strings (YYYY-MM-DD), parses as local date to avoid timezone shifts.
  * Returns "—" if missing or invalid.
  */
 export function formatDate(iso?: string | null): string {
   if (iso == null || iso === "") return "—";
   try {
-    return new Date(iso).toLocaleDateString("en-US", {
+    const dt = isDateOnlyString(iso) ? parseLocalDateOnly(iso) : new Date(iso);
+    if (Number.isNaN(dt.getTime())) return "—";
+    return dt.toLocaleDateString("en-US", {
       month: "short",
       day: "numeric",
       year: "numeric",
@@ -31,6 +60,17 @@ export function formatDate(iso?: string | null): string {
     return "—";
   }
 }
+
+/** Format a Date as YYYY-MM-DD using local getters (for date inputs). */
+export function formatLocalDateInput(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/** Alias for formatLocalDateInput. */
+export const formatDateOnly = formatLocalDateInput;
 
 /**
  * Format an ISO date string for display with time (e.g. "January 1, 2024 at 12:00 PM").

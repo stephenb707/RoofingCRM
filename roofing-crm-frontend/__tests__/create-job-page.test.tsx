@@ -72,7 +72,6 @@ const mockLead: LeadDto = {
     state: "CO",
     zip: "80202",
   },
-  preferredContactMethod: null,
   createdAt: "2024-01-01T00:00:00Z",
   updatedAt: "2024-01-01T00:00:00Z",
 };
@@ -81,7 +80,7 @@ const mockCreatedJob: JobDto = {
   id: "job-new-1",
   customerId: "cust-1",
   leadId: null,
-  status: "SCHEDULED",
+  status: "UNSCHEDULED",
   type: "REPAIR",
   propertyAddress: { line1: "123 Test Ave", city: "Denver", state: "CO" },
   scheduledStartDate: null,
@@ -116,12 +115,17 @@ describe("NewJobPage", () => {
       render(<NewJobPage />);
 
       await waitFor(() => {
-        expect(screen.getByRole("option", { name: /Jane Doe/ })).toBeInTheDocument();
+        expect(mockedCustomersApi.listCustomers).toHaveBeenCalled();
       });
 
       const user = userEvent.setup();
+      await user.click(screen.getByPlaceholderText("Search by name, email, or phone…"));
 
-      await user.selectOptions(screen.getByLabelText(/Select customer/i), "cust-1");
+      await waitFor(() => {
+        expect(screen.getByRole("option", { name: /Jane Doe/ })).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole("option", { name: /Jane Doe/ }));
       await user.selectOptions(screen.getByLabelText(/Job type/i), "REPAIR");
       await user.type(screen.getByPlaceholderText("123 Main Street"), "123 Test Ave");
       await user.type(screen.getByPlaceholderText("Denver"), "Denver");
@@ -154,12 +158,14 @@ describe("NewJobPage", () => {
 
       render(<NewJobPage />);
 
+      const user = userEvent.setup();
+      await user.click(screen.getByPlaceholderText("Search by name, email, or phone…"));
+
       await waitFor(() => {
         expect(screen.getByRole("option", { name: /Jane Doe/ })).toBeInTheDocument();
       });
 
-      const user = userEvent.setup();
-      await user.selectOptions(screen.getByLabelText(/Select customer/i), "cust-1");
+      await user.click(screen.getByRole("option", { name: /Jane Doe/ }));
 
       await waitFor(() => {
         expect(mockedCustomersApi.getCustomer).toHaveBeenCalledWith(expect.anything(), "cust-1");
@@ -179,12 +185,14 @@ describe("NewJobPage", () => {
 
       render(<NewJobPage />);
 
+      const user = userEvent.setup();
+      await user.click(screen.getByPlaceholderText("Search by name, email, or phone…"));
+
       await waitFor(() => {
         expect(screen.getByRole("option", { name: /Jane Doe/ })).toBeInTheDocument();
       });
 
-      const user = userEvent.setup();
-      await user.selectOptions(screen.getByLabelText(/Select customer/i), "cust-1");
+      await user.click(screen.getByRole("option", { name: /Jane Doe/ }));
       await waitFor(() => {
         expect(screen.getByRole("button", { name: "Use billing address" })).toBeInTheDocument();
       });
@@ -205,12 +213,14 @@ describe("NewJobPage", () => {
 
       render(<NewJobPage />);
 
+      const user = userEvent.setup();
+      await user.click(screen.getByPlaceholderText("Search by name, email, or phone…"));
+
       await waitFor(() => {
         expect(screen.getByRole("option", { name: /Jane Doe/ })).toBeInTheDocument();
       });
 
-      const user = userEvent.setup();
-      await user.selectOptions(screen.getByLabelText(/Select customer/i), "cust-1");
+      await user.click(screen.getByRole("option", { name: /Jane Doe/ }));
       await waitFor(() => {
         expect(screen.getByRole("button", { name: "Use billing address" })).toBeInTheDocument();
       });
@@ -241,8 +251,11 @@ describe("NewJobPage", () => {
 
     render(<NewJobPage />);
 
+    const user = userEvent.setup();
+    await user.click(screen.getByPlaceholderText("Search by name, email, or phone…"));
+
     await waitFor(() => {
-      expect(screen.getByText(/\(312\)\s*111-2222/)).toBeInTheDocument();
+      expect(screen.getByRole("option", { name: /John Smith/ })).toBeInTheDocument();
     });
     const option = screen.getByRole("option", { name: /John Smith/ });
     expect(option).toHaveTextContent(/\(312\)\s*111-2222/);

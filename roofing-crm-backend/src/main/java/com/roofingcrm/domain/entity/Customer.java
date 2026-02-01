@@ -1,5 +1,6 @@
 package com.roofingcrm.domain.entity;
 
+import com.roofingcrm.domain.enums.PreferredContactMethod;
 import com.roofingcrm.domain.value.Address;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
@@ -34,6 +35,10 @@ public class Customer extends TenantAuditedEntity {
 
     @Email
     private String email;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "preferred_contact_method", length = 20)
+    private PreferredContactMethod preferredContactMethod;
 
     @Embedded
     @AttributeOverrides({

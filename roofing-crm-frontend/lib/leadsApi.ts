@@ -45,6 +45,32 @@ export async function listLeads(
   return response.data;
 }
 
+export interface PickerItem {
+  id: string;
+  label: string;
+  subLabel: string;
+}
+
+/**
+ * Search leads for picker (lightweight { id, label, subLabel }).
+ */
+export async function searchLeadsPicker(
+  api: AxiosInstance,
+  params: { q?: string | null; limit?: number } = {}
+): Promise<PickerItem[]> {
+  const queryParams: Record<string, string | number> = {};
+  if (params.q != null && params.q !== "") {
+    queryParams.q = params.q;
+  }
+  if (params.limit != null) {
+    queryParams.limit = params.limit;
+  }
+  const res = await api.get<PickerItem[]>("/api/v1/leads/picker", {
+    params: queryParams,
+  });
+  return res.data;
+}
+
 /**
  * Fetch a single lead by ID.
  */
@@ -68,7 +94,7 @@ export async function createLead(
 }
 
 /**
- * Update an existing lead (source, leadNotes, preferredContactMethod, propertyAddress).
+ * Update an existing lead (source, leadNotes, propertyAddress).
  */
 export async function updateLead(
   api: AxiosInstance,

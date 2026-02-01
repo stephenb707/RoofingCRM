@@ -8,7 +8,9 @@ import com.roofingcrm.domain.enums.ActivityEntityType;
 import com.roofingcrm.domain.enums.ActivityEventType;
 import com.roofingcrm.domain.repository.ActivityEventRepository;
 import com.roofingcrm.domain.repository.UserRepository;
+import com.roofingcrm.realtime.ActivityEventCreatedAppEvent;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.lang.NonNull;
@@ -25,12 +27,15 @@ public class ActivityEventServiceImpl implements ActivityEventService {
 
     private final ActivityEventRepository activityEventRepository;
     private final UserRepository userRepository;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     @Autowired
     public ActivityEventServiceImpl(ActivityEventRepository activityEventRepository,
-                                    UserRepository userRepository) {
+                                    UserRepository userRepository,
+                                    ApplicationEventPublisher applicationEventPublisher) {
         this.activityEventRepository = activityEventRepository;
         this.userRepository = userRepository;
+        this.applicationEventPublisher = applicationEventPublisher;
     }
 
     @Override
@@ -45,7 +50,15 @@ public class ActivityEventServiceImpl implements ActivityEventService {
         event.setMessage(message != null ? message.trim() : "");
         event.setMetadata(metadata != null ? metadata : Collections.emptyMap());
         event.setCreatedBy(actor);
-        return activityEventRepository.save(event);
+        event = activityEventRepository.save(event);
+        publishCreatedEvent(tenant, entityType, entityId, event.getId());
+        return event;
+    }
+
+    private void publishCreatedEvent(Tenant tenant, ActivityEntityType entityType, UUID entityId, UUID activityEventId) {
+        UUID tenantId = Objects.requireNonNull(tenant.getId());
+        applicationEventPublisher.publishEvent(
+                new ActivityEventCreatedAppEvent(this, tenantId, entityType, entityId, activityEventId));
     }
 
     @Override

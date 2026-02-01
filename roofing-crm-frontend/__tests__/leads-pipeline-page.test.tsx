@@ -22,7 +22,6 @@ const mockLeadNew: LeadDto = {
   source: "WEBSITE",
   leadNotes: "",
   propertyAddress: { line1: "123 Main St", city: "Denver", state: "CO" },
-  preferredContactMethod: null,
   createdAt: "2024-01-01T00:00:00Z",
   updatedAt: "2024-01-01T00:00:00Z",
   customerFirstName: "Alice",

@@ -6,6 +6,36 @@ import * as leadsApi from "@/lib/leadsApi";
 import { LeadDto, JobDto } from "@/lib/types";
 
 jest.mock("@/lib/leadsApi");
+
+jest.mock("@/components/DateRangePicker", () => ({
+  DateRangePicker: ({
+    startDate,
+    endDate,
+    onChange,
+  }: {
+    startDate: string;
+    endDate: string;
+    onChange: (start: string, end: string) => void;
+  }) => (
+    <div data-testid="date-range-picker">
+      <input
+        data-testid="convert-date-start"
+        aria-label="Scheduled start date"
+        type="text"
+        value={startDate}
+        onChange={(e) => onChange(e.target.value, endDate)}
+      />
+      <input
+        data-testid="convert-date-end"
+        aria-label="Scheduled end date"
+        type="text"
+        value={endDate}
+        onChange={(e) => onChange(startDate, e.target.value)}
+      />
+    </div>
+  ),
+}));
+
 const mockedLeadsApi = leadsApi as jest.Mocked<typeof leadsApi>;
 
 const mockPush = jest.fn();
@@ -28,7 +58,6 @@ const mockLead: LeadDto = {
     state: "IL",
     zip: "60601",
   },
-  preferredContactMethod: null,
   customerFirstName: "John",
   customerLastName: "Doe",
   customerEmail: "john@example.com",

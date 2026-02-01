@@ -16,6 +16,4 @@ public class UpdateLeadRequest {
 
     @Valid
     private AddressDto propertyAddress;
-
-    private String preferredContactMethod;
 }

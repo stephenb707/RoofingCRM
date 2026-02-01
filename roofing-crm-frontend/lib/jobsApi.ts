@@ -41,6 +41,32 @@ export async function listJobs(
   return res.data;
 }
 
+export interface PickerItem {
+  id: string;
+  label: string;
+  subLabel: string;
+}
+
+/**
+ * Search jobs for picker (lightweight { id, label, subLabel }).
+ */
+export async function searchJobsPicker(
+  api: AxiosInstance,
+  params: { q?: string | null; limit?: number } = {}
+): Promise<PickerItem[]> {
+  const queryParams: Record<string, string | number> = {};
+  if (params.q != null && params.q !== "") {
+    queryParams.q = params.q;
+  }
+  if (params.limit != null) {
+    queryParams.limit = params.limit;
+  }
+  const res = await api.get<PickerItem[]>("/api/v1/jobs/picker", {
+    params: queryParams,
+  });
+  return res.data;
+}
+
 /**
  * Fetch a single job by ID.
  */

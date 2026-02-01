@@ -10,6 +10,7 @@ import { listLeads } from "@/lib/leadsApi";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { queryKeys } from "@/lib/queryKeys";
 import { formatPhone, formatAddress, formatDate } from "@/lib/format";
+import { PREFERRED_CONTACT_LABELS } from "@/lib/preferredContactConstants";
 import type { LeadDto } from "@/lib/types";
 import { JOB_TYPE_LABELS, JOB_STATUS_LABELS, JOB_STATUS_COLORS } from "@/lib/jobsConstants";
 import { STATUS_LABELS, STATUS_COLORS } from "@/lib/leadsConstants";
@@ -106,6 +107,14 @@ export default function CustomerDetailPage() {
               <div>
                 <dt className="text-xs font-medium text-slate-500 uppercase tracking-wider">Email</dt>
                 <dd className="mt-1 text-sm text-slate-800">{customer.email || "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium text-slate-500 uppercase tracking-wider">Preferred contact</dt>
+                <dd className="mt-1 text-sm text-slate-800">
+                  {customer.preferredContactMethod
+                    ? PREFERRED_CONTACT_LABELS[customer.preferredContactMethod]
+                    : "—"}
+                </dd>
               </div>
               {customer.billingAddress && (
                 <div className="sm:col-span-2">

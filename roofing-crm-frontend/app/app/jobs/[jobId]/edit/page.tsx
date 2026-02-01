@@ -9,17 +9,8 @@ import { getJob, updateJob } from "@/lib/jobsApi";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { queryKeys } from "@/lib/queryKeys";
 import { JOB_TYPES, JOB_TYPE_LABELS } from "@/lib/jobsConstants";
+import { DateRangePicker } from "@/components/DateRangePicker";
 import type { JobType, AddressDto, UpdateJobRequest } from "@/lib/types";
-
-function toDateInputValue(s: string | null | undefined): string {
-  if (!s) return "";
-  try {
-    const d = new Date(s);
-    return d.toISOString().slice(0, 10);
-  } catch {
-    return "";
-  }
-}
 
 export default function EditJobPage() {
   const params = useParams();
@@ -55,8 +46,8 @@ export default function EditJobPage() {
       setCity(addr?.city ?? "");
       setState(addr?.state ?? "");
       setZip(addr?.zip ?? "");
-      setScheduledStartDate(toDateInputValue(job.scheduledStartDate));
-      setScheduledEndDate(toDateInputValue(job.scheduledEndDate));
+      setScheduledStartDate(job.scheduledStartDate ?? "");
+      setScheduledEndDate(job.scheduledEndDate ?? "");
       setInternalNotes(job.internalNotes ?? "");
       setCrewName(job.crewName ?? "");
     }
@@ -89,11 +80,13 @@ export default function EditJobPage() {
       state: state.trim() || undefined,
       zip: zip.trim() || undefined,
     };
+    const clearSchedule = !scheduledStartDate && !scheduledEndDate;
     mutation.mutate({
       type,
       propertyAddress,
-      scheduledStartDate: scheduledStartDate || null,
-      scheduledEndDate: scheduledEndDate || null,
+      scheduledStartDate: scheduledStartDate || undefined,
+      scheduledEndDate: scheduledEndDate || undefined,
+      clearSchedule: clearSchedule || undefined,
       internalNotes: internalNotes.trim() || null,
       crewName: crewName.trim() || null,
     });
@@ -157,21 +150,17 @@ export default function EditJobPage() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Scheduled start date</label>
-              <input
-                type="date"
-                value={scheduledStartDate}
-                onChange={(e) => setScheduledStartDate(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Scheduled end date</label>
-              <input
-                type="date"
-                value={scheduledEndDate}
-                onChange={(e) => setScheduledEndDate(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                Scheduled dates
+              </label>
+              <DateRangePicker
+                startDate={scheduledStartDate}
+                endDate={scheduledEndDate}
+                onChange={(start, end) => {
+                  setScheduledStartDate(start);
+                  setScheduledEndDate(end);
+                }}
+                placeholder="Select date range…"
               />
             </div>
             <div>

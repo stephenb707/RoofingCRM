@@ -27,6 +27,4 @@ public class CreateLeadRequest {
     @Valid
     @NotNull
     private AddressDto propertyAddress;
-
-    private String preferredContactMethod;
 }

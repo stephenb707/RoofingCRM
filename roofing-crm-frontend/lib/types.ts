@@ -13,12 +13,15 @@ export interface AuthResponse {
   tenants: TenantSummary[];
 }
 
+export type PreferredContactMethod = "PHONE" | "TEXT" | "EMAIL";
+
 export interface CustomerDto {
   id: string;
   firstName: string;
   lastName: string;
   primaryPhone?: string | null;
   email?: string | null;
+  preferredContactMethod?: PreferredContactMethod | null;
   billingAddress?: AddressDto | null;
   notes?: string | null;
   createdAt?: string;
@@ -30,6 +33,7 @@ export interface CreateCustomerRequest {
   lastName: string;
   primaryPhone: string;
   email?: string | null;
+  preferredContactMethod?: PreferredContactMethod | null;
   billingAddress?: AddressDto | null;
   notes?: string | null;
 }
@@ -39,6 +43,7 @@ export interface UpdateCustomerRequest {
   lastName: string;
   primaryPhone: string;
   email?: string | null;
+  preferredContactMethod?: PreferredContactMethod | null;
   billingAddress?: AddressDto | null;
   notes?: string | null;
 }
@@ -75,7 +80,6 @@ export interface LeadDto {
   source: LeadSource | null;
   leadNotes: string | null;
   propertyAddress: AddressDto | null;
-  preferredContactMethod: string | null;
   createdAt: string;
   updatedAt: string;
   // Enriched fields from backend (customer data)
@@ -92,6 +96,7 @@ export interface NewLeadCustomerRequest {
   lastName: string;
   primaryPhone: string;
   email?: string | null;
+  preferredContactMethod?: PreferredContactMethod | null;
   billingAddress?: AddressDto | null;
 }
 
@@ -101,7 +106,6 @@ export interface CreateLeadRequest {
   source?: LeadSource | null;
   leadNotes?: string | null;
   propertyAddress: AddressDto;
-  preferredContactMethod?: string | null;
 }
 
 export interface UpdateLeadStatusRequest {
@@ -119,7 +123,6 @@ export interface ConvertLeadToJobRequest {
 export interface UpdateLeadRequest {
   source?: LeadSource | null;
   leadNotes?: string | null;
-  preferredContactMethod?: string | null;
   propertyAddress?: AddressDto | null;
 }
 
@@ -135,6 +138,7 @@ export interface PageResponse<T> {
 
 // Job-related types
 export type JobStatus =
+  | "UNSCHEDULED"
   | "SCHEDULED"
   | "IN_PROGRESS"
   | "COMPLETED"
@@ -166,6 +170,7 @@ export interface UpdateJobRequest {
   propertyAddress?: AddressDto | null;
   scheduledStartDate?: string | null;
   scheduledEndDate?: string | null;
+  clearSchedule?: boolean | null;
   internalNotes?: string | null;
   crewName?: string | null;
 }
@@ -343,6 +348,7 @@ export type ActivityEventType =
   | "NOTE"
   | "LEAD_STATUS_CHANGED"
   | "JOB_STATUS_CHANGED"
+  | "JOB_SCHEDULE_CHANGED"
   | "TASK_CREATED"
   | "TASK_STATUS_CHANGED"
   | "LEAD_CONVERTED_TO_JOB"

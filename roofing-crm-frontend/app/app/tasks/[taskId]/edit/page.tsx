@@ -9,6 +9,7 @@ import { getTask, updateTask } from "@/lib/tasksApi";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { TASK_STATUS_OPTIONS, TASK_PRIORITY_OPTIONS } from "@/lib/tasksConstants";
 import { queryKeys } from "@/lib/queryKeys";
+import { DateTimePicker } from "@/components/DateTimePicker";
 import type { TaskStatus, TaskPriority, UpdateTaskRequest } from "@/lib/types";
 
 function toDatetimeLocal(iso?: string | null): string {
@@ -180,11 +181,10 @@ export default function EditTaskPage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Due Date & Time</label>
-              <input
-                type="datetime-local"
+              <DateTimePicker
                 value={dueAtLocal}
-                onChange={(e) => setDueAtLocal(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+                onChange={setDueAtLocal}
+                placeholder="Select date and time…"
               />
             </div>
           </div>

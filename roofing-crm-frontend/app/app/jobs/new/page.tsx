@@ -12,6 +12,8 @@ import { getApiErrorMessage } from "@/lib/apiError";
 import { JOB_TYPES, JOB_TYPE_LABELS } from "@/lib/jobsConstants";
 import { formatAddress, formatPhone } from "@/lib/format";
 import { BillingAddressAssist } from "@/components/BillingAddressAssist";
+import { DateRangePicker } from "@/components/DateRangePicker";
+import { Combobox } from "@/components/Combobox";
 import type { JobType, AddressDto, CreateJobRequest } from "@/lib/types";
 
 const emptyAddress: AddressDto = {
@@ -217,39 +219,54 @@ export default function NewJobPage() {
 
         {!isLeadMode && (
           <div className="bg-white rounded-xl border border-slate-200 p-6 mb-6">
-            <h2 className="text-lg font-semibold text-slate-800 mb-4">Customer</h2>
-            <label htmlFor="customer-search" className="block text-sm font-medium text-slate-700 mb-1.5">
-              Search customer <span className="text-red-500">*</span>
-            </label>
-            <input
-              id="customer-search"
-              type="text"
-              value={customerSearch}
-              onChange={(e) => setCustomerSearch(e.target.value)}
-              placeholder="Search by name, email, or phone..."
-              className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent mb-3"
-            />
-            <label htmlFor="customer-select" className="block text-sm font-medium text-slate-700 mb-1.5">
-              Select customer <span className="text-red-500">*</span>
-            </label>
-            <select
-              id="customer-select"
-              value={customerId}
-              onChange={(e) => setCustomerId(e.target.value)}
-              required={!isLeadMode}
-              className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
-            >
-              <option value="">Select customer</option>
-              {customers.map((c) => {
-                const phoneFormatted = formatPhone(c.primaryPhone ?? null);
-                const displayExtra = phoneFormatted !== "—" ? ` — ${phoneFormatted}` : c.email ? ` — ${c.email}` : "";
-                return (
-                  <option key={c.id} value={c.id}>
-                    {c.firstName} {c.lastName}{displayExtra}
-                  </option>
-                );
-              })}
-            </select>
+            <h2 className="text-lg font-semibold text-slate-800 mb-4">
+              Customer <span className="text-red-500">*</span>
+            </h2>
+            {customerId && selectedCustomer ? (
+              <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-200">
+                <div className="text-sm">
+                  <p className="font-medium text-slate-800">
+                    {selectedCustomer.firstName} {selectedCustomer.lastName}
+                  </p>
+                  {(selectedCustomer.email || selectedCustomer.primaryPhone) && (
+                    <p className="text-slate-600 mt-0.5">
+                      {selectedCustomer.email ?? formatPhone(selectedCustomer.primaryPhone ?? null)}
+                    </p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCustomerId("");
+                    setCustomerSearch("");
+                  }}
+                  className="text-sm font-medium text-sky-600 hover:text-sky-700"
+                >
+                  Change
+                </button>
+              </div>
+            ) : (
+              <Combobox
+                items={customers}
+                getItemLabel={(c) => `${c.firstName} ${c.lastName}`}
+                getItemKey={(c) => c.id}
+                onSelect={(c) => {
+                  setCustomerId(c.id);
+                  setCustomerSearch("");
+                }}
+                onSearchChange={setCustomerSearch}
+                value={customerSearch}
+                placeholder="Search by name, email, or phone…"
+                renderItem={(c) => {
+                  const extra = formatPhone(c.primaryPhone ?? null) !== "—"
+                    ? ` — ${formatPhone(c.primaryPhone ?? null)}`
+                    : c.email
+                      ? ` — ${c.email}`
+                      : "";
+                  return `${c.firstName} ${c.lastName}${extra}`;
+                }}
+              />
+            )}
           </div>
         )}
 
@@ -344,25 +361,19 @@ export default function NewJobPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Scheduled start</label>
-                <input
-                  type="date"
-                  value={scheduledStartDate}
-                  onChange={(e) => setScheduledStartDate(e.target.value)}
-                  className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Scheduled end</label>
-                <input
-                  type="date"
-                  value={scheduledEndDate}
-                  onChange={(e) => setScheduledEndDate(e.target.value)}
-                  className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
-                />
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                Scheduled dates
+              </label>
+              <DateRangePicker
+                startDate={scheduledStartDate}
+                endDate={scheduledEndDate}
+                onChange={(start, end) => {
+                  setScheduledStartDate(start);
+                  setScheduledEndDate(end);
+                }}
+                placeholder="Select date range…"
+              />
             </div>
 
             <div>

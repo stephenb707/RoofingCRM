@@ -10,6 +10,7 @@ import { getApiErrorMessage } from "@/lib/apiError";
 import { queryKeys } from "@/lib/queryKeys";
 import { JOB_TYPES, JOB_TYPE_LABELS } from "@/lib/jobsConstants";
 import { formatAddress } from "@/lib/format";
+import { DateRangePicker } from "@/components/DateRangePicker";
 import type { JobType, ConvertLeadToJobRequest } from "@/lib/types";
 
 export default function ConvertLeadPage() {
@@ -221,27 +222,19 @@ export default function ConvertLeadPage() {
               </select>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="scheduledStartDate" className="block text-sm font-medium text-slate-700 mb-1.5">Scheduled Start Date</label>
-                <input
-                  id="scheduledStartDate"
-                  type="date"
-                  value={scheduledStartDate}
-                  onChange={(e) => setScheduledStartDate(e.target.value)}
-                  className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
-                />
-              </div>
-              <div>
-                <label htmlFor="scheduledEndDate" className="block text-sm font-medium text-slate-700 mb-1.5">Scheduled End Date</label>
-                <input
-                  id="scheduledEndDate"
-                  type="date"
-                  value={scheduledEndDate}
-                  onChange={(e) => setScheduledEndDate(e.target.value)}
-                  className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
-                />
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                Scheduled dates
+              </label>
+              <DateRangePicker
+                startDate={scheduledStartDate}
+                endDate={scheduledEndDate}
+                onChange={(start, end) => {
+                  setScheduledStartDate(start);
+                  setScheduledEndDate(end);
+                }}
+                placeholder="Select date range…"
+              />
             </div>
 
             <div>
