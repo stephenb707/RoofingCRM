@@ -26,6 +26,8 @@ public class LeadDto {
 
     private LeadSource source;
 
+    private int pipelinePosition;
+
     private String leadNotes;
 
     private AddressDto propertyAddress;

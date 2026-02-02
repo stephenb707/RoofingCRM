@@ -99,12 +99,35 @@ public class JobServiceImpl implements JobService {
         }
 
         job.setScheduledStartDate(request.getScheduledStartDate());
-        job.setScheduledEndDate(request.getScheduledEndDate());
+        LocalDate reqStart = request.getScheduledStartDate();
+        LocalDate reqEnd = request.getScheduledEndDate();
+        if (reqStart != null && reqEnd == null) {
+            job.setScheduledEndDate(reqStart);
+        } else {
+            job.setScheduledEndDate(reqEnd);
+        }
         job.setJobNotes(request.getInternalNotes());
         job.setAssignedCrew(request.getCrewName());
 
+        normalizeSchedulingStatus(job);
+
         Job saved = jobRepository.save(job);
         return toDto(saved);
+    }
+
+    /**
+     * Normalize scheduling status: ensure status reflects schedule state.
+     * scheduled → SCHEDULED; unscheduled → UNSCHEDULED.
+     * Idempotent; only flips between SCHEDULED and UNSCHEDULED.
+     */
+    private void normalizeSchedulingStatus(Job job) {
+        boolean isScheduled = job.getScheduledStartDate() != null;
+        JobStatus current = job.getStatus();
+        if (isScheduled && current == JobStatus.UNSCHEDULED) {
+            job.setStatus(JobStatus.SCHEDULED);
+        } else if (!isScheduled && current == JobStatus.SCHEDULED) {
+            job.setStatus(JobStatus.UNSCHEDULED);
+        }
     }
 
     @Override
@@ -159,13 +182,7 @@ public class JobServiceImpl implements JobService {
             job.setAssignedCrew(request.getCrewName());
         }
 
-        // Sync status with schedule: UNSCHEDULED <-> SCHEDULED based on dates
-        JobStatus currentStatus = job.getStatus();
-        if (currentStatus == JobStatus.SCHEDULED && newStart == null) {
-            job.setStatus(JobStatus.UNSCHEDULED);
-        } else if (currentStatus == JobStatus.UNSCHEDULED && newStart != null) {
-            job.setStatus(JobStatus.SCHEDULED);
-        }
+        normalizeSchedulingStatus(job);
 
         Job saved = jobRepository.save(job);
 

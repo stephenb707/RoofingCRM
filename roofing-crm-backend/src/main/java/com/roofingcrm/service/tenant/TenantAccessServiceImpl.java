@@ -64,9 +64,14 @@ public class TenantAccessServiceImpl implements TenantAccessService {
 
     @Override
     public TenantUserMembership requireAnyRole(@NonNull UUID tenantId, @NonNull UUID userId, @NonNull Set<UserRole> allowedRoles) {
+        return requireAnyRole(tenantId, userId, allowedRoles, "You do not have permission to perform this action.");
+    }
+
+    @Override
+    public TenantUserMembership requireAnyRole(@NonNull UUID tenantId, @NonNull UUID userId, @NonNull Set<UserRole> allowedRoles, @NonNull String deniedMessage) {
         TenantUserMembership membership = loadMembershipForUserOrThrow(tenantId, userId);
         if (!allowedRoles.contains(membership.getRole())) {
-            throw new TenantAccessDeniedException("You do not have permission to manage team members.");
+            throw new TenantAccessDeniedException(deniedMessage);
         }
         return membership;
     }

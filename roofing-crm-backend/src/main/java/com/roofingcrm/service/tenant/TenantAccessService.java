@@ -27,4 +27,10 @@ public interface TenantAccessService {
      * Throws TenantAccessDeniedException if not.
      */
     TenantUserMembership requireAnyRole(@NonNull UUID tenantId, @NonNull UUID userId, @NonNull Set<UserRole> allowedRoles);
+
+    /**
+     * Ensure the user has one of the allowed roles in the tenant.
+     * Throws TenantAccessDeniedException with the given message if not.
+     */
+    TenantUserMembership requireAnyRole(@NonNull UUID tenantId, @NonNull UUID userId, @NonNull Set<UserRole> allowedRoles, @NonNull String deniedMessage);
 }

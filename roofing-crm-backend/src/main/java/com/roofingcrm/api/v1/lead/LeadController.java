@@ -92,7 +92,7 @@ public class LeadController {
             @Valid @RequestBody UpdateLeadStatusRequest request) {
 
         UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
-        LeadDto updated = leadService.updateLeadStatus(tenantId, userId, leadId, request.getStatus());
+        LeadDto updated = leadService.updateLeadStatus(tenantId, userId, leadId, request.getStatus(), request.getPosition());
         return ResponseEntity.ok(updated);
     }
 

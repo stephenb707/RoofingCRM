@@ -44,14 +44,15 @@ public final class JobSpecifications {
             }
 
             // Date predicate: scheduled overlap OR unscheduled
-            // Overlap: scheduledStartDate is not null AND scheduledStartDate <= to AND (scheduledEndDate is null OR scheduledEndDate >= from)
+            // Overlap: scheduledStartDate <= to AND effectiveEnd >= from, where effectiveEnd = coalesce(scheduledEndDate, scheduledStartDate)
+            var effectiveEndGteFrom = cb.or(
+                    cb.and(cb.isNotNull(root.get("scheduledEndDate")), cb.greaterThanOrEqualTo(root.get("scheduledEndDate"), from)),
+                    cb.and(cb.isNull(root.get("scheduledEndDate")), cb.greaterThanOrEqualTo(root.get("scheduledStartDate"), from))
+            );
             var hasScheduledOverlap = cb.and(
                     cb.isNotNull(root.get("scheduledStartDate")),
                     cb.lessThanOrEqualTo(root.get("scheduledStartDate"), to),
-                    cb.or(
-                            cb.isNull(root.get("scheduledEndDate")),
-                            cb.greaterThanOrEqualTo(root.get("scheduledEndDate"), from)
-                    )
+                    effectiveEndGteFrom
             );
             var isUnscheduled = cb.isNull(root.get("scheduledStartDate"));
 

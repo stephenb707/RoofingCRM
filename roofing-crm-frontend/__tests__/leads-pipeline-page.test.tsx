@@ -22,6 +22,7 @@ const mockLeadNew: LeadDto = {
   source: "WEBSITE",
   leadNotes: "",
   propertyAddress: { line1: "123 Main St", city: "Denver", state: "CO" },
+  pipelinePosition: 0,
   createdAt: "2024-01-01T00:00:00Z",
   updatedAt: "2024-01-01T00:00:00Z",
   customerFirstName: "Alice",
@@ -32,6 +33,7 @@ const mockLeadContacted: LeadDto = {
   ...mockLeadNew,
   id: "lead-2",
   status: "CONTACTED",
+  pipelinePosition: 0,
   customerFirstName: "Bob",
   customerLastName: "Jones",
   propertyAddress: { line1: "456 Oak Ave", city: "Boulder", state: "CO" },
@@ -73,56 +75,36 @@ describe("LeadsPipelinePage", () => {
     expect(screen.getByText("456 Oak Ave, Boulder, CO")).toBeInTheDocument();
   });
 
-  it("changing a lead's status calls updateLeadStatus with correct args", async () => {
-    mockedLeadsApi.updateLeadStatus.mockResolvedValue({
-      ...mockLeadNew,
-      status: "CONTACTED",
-    });
-
+  it("does not have a status dropdown on cards", async () => {
     render(<LeadsPipelinePage />);
 
     await waitFor(() => {
       expect(screen.getByText("Alice Smith")).toBeInTheDocument();
     });
 
-    const select = screen.getByLabelText(/Status for Alice Smith/i);
-    await userEvent.selectOptions(select, "Contacted");
-
-    await waitFor(() => {
-      expect(mockedLeadsApi.updateLeadStatus).toHaveBeenCalledWith(
-        expect.anything(),
-        "lead-1",
-        "CONTACTED"
-      );
-    });
+    expect(screen.queryByLabelText(/Status for Alice Smith/i)).not.toBeInTheDocument();
   });
 
-  it("optimistic UI: after change, the lead appears under the new column", async () => {
-    mockedLeadsApi.updateLeadStatus.mockImplementation(
-      () => new Promise((resolve) => setTimeout(() => resolve({
-        ...mockLeadNew,
-        status: "CONTACTED",
-      }), 100))
-    );
-
+  it("shows status badge on each card", async () => {
     render(<LeadsPipelinePage />);
 
     await waitFor(() => {
       expect(screen.getByText("Alice Smith")).toBeInTheDocument();
     });
 
-    const newColumn = screen.getByRole("heading", { name: "New" }).closest(".flex-shrink-0");
-    expect(newColumn).toHaveTextContent("Alice Smith");
+    expect(screen.getByTestId("pipeline-card-status-lead-1")).toHaveTextContent("New");
+    expect(screen.getByTestId("pipeline-card-status-lead-2")).toHaveTextContent("Contacted");
+  });
 
-    const select = screen.getByLabelText(/Status for Alice Smith/i);
-    await userEvent.selectOptions(select, "Contacted");
+  it("shows tip with link to open leads", async () => {
+    render(<LeadsPipelinePage />);
 
-    await waitFor(
-      () => {
-        const contactedColumn = screen.getByRole("heading", { name: "Contacted" }).closest(".flex-shrink-0");
-        expect(contactedColumn).toHaveTextContent("Alice Smith");
-      },
-      { timeout: 500 }
-    );
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Pipeline");
+    });
+
+    expect(screen.getByText(/Drag leads to move them between stages/)).toBeInTheDocument();
+    const openLink = screen.getByRole("link", { name: /open a lead/i });
+    expect(openLink).toHaveAttribute("href", "/app/leads");
   });
 });

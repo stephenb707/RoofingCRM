@@ -3,6 +3,13 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  DndContext,
+  DragEndEvent,
+  useDraggable,
+  useDroppable,
+} from "@dnd-kit/core";
+import { CSS } from "@dnd-kit/utilities";
 import { useAuthReady } from "@/lib/AuthContext";
 import { listJobSchedule, updateJob } from "@/lib/jobsApi";
 import { getApiErrorMessage } from "@/lib/apiError";
@@ -18,6 +25,7 @@ import {
   parseLocalDateOnly,
 } from "@/lib/format";
 import { DateRangePicker } from "@/components/DateRangePicker";
+import { computeScheduleUpdate, applyOptimisticSchedulingTagChange } from "@/lib/scheduleDnd";
 import type { JobDto, JobStatus } from "@/lib/types";
 
 function getMondayOfWeek(d: Date): string {
@@ -98,9 +106,37 @@ export default function SchedulePage() {
         clearSchedule: args.clearSchedule,
         crewName: args.crewName ?? undefined,
       }),
+    onMutate: async (variables) => {
+      await queryClient.cancelQueries({ queryKey: scheduleKey });
+      const previous = queryClient.getQueryData<JobDto[]>(scheduleKey);
+      const scheduleUpdate = {
+        clearSchedule: variables.clearSchedule ?? false,
+        scheduledStartDate: variables.scheduledStartDate ?? undefined,
+        scheduledEndDate: variables.scheduledEndDate ?? undefined,
+      };
+      queryClient.setQueryData<JobDto[]>(scheduleKey, (old) => {
+        if (!old) return old;
+        return old.map((j) => {
+          if (j.id !== variables.jobId) return j;
+          const updated = applyOptimisticSchedulingTagChange(j, scheduleUpdate);
+          if (variables.crewName !== undefined) {
+            updated.crewName = variables.crewName ?? null;
+          }
+          return updated;
+        });
+      });
+      return { previous };
+    },
+    onError: (_err, _variables, context) => {
+      if (context?.previous != null) {
+        queryClient.setQueryData(scheduleKey, context.previous);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: scheduleKey });
+    },
     onSuccess: (_, variables) => {
       setEditingJobId(null);
-      queryClient.invalidateQueries({ queryKey: scheduleKey });
       queryClient.invalidateQueries({
         queryKey: queryKeys.job(auth.selectedTenantId, variables.jobId),
       });
@@ -123,6 +159,33 @@ export default function SchedulePage() {
       scheduledEndDate: editEnd || null,
       clearSchedule,
       crewName: editCrew || null,
+    });
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over) return;
+    const activeId = String(active.id);
+    const overId = String(over.id);
+    if (!activeId.startsWith("job:") || (!overId.startsWith("date:") && overId !== "unscheduled")) {
+      return;
+    }
+    const jobId = activeId.slice(4);
+    const job = jobs.find((j) => j.id === jobId);
+    if (!job) return;
+
+    const target =
+      overId === "unscheduled"
+        ? { type: "unscheduled" as const }
+        : { type: "date" as const, dateKey: overId.slice(5) };
+    const update = computeScheduleUpdate(job, target);
+
+    updateJobMutation.mutate({
+      jobId,
+      scheduledStartDate: update.scheduledStartDate ?? null,
+      scheduledEndDate: update.scheduledEndDate ?? null,
+      clearSchedule: update.clearSchedule ?? false,
+      crewName: job.crewName ?? null,
     });
   };
 
@@ -331,83 +394,149 @@ export default function SchedulePage() {
       )}
 
       {!isLoading && !isError && (
-        <div className="space-y-6">
-          {datesInRange.map((dateStr) => {
-            const dayJobs = jobsByDate.byDate.get(dateStr) ?? [];
-            if (dayJobs.length === 0) return null;
-            return (
-              <section
-                key={dateStr}
-                className="bg-white rounded-xl border border-slate-200 p-4"
-              >
-                <h2 className="text-lg font-semibold text-slate-800 mb-3">
-                  {formatDate(dateStr)}
-                </h2>
-                <ul className="space-y-2">
-                  {dayJobs.map((job) => (
-                    <JobScheduleCard
-                      key={job.id}
-                      job={job}
-                      isEditing={editingJobId === job.id}
-                      editStart={editStart}
-                      editEnd={editEnd}
-                      editCrew={editCrew}
-                      onEditStartChange={setEditStart}
-                      onEditEndChange={setEditEnd}
-                      onEditCrewChange={setEditCrew}
-                      onEdit={() => openEdit(job)}
-                      onSave={(e) => handleSaveEdit(e, job.id)}
-                      onCancel={() => setEditingJobId(null)}
-                      isSaving={updateJobMutation.isPending}
-                      saveError={updateJobMutation.isError ? getApiErrorMessage(updateJobMutation.error, "Failed to update") : null}
-                    />
-                  ))}
-                </ul>
-              </section>
-            );
-          })}
+        <DndContext onDragEnd={handleDragEnd}>
+          <div className="space-y-6">
+            {datesInRange.map((dateStr) => {
+              const dayJobs = jobsByDate.byDate.get(dateStr) ?? [];
+              return (
+                <ScheduleColumn
+                  key={dateStr}
+                  columnId={`date:${dateStr}`}
+                  title={formatDate(dateStr)}
+                  dateStr={dateStr}
+                  jobs={dayJobs}
+                  editingJobId={editingJobId}
+                  editStart={editStart}
+                  editEnd={editEnd}
+                  editCrew={editCrew}
+                  onEditStartChange={setEditStart}
+                  onEditEndChange={setEditEnd}
+                  onEditCrewChange={setEditCrew}
+                  openEdit={openEdit}
+                  handleSaveEdit={handleSaveEdit}
+                  setEditingJobId={setEditingJobId}
+                  isSaving={updateJobMutation.isPending}
+                  saveError={
+                    updateJobMutation.isError
+                      ? getApiErrorMessage(updateJobMutation.error, "Failed to update")
+                      : null
+                  }
+                />
+              );
+            })}
 
-          {includeUnscheduled && jobsByDate.unscheduled.length > 0 && (
-            <section className="bg-white rounded-xl border border-slate-200 p-4">
-              <h2 className="text-lg font-semibold text-slate-800 mb-3">
-                Unscheduled
-              </h2>
-              <ul className="space-y-2">
-                {jobsByDate.unscheduled.map((job) => (
-                  <JobScheduleCard
-                    key={job.id}
-                    job={job}
-                    isEditing={editingJobId === job.id}
-                    editStart={editStart}
-                    editEnd={editEnd}
-                    editCrew={editCrew}
-                    onEditStartChange={setEditStart}
-                    onEditEndChange={setEditEnd}
-                    onEditCrewChange={setEditCrew}
-                    onEdit={() => openEdit(job)}
-                    onSave={(e) => handleSaveEdit(e, job.id)}
-                    onCancel={() => setEditingJobId(null)}
-                    isSaving={updateJobMutation.isPending}
-                    saveError={updateJobMutation.isError ? getApiErrorMessage(updateJobMutation.error, "Failed to update") : null}
-                  />
-                ))}
-              </ul>
-            </section>
-          )}
+            {includeUnscheduled && (
+              <ScheduleColumn
+                columnId="unscheduled"
+                title="Unscheduled"
+                dateStr={null}
+                jobs={jobsByDate.unscheduled}
+                editingJobId={editingJobId}
+                editStart={editStart}
+                editEnd={editEnd}
+                editCrew={editCrew}
+                onEditStartChange={setEditStart}
+                onEditEndChange={setEditEnd}
+                onEditCrewChange={setEditCrew}
+                openEdit={openEdit}
+                handleSaveEdit={handleSaveEdit}
+                setEditingJobId={setEditingJobId}
+                isSaving={updateJobMutation.isPending}
+                saveError={
+                  updateJobMutation.isError
+                    ? getApiErrorMessage(updateJobMutation.error, "Failed to update")
+                    : null
+                }
+              />
+            )}
 
-          {jobs.length === 0 && (
-            <p className="text-sm text-slate-500 py-8">
-              No jobs in this range.
-              {!includeUnscheduled && " Try enabling “Include unscheduled”."}
-            </p>
-          )}
-        </div>
+            {jobs.length === 0 && (
+              <p className="text-sm text-slate-500 py-8">
+                No jobs in this range.
+                {!includeUnscheduled && " Try enabling “Include unscheduled”."}
+              </p>
+            )}
+          </div>
+        </DndContext>
       )}
     </div>
   );
 }
 
-function JobScheduleCard({
+function ScheduleColumn({
+  columnId,
+  title,
+  jobs,
+  editingJobId,
+  editStart,
+  editEnd,
+  editCrew,
+  onEditStartChange,
+  onEditEndChange,
+  onEditCrewChange,
+  openEdit,
+  handleSaveEdit,
+  setEditingJobId,
+  isSaving,
+  saveError,
+}: {
+  columnId: string;
+  title: string;
+  dateStr: string | null;
+  jobs: JobDto[];
+  editingJobId: string | null;
+  editStart: string;
+  editEnd: string;
+  editCrew: string;
+  onEditStartChange: (v: string) => void;
+  onEditEndChange: (v: string) => void;
+  onEditCrewChange: (v: string) => void;
+  openEdit: (job: JobDto) => void;
+  handleSaveEdit: (e: React.FormEvent, jobId: string) => void;
+  setEditingJobId: (id: string | null) => void;
+  isSaving: boolean;
+  saveError: string | null;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: columnId });
+  const dataTestId =
+    columnId === "unscheduled"
+      ? "schedule-col-unscheduled"
+      : `schedule-col-${columnId.slice(5)}`;
+
+  return (
+    <section
+      ref={setNodeRef}
+      data-testid={dataTestId}
+      className={`bg-white rounded-xl border p-4 min-h-[120px] transition-colors ${
+        isOver ? "border-sky-400 bg-sky-50/50" : "border-slate-200"
+      }`}
+    >
+      <h2 className="text-lg font-semibold text-slate-800 mb-3">{title}</h2>
+      <ul className="space-y-2">
+        {jobs.map((job) => (
+          <DraggableJobCard
+            key={job.id}
+            job={job}
+            isEditing={editingJobId === job.id}
+            editStart={editStart}
+            editEnd={editEnd}
+            editCrew={editCrew}
+            onEditStartChange={onEditStartChange}
+            onEditEndChange={onEditEndChange}
+            onEditCrewChange={onEditCrewChange}
+            onEdit={() => openEdit(job)}
+            onSave={(e) => handleSaveEdit(e, job.id)}
+            onCancel={() => setEditingJobId(null)}
+            isSaving={isSaving}
+            saveError={saveError}
+          />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function DraggableJobCard({
   job,
   isEditing,
   editStart,
@@ -436,14 +565,103 @@ function JobScheduleCard({
   isSaving: boolean;
   saveError: string | null;
 }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    isDragging,
+  } = useDraggable({ id: `job:${job.id}` });
+
+  const style = transform
+    ? { transform: CSS.Translate.toString(transform) }
+    : undefined;
+
+  return (
+    <li
+      ref={setNodeRef}
+      style={style}
+      data-testid={`schedule-card-${job.id}`}
+      className={`flex flex-col rounded-lg border transition-shadow ${
+        isDragging ? "opacity-80 shadow-lg z-10" : "bg-slate-50 border-slate-100"
+      }`}
+    >
+      <JobScheduleCard
+        job={job}
+        isEditing={isEditing}
+        editStart={editStart}
+        editEnd={editEnd}
+        editCrew={editCrew}
+        onEditStartChange={onEditStartChange}
+        onEditEndChange={onEditEndChange}
+        onEditCrewChange={onEditCrewChange}
+        onEdit={onEdit}
+        onSave={onSave}
+        onCancel={onCancel}
+        isSaving={isSaving}
+        saveError={saveError}
+        dragHandleProps={
+          attributes && listeners
+            ? { attributes: attributes as object, listeners: listeners as object }
+            : undefined
+        }
+      />
+    </li>
+  );
+}
+
+function JobScheduleCard({
+  job,
+  isEditing,
+  editStart,
+  editEnd,
+  editCrew,
+  onEditStartChange,
+  onEditEndChange,
+  onEditCrewChange,
+  onEdit,
+  onSave,
+  onCancel,
+  isSaving,
+  saveError,
+  dragHandleProps,
+}: {
+  job: JobDto;
+  isEditing: boolean;
+  editStart: string;
+  editEnd: string;
+  editCrew: string;
+  onEditStartChange: (v: string) => void;
+  onEditEndChange: (v: string) => void;
+  onEditCrewChange: (v: string) => void;
+  onEdit: () => void;
+  onSave: (e: React.FormEvent) => void;
+  onCancel: () => void;
+  isSaving: boolean;
+  saveError: string | null;
+  dragHandleProps?: { attributes: object; listeners: object } | undefined;
+}) {
   const addr = job.propertyAddress;
   const cityState = [addr?.city, addr?.state].filter(Boolean).join(", ");
   const customerName = [job.customerFirstName, job.customerLastName].filter(Boolean).join(" ").trim() || "—";
 
   return (
-    <li className="flex flex-col p-3 bg-slate-50 rounded-lg border border-slate-100">
-      <div className="flex items-center justify-between">
-        <div className="min-w-0">
+    <div className="flex flex-col p-3">
+      <div className="flex items-center justify-between gap-2">
+        {dragHandleProps && !isEditing && (
+          <div
+            {...dragHandleProps.listeners}
+            {...dragHandleProps.attributes}
+            data-testid={`schedule-drag-handle-${job.id}`}
+            className="cursor-grab active:cursor-grabbing p-1 -m-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+            aria-label="Drag to reschedule"
+          >
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 16 16">
+              <path d="M4 3a1 1 0 000 2h8a1 1 0 100-2H4zm0 4a1 1 0 000 2h8a1 1 0 100-2H4zm0 4a1 1 0 100 2h8a1 1 0 100-2H4z" />
+            </svg>
+          </div>
+        )}
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <span className="text-xs font-medium text-slate-500">
               {JOB_TYPE_LABELS[job.type]}
@@ -548,6 +766,6 @@ function JobScheduleCard({
           </div>
         </form>
       )}
-    </li>
+    </div>
   );
 }

@@ -1,5 +1,8 @@
 package com.roofingcrm.security;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -16,6 +19,8 @@ import java.io.IOException;
 
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
+    private static final Logger log = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
+
     private final JwtService jwtService;
 
     public JwtAuthenticationFilter(JwtService jwtService) {
@@ -27,8 +32,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     @NonNull HttpServletResponse response,
                                     @NonNull FilterChain filterChain) throws ServletException, IOException {
 
+        String path = request.getRequestURI();
         String authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
-        if (StringUtils.hasText(authHeader) && authHeader.startsWith("Bearer ")) {
+        boolean hasAuth = StringUtils.hasText(authHeader) && authHeader.startsWith("Bearer ");
+        log.debug("JwtAuthenticationFilter: path={} hasAuthHeader={}", path, hasAuth);
+
+        if (hasAuth) {
             String token = authHeader.substring(7);
 
             try {
@@ -49,11 +58,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 authentication.setAuthenticated(true);
                 SecurityContextHolder.getContext().setAuthentication(authentication);
             } catch (Exception ex) {
-                // Invalid token, clear context and continue. Request will be treated as unauthenticated.
+                log.debug("JwtAuthenticationFilter: token parse failed path={} reason={}", path, ex.getMessage());
                 SecurityContextHolder.clearContext();
             }
         }
 
         filterChain.doFilter(request, response);
+        if (log.isDebugEnabled() && path != null && path.contains("schedule")) {
+            var ctx = SecurityContextHolder.getContext().getAuthentication();
+            log.debug("JwtAuthenticationFilter after chain: path={} authSet={}", path, ctx != null && ctx.isAuthenticated());
+        }
     }
 }

@@ -1,5 +1,8 @@
 package com.roofingcrm.api.v1.job;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.roofingcrm.api.v1.common.PickerItemDto;
 import com.roofingcrm.domain.enums.JobStatus;
 import com.roofingcrm.security.SecurityUtils;
@@ -25,6 +28,8 @@ import java.util.UUID;
 @Validated
 public class JobController {
 
+    private static final Logger log = LoggerFactory.getLogger(JobController.class);
+
     private final JobService jobService;
 
     @Autowired
@@ -42,7 +47,7 @@ public class JobController {
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
-    @PutMapping("/{id}")
+    @PutMapping("/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}")
     public ResponseEntity<JobDto> updateJob(
             @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
             @PathVariable("id") UUID jobId,
@@ -53,7 +58,7 @@ public class JobController {
         return ResponseEntity.ok(updated);
     }
 
-    @GetMapping("/{id}")
+    @GetMapping("/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}")
     public ResponseEntity<JobDto> getJob(
             @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
             @PathVariable("id") UUID jobId) {
@@ -73,6 +78,7 @@ public class JobController {
             @RequestParam(value = "includeUnscheduled", defaultValue = "true") boolean includeUnscheduled) {
 
         UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
+        log.debug("listSchedule: tenantId={} from={} to={} userId={}", tenantId, from, to, userId);
         List<JobDto> jobs = jobService.listSchedule(tenantId, userId, from, to, status, crewName, includeUnscheduled);
         return ResponseEntity.ok(jobs);
     }
@@ -100,7 +106,7 @@ public class JobController {
         return ResponseEntity.ok(page);
     }
 
-    @PostMapping("/{id}/status")
+    @PostMapping("/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}/status")
     public ResponseEntity<JobDto> updateJobStatus(
             @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
             @PathVariable("id") UUID jobId,

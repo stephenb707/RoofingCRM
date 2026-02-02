@@ -24,6 +24,12 @@ public interface LeadRepository extends JpaRepository<Lead, UUID> {
     Page<Lead> findByTenantAndStatusAndArchivedFalse(Tenant tenant, LeadStatus status, Pageable pageable);
 
     @EntityGraph(attributePaths = {"customer"})
+    List<Lead> findByTenantAndStatusAndArchivedFalseOrderByPipelinePositionAscCreatedAtAsc(Tenant tenant, LeadStatus status);
+
+    @Query("select coalesce(max(l.pipelinePosition), -1) from Lead l where l.tenant = :tenant and l.status = :status and l.archived = false")
+    int findMaxPipelinePositionByTenantAndStatusAndArchivedFalse(@Param("tenant") Tenant tenant, @Param("status") LeadStatus status);
+
+    @EntityGraph(attributePaths = {"customer"})
     Page<Lead> findByTenantAndCustomerIdAndArchivedFalse(Tenant tenant, UUID customerId, Pageable pageable);
 
     @EntityGraph(attributePaths = {"customer"})

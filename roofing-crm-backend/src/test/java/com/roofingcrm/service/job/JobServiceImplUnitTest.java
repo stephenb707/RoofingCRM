@@ -1,5 +1,7 @@
 package com.roofingcrm.service.job;
 
+import com.roofingcrm.api.v1.common.AddressDto;
+import com.roofingcrm.api.v1.job.CreateJobRequest;
 import com.roofingcrm.api.v1.job.UpdateJobRequest;
 import com.roofingcrm.domain.entity.Customer;
 import com.roofingcrm.domain.entity.Job;
@@ -139,5 +141,156 @@ class JobServiceImplUnitTest {
 
         verify(activityEventService, never()).recordEvent(
                 any(), any(), any(), any(), eq(ActivityEventType.JOB_SCHEDULE_CHANGED), any(), any());
+    }
+
+    @Test
+    void createJob_whenScheduledStartDateSetAndEndDateNull_defaultsEndDateToStartDate() {
+        when(tenantAccessService.loadTenantForUserOrThrow(tenantId, userId)).thenReturn(tenant);
+        when(customerRepository.findByIdAndTenantAndArchivedFalse(customer.getId(), tenant))
+                .thenReturn(Optional.of(customer));
+
+        AddressDto address = new AddressDto();
+        address.setLine1("123 Main St");
+        address.setCity("Chicago");
+        address.setState("IL");
+        address.setZip("60601");
+
+        CreateJobRequest request = new CreateJobRequest();
+        request.setCustomerId(customer.getId());
+        request.setType(JobType.REPLACEMENT);
+        request.setPropertyAddress(address);
+        request.setScheduledStartDate(LocalDate.of(2026, 2, 10));
+        request.setScheduledEndDate(null);
+
+        ArgumentCaptor<Job> jobCaptor = ArgumentCaptor.forClass(Job.class);
+        when(jobRepository.save(jobCaptor.capture())).thenAnswer(inv -> {
+            Job j = inv.getArgument(0);
+            j.setId(jobId);
+            return j;
+        });
+
+        service.createJob(tenantId, userId, request);
+
+        Job saved = jobCaptor.getValue();
+        assertEquals(LocalDate.of(2026, 2, 10), saved.getScheduledStartDate());
+        assertEquals(LocalDate.of(2026, 2, 10), saved.getScheduledEndDate());
+        assertEquals(JobStatus.SCHEDULED, saved.getStatus());
+    }
+
+    @Test
+    void updateJob_unscheduledToScheduled_flipsStatusToScheduled() {
+        job.setStatus(JobStatus.UNSCHEDULED);
+        job.setScheduledStartDate(null);
+        job.setScheduledEndDate(null);
+
+        when(tenantAccessService.loadTenantForUserOrThrow(tenantId, userId)).thenReturn(tenant);
+        when(jobRepository.findByIdAndTenantAndArchivedFalse(jobId, tenant)).thenReturn(Optional.of(job));
+
+        Job savedJob = new Job();
+        savedJob.setId(jobId);
+        savedJob.setTenant(tenant);
+        savedJob.setCustomer(customer);
+        savedJob.setStatus(JobStatus.SCHEDULED);
+        savedJob.setScheduledStartDate(LocalDate.of(2026, 2, 15));
+        savedJob.setScheduledEndDate(LocalDate.of(2026, 2, 15));
+        savedJob.setUpdatedByUserId(userId);
+        when(jobRepository.save(any(Job.class))).thenReturn(savedJob);
+
+        UpdateJobRequest request = new UpdateJobRequest();
+        request.setScheduledStartDate(LocalDate.of(2026, 2, 15));
+        request.setScheduledEndDate(LocalDate.of(2026, 2, 15));
+
+        service.updateJob(tenantId, userId, jobId, request);
+
+        ArgumentCaptor<Job> captor = ArgumentCaptor.forClass(Job.class);
+        verify(jobRepository).save(captor.capture());
+        Job saved = captor.getValue();
+        assertEquals(JobStatus.SCHEDULED, saved.getStatus());
+        assertEquals(LocalDate.of(2026, 2, 15), saved.getScheduledStartDate());
+    }
+
+    @Test
+    void updateJob_scheduledToUnscheduled_flipsStatusToUnscheduled() {
+        when(tenantAccessService.loadTenantForUserOrThrow(tenantId, userId)).thenReturn(tenant);
+        when(jobRepository.findByIdAndTenantAndArchivedFalse(jobId, tenant)).thenReturn(Optional.of(job));
+
+        Job savedJob = new Job();
+        savedJob.setId(jobId);
+        savedJob.setTenant(tenant);
+        savedJob.setCustomer(customer);
+        savedJob.setStatus(JobStatus.UNSCHEDULED);
+        savedJob.setScheduledStartDate(null);
+        savedJob.setScheduledEndDate(null);
+        savedJob.setUpdatedByUserId(userId);
+        when(jobRepository.save(any(Job.class))).thenReturn(savedJob);
+
+        UpdateJobRequest request = new UpdateJobRequest();
+        request.setClearSchedule(true);
+
+        service.updateJob(tenantId, userId, jobId, request);
+
+        ArgumentCaptor<Job> captor = ArgumentCaptor.forClass(Job.class);
+        verify(jobRepository).save(captor.capture());
+        Job saved = captor.getValue();
+        assertEquals(JobStatus.UNSCHEDULED, saved.getStatus());
+        assertNull(saved.getScheduledStartDate());
+        assertNull(saved.getScheduledEndDate());
+    }
+
+    @Test
+    void updateJob_scheduledStaysScheduled_idempotent() {
+        when(tenantAccessService.loadTenantForUserOrThrow(tenantId, userId)).thenReturn(tenant);
+        when(jobRepository.findByIdAndTenantAndArchivedFalse(jobId, tenant)).thenReturn(Optional.of(job));
+
+        Job savedJob = new Job();
+        savedJob.setId(jobId);
+        savedJob.setTenant(tenant);
+        savedJob.setCustomer(customer);
+        savedJob.setStatus(JobStatus.SCHEDULED);
+        savedJob.setScheduledStartDate(LocalDate.of(2026, 2, 20));
+        savedJob.setScheduledEndDate(LocalDate.of(2026, 2, 22));
+        savedJob.setUpdatedByUserId(userId);
+        when(jobRepository.save(any(Job.class))).thenReturn(savedJob);
+
+        UpdateJobRequest request = new UpdateJobRequest();
+        request.setScheduledStartDate(LocalDate.of(2026, 2, 20));
+        request.setScheduledEndDate(LocalDate.of(2026, 2, 22));
+
+        service.updateJob(tenantId, userId, jobId, request);
+
+        ArgumentCaptor<Job> captor = ArgumentCaptor.forClass(Job.class);
+        verify(jobRepository).save(captor.capture());
+        Job saved = captor.getValue();
+        assertEquals(JobStatus.SCHEDULED, saved.getStatus());
+    }
+
+    @Test
+    void updateJob_unscheduledStaysUnscheduled_idempotent() {
+        job.setStatus(JobStatus.UNSCHEDULED);
+        job.setScheduledStartDate(null);
+        job.setScheduledEndDate(null);
+
+        when(tenantAccessService.loadTenantForUserOrThrow(tenantId, userId)).thenReturn(tenant);
+        when(jobRepository.findByIdAndTenantAndArchivedFalse(jobId, tenant)).thenReturn(Optional.of(job));
+
+        Job savedJob = new Job();
+        savedJob.setId(jobId);
+        savedJob.setTenant(tenant);
+        savedJob.setCustomer(customer);
+        savedJob.setStatus(JobStatus.UNSCHEDULED);
+        savedJob.setScheduledStartDate(null);
+        savedJob.setScheduledEndDate(null);
+        savedJob.setUpdatedByUserId(userId);
+        when(jobRepository.save(any(Job.class))).thenReturn(savedJob);
+
+        UpdateJobRequest request = new UpdateJobRequest();
+        request.setInternalNotes("Just notes, no schedule");
+
+        service.updateJob(tenantId, userId, jobId, request);
+
+        ArgumentCaptor<Job> captor = ArgumentCaptor.forClass(Job.class);
+        verify(jobRepository).save(captor.capture());
+        Job saved = captor.getValue();
+        assertEquals(JobStatus.UNSCHEDULED, saved.getStatus());
     }
 }

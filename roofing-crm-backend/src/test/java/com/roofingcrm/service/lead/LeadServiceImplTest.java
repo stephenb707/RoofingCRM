@@ -144,7 +144,7 @@ class LeadServiceImplTest extends AbstractIntegrationTest {
         LeadDto lead2 = leadService.createLead(tenantId, userId, request2);
 
         // Update second lead to WON
-        leadService.updateLeadStatus(tenantId, userId, lead2.getId(), LeadStatus.WON);
+        leadService.updateLeadStatus(tenantId, userId, lead2.getId(), LeadStatus.WON, null);
 
         Page<LeadDto> newLeads = leadService.listLeads(tenantId, userId, LeadStatus.NEW, null, PageRequest.of(0, 10));
         Page<LeadDto> wonLeads = leadService.listLeads(tenantId, userId, LeadStatus.WON, null, PageRequest.of(0, 10));
@@ -184,7 +184,7 @@ class LeadServiceImplTest extends AbstractIntegrationTest {
         UpdateLeadStatusRequest statusRequest = new UpdateLeadStatusRequest();
         statusRequest.setStatus(LeadStatus.LOST);
 
-        LeadDto updated = leadService.updateLeadStatus(tenantId, userId, lead.getId(), statusRequest.getStatus());
+        LeadDto updated = leadService.updateLeadStatus(tenantId, userId, lead.getId(), statusRequest.getStatus(), null);
 
         assertEquals(LeadStatus.LOST, updated.getStatus());
     }
@@ -279,7 +279,7 @@ class LeadServiceImplTest extends AbstractIntegrationTest {
         LeadDto lead = leadService.createLead(tenantId, userId, leadRequest);
 
         // Update lead to a convertible status
-        leadService.updateLeadStatus(tenantId, userId, lead.getId(), LeadStatus.QUOTE_SENT);
+        leadService.updateLeadStatus(tenantId, userId, lead.getId(), LeadStatus.QUOTE_SENT, null);
 
         // Convert to job
         ConvertLeadToJobRequest convertRequest = new ConvertLeadToJobRequest();
@@ -366,7 +366,7 @@ class LeadServiceImplTest extends AbstractIntegrationTest {
         LeadDto lead = leadService.createLead(tenantId, userId, leadRequest);
 
         // Mark lead as LOST
-        leadService.updateLeadStatus(tenantId, userId, lead.getId(), LeadStatus.LOST);
+        leadService.updateLeadStatus(tenantId, userId, lead.getId(), LeadStatus.LOST, null);
 
         // Attempt conversion
         ConvertLeadToJobRequest convertRequest = new ConvertLeadToJobRequest();

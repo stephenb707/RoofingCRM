@@ -20,6 +20,7 @@ C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\c
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\entity\Attachment.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\team\AcceptInviteResponse.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\schedule\ScheduleController.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\config\SecurityErrorHandlers.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\attachment\AttachmentController.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\repository\TaskRepository.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\customer\CustomerController.java

@@ -22,7 +22,7 @@ import java.util.UUID;
 public interface JobRepository extends JpaRepository<Job, UUID>, JpaSpecificationExecutor<Job> {
 
     @EntityGraph(attributePaths = {"customer", "lead"})
-    List<Job> findAll(@NonNull Specification<Job> spec, @NonNull Sort sort);
+    @NonNull List<Job> findAll(@NonNull Specification<Job> spec, @NonNull Sort sort);
 
     @EntityGraph(attributePaths = {"customer"})
     Page<Job> findByTenantAndArchivedFalse(Tenant tenant, Pageable pageable);

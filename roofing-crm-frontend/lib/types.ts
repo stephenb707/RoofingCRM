@@ -107,6 +107,7 @@ export interface LeadDto {
   source: LeadSource | null;
   leadNotes: string | null;
   propertyAddress: AddressDto | null;
+  pipelinePosition: number;
   createdAt: string;
   updatedAt: string;
   // Enriched fields from backend (customer data)
@@ -137,6 +138,7 @@ export interface CreateLeadRequest {
 
 export interface UpdateLeadStatusRequest {
   status: LeadStatus;
+  position?: number;
 }
 
 export interface ConvertLeadToJobRequest {
