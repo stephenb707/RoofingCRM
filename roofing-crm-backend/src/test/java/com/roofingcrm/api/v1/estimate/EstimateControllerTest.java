@@ -25,6 +25,7 @@ import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -143,6 +144,29 @@ class EstimateControllerTest {
                         .header("X-Tenant-Id", tenantId.toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()", is(2)));
+    }
+
+    @Test
+    void shareEstimate_returnsTokenAndExpiresAt() throws Exception {
+        UUID tenantId = UUID.randomUUID();
+        UUID estimateId = UUID.randomUUID();
+
+        ShareEstimateResponse response = new ShareEstimateResponse();
+        response.setToken("abc123token");
+        response.setExpiresAt(Instant.now().plusSeconds(86400 * 14));
+
+        when(estimateService.shareEstimate(eq(tenantId), eq(userId), eq(estimateId), any(ShareEstimateRequest.class)))
+                .thenReturn(response);
+
+        mockMvc.perform(post("/api/v1/estimates/{id}/share", estimateId)
+                        .header("X-Tenant-Id", tenantId.toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expiresInDays\":14}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.token", is("abc123token")))
+                .andExpect(jsonPath("$.expiresAt").exists());
+
+        verify(estimateService).shareEstimate(eq(tenantId), eq(userId), eq(estimateId), any(ShareEstimateRequest.class));
     }
 
     @Test

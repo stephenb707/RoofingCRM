@@ -277,6 +277,41 @@ export interface UpdateEstimateStatusRequest {
   status: EstimateStatus;
 }
 
+export interface ShareEstimateResponse {
+  token: string;
+  expiresAt: string;
+}
+
+export interface PublicEstimateItemDto {
+  name: string;
+  description?: string | null;
+  quantity: number;
+  unitPrice: number;
+  unit?: string | null;
+  lineTotal: number;
+}
+
+export interface PublicEstimateDto {
+  estimateNumber: string;
+  status: EstimateStatus;
+  title?: string | null;
+  notes?: string | null;
+  issueDate?: string | null;
+  validUntil?: string | null;
+  subtotal?: number | null;
+  total?: number | null;
+  publicExpiresAt?: string | null;
+  customerName?: string | null;
+  customerAddress?: string | null;
+  items: PublicEstimateItemDto[];
+}
+
+export interface PublicEstimateDecisionRequest {
+  decision: EstimateStatus;
+  signerName: string;
+  signerEmail?: string | null;
+}
+
 // Attachment types
 export type AttachmentTag =
   | "BEFORE"
@@ -381,7 +416,10 @@ export type ActivityEventType =
   | "TASK_CREATED"
   | "TASK_STATUS_CHANGED"
   | "LEAD_CONVERTED_TO_JOB"
-  | "ATTACHMENT_ADDED";
+  | "ATTACHMENT_ADDED"
+  | "ESTIMATE_SHARED"
+  | "ESTIMATE_ACCEPTED"
+  | "ESTIMATE_REJECTED";
 
 export interface ActivityEventDto {
   activityId: string;

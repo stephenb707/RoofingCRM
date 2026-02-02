@@ -132,6 +132,39 @@ describe("EstimateDetailPage", () => {
     });
   });
 
+  it("shows Share section and calls shareEstimate when Generate link clicked", async () => {
+    const shareResponse = { token: "abc123", expiresAt: "2026-02-16T00:00:00Z" };
+    mockedEstimatesApi.shareEstimate.mockResolvedValue(shareResponse);
+
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: jest.fn().mockResolvedValue(undefined) },
+      configurable: true,
+    });
+
+    render(<EstimateDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Estimate 1")).toBeInTheDocument();
+    });
+
+    const generateBtn = screen.getByRole("button", { name: /Generate link/i });
+    fireEvent.click(generateBtn);
+
+    await waitFor(() => {
+      expect(mockedEstimatesApi.shareEstimate).toHaveBeenCalledWith(
+        expect.anything(),
+        "est-1",
+        expect.any(Object)
+      );
+    });
+
+    await waitFor(() => {
+      const linkInput = screen.getByTestId("share-link-input") as HTMLInputElement;
+      expect(linkInput.value).toContain("/estimate/abc123");
+    });
+    expect(screen.getByRole("button", { name: /Copy/i })).toBeInTheDocument();
+  });
+
   it("renders Edit Estimate link in Actions section", async () => {
     render(<EstimateDetailPage />);
 

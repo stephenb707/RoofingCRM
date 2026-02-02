@@ -4,14 +4,20 @@ import com.roofingcrm.api.v1.estimate.CreateEstimateRequest;
 import com.roofingcrm.api.v1.estimate.EstimateDto;
 import com.roofingcrm.api.v1.estimate.EstimateItemDto;
 import com.roofingcrm.api.v1.estimate.EstimateItemRequest;
+import com.roofingcrm.api.v1.estimate.ShareEstimateRequest;
+import com.roofingcrm.api.v1.estimate.ShareEstimateResponse;
 import com.roofingcrm.api.v1.estimate.UpdateEstimateRequest;
 import com.roofingcrm.domain.entity.Estimate;
 import com.roofingcrm.domain.entity.EstimateItem;
 import com.roofingcrm.domain.entity.Job;
 import com.roofingcrm.domain.entity.Tenant;
+import com.roofingcrm.domain.enums.ActivityEntityType;
+import com.roofingcrm.domain.enums.ActivityEventType;
+import com.roofingcrm.domain.enums.UserRole;
 import com.roofingcrm.domain.enums.EstimateStatus;
 import com.roofingcrm.domain.repository.EstimateRepository;
 import com.roofingcrm.domain.repository.JobRepository;
+import com.roofingcrm.service.activity.ActivityEventService;
 import com.roofingcrm.service.exception.ResourceNotFoundException;
 import com.roofingcrm.service.tenant.TenantAccessService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,8 +26,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.security.SecureRandom;
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -32,6 +45,9 @@ public class EstimateServiceImpl implements EstimateService {
     private final TenantAccessService tenantAccessService;
     private final JobRepository jobRepository;
     private final EstimateRepository estimateRepository;
+    private final ActivityEventService activityEventService;
+
+    private static final SecureRandom secureRandom = new SecureRandom();
 
     // Simple counter for generating estimate numbers (in production, use a more robust approach)
     private static final AtomicLong estimateCounter = new AtomicLong(System.currentTimeMillis());
@@ -39,10 +55,12 @@ public class EstimateServiceImpl implements EstimateService {
     @Autowired
     public EstimateServiceImpl(TenantAccessService tenantAccessService,
                                JobRepository jobRepository,
-                               EstimateRepository estimateRepository) {
+                               EstimateRepository estimateRepository,
+                               ActivityEventService activityEventService) {
         this.tenantAccessService = tenantAccessService;
         this.jobRepository = jobRepository;
         this.estimateRepository = estimateRepository;
+        this.activityEventService = activityEventService;
     }
 
     @Override
@@ -166,6 +184,51 @@ public class EstimateServiceImpl implements EstimateService {
 
         Estimate saved = estimateRepository.save(estimate);
         return toDto(saved);
+    }
+
+    @Override
+    public ShareEstimateResponse shareEstimate(@NonNull UUID tenantId, @NonNull UUID userId, UUID estimateId, ShareEstimateRequest request) {
+        tenantAccessService.requireAnyRole(tenantId, userId, Objects.requireNonNull(Set.of(UserRole.OWNER, UserRole.ADMIN, UserRole.SALES)),
+                "You do not have permission to share estimates.");
+        Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
+
+        Estimate estimate = estimateRepository.findByIdAndTenantAndArchivedFalse(estimateId, tenant)
+                .orElseThrow(() -> new ResourceNotFoundException("Estimate not found"));
+
+        int days = (request != null && request.getExpiresInDays() != null) ? request.getExpiresInDays() : 14;
+        days = Math.min(365, Math.max(1, days));
+
+        Instant now = Instant.now();
+        Instant expiresAt = now.plusSeconds(days * 86400L);
+
+        boolean needNewToken = estimate.getPublicToken() == null || estimate.getPublicToken().isBlank()
+                || (estimate.getPublicExpiresAt() != null && estimate.getPublicExpiresAt().isBefore(now));
+
+        if (needNewToken) {
+            byte[] bytes = new byte[32];
+            secureRandom.nextBytes(bytes);
+            String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+            estimate.setPublicToken(token);
+        }
+
+        estimate.setPublicEnabled(true);
+        estimate.setPublicExpiresAt(expiresAt);
+        estimate.setPublicLastSharedAt(now);
+        estimate.setUpdatedByUserId(userId);
+        Estimate saved = estimateRepository.save(estimate);
+
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("estimateId", saved.getId().toString());
+        metadata.put("estimateNumber", saved.getEstimateNumber());
+        metadata.put("expiresAt", expiresAt.toString());
+        activityEventService.recordEvent(tenant, userId, ActivityEntityType.JOB,
+                Objects.requireNonNull(saved.getJob().getId()),
+                ActivityEventType.ESTIMATE_SHARED, "Estimate shared via public link", metadata);
+
+        ShareEstimateResponse response = new ShareEstimateResponse();
+        response.setToken(saved.getPublicToken());
+        response.setExpiresAt(expiresAt);
+        return response;
     }
 
     private EstimateItem toItem(Tenant tenant, UUID userId, Estimate estimate, EstimateItemRequest req) {

@@ -2,6 +2,8 @@ package com.roofingcrm.service.estimate;
 
 import com.roofingcrm.api.v1.estimate.CreateEstimateRequest;
 import com.roofingcrm.api.v1.estimate.EstimateDto;
+import com.roofingcrm.api.v1.estimate.ShareEstimateRequest;
+import com.roofingcrm.api.v1.estimate.ShareEstimateResponse;
 import com.roofingcrm.api.v1.estimate.UpdateEstimateRequest;
 import com.roofingcrm.domain.enums.EstimateStatus;
 import org.springframework.lang.NonNull;
@@ -20,4 +22,6 @@ public interface EstimateService {
     List<EstimateDto> listEstimatesForJob(@NonNull UUID tenantId, @NonNull UUID userId, UUID jobId);
 
     EstimateDto updateEstimateStatus(@NonNull UUID tenantId, @NonNull UUID userId, UUID estimateId, EstimateStatus newStatus);
+
+    ShareEstimateResponse shareEstimate(@NonNull UUID tenantId, @NonNull UUID userId, UUID estimateId, ShareEstimateRequest request);
 }

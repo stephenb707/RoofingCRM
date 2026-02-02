@@ -36,6 +36,9 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   TASK_STATUS_CHANGED: "Task updated",
   LEAD_CONVERTED_TO_JOB: "Converted to job",
   ATTACHMENT_ADDED: "Attachment added",
+  ESTIMATE_SHARED: "Estimate shared",
+  ESTIMATE_ACCEPTED: "Estimate accepted",
+  ESTIMATE_REJECTED: "Estimate rejected",
 };
 
 export interface ActivitySectionProps {

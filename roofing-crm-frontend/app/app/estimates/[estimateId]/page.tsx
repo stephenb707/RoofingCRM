@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuthReady } from "@/lib/AuthContext";
-import { getEstimate, updateEstimate, updateEstimateStatus } from "@/lib/estimatesApi";
+import { getEstimate, updateEstimate, updateEstimateStatus, shareEstimate } from "@/lib/estimatesApi";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { queryKeys } from "@/lib/queryKeys";
 import {
@@ -49,6 +49,27 @@ export default function EstimateDetailPage() {
     unit: "ea",
   });
   const [editForm, setEditForm] = useState<EstimateItemRequest | null>(null);
+  const [shareLink, setShareLink] = useState<string | null>(null);
+  const [shareExpiresAt, setShareExpiresAt] = useState<string | null>(null);
+
+  const canShare =
+    auth.tenants.find((t) => t.tenantId === auth.selectedTenantId)?.role === "OWNER" ||
+    auth.tenants.find((t) => t.tenantId === auth.selectedTenantId)?.role === "ADMIN" ||
+    auth.tenants.find((t) => t.tenantId === auth.selectedTenantId)?.role === "SALES";
+
+  const shareMutation = useMutation({
+    mutationFn: () => shareEstimate(api, estimateId, { expiresInDays: 14 }),
+    onSuccess: (data) => {
+      const url = typeof window !== "undefined"
+        ? `${window.location.origin}/estimate/${data.token}`
+        : "";
+      setShareLink(url);
+      setShareExpiresAt(data.expiresAt ?? null);
+      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(url).catch(() => {});
+      }
+    },
+  });
 
   const { data: estimate, isLoading, isError, error } = useQuery({
     queryKey: queryKeys.estimate(auth.selectedTenantId, estimateId),
@@ -415,6 +436,47 @@ export default function EstimateDetailPage() {
               ))}
             </div>
           </div>
+
+          {/* Share */}
+          {canShare && (
+            <div className="bg-white rounded-xl border border-slate-200 p-6">
+              <h2 className="text-lg font-semibold text-slate-800 mb-4">
+                Share
+              </h2>
+              <button
+                type="button"
+                onClick={() => shareMutation.mutate()}
+                disabled={shareMutation.isPending}
+                className="w-full px-4 py-2.5 text-sm font-medium text-sky-600 border border-sky-300 rounded-lg hover:bg-sky-50 disabled:opacity-60"
+              >
+                {shareMutation.isPending ? "Generating…" : shareLink ? "Refresh link" : "Generate link"}
+              </button>
+              {shareLink && (
+                <div className="mt-4 space-y-2">
+                  <div className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-center">
+                    <input
+                      readOnly
+                      value={shareLink}
+                      data-testid="share-link-input"
+                      className="w-full min-w-0 truncate border border-slate-300 rounded-lg px-3 py-2 text-sm bg-slate-50"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => navigator.clipboard?.writeText(shareLink)}
+                      className="w-full shrink-0 px-4 py-2 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50 sm:w-auto"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                  {shareExpiresAt && (
+                    <p className="text-xs text-slate-500">
+                      Expires {new Date(shareExpiresAt).toLocaleString()}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Actions */}
           <div className="bg-white rounded-xl border border-slate-200 p-6">
