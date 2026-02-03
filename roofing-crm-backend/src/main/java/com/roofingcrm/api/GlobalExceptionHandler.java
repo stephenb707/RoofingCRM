@@ -1,6 +1,7 @@
 package com.roofingcrm.api;
 
 import com.roofingcrm.service.exception.EstimateConflictException;
+import com.roofingcrm.service.exception.InvoiceConflictException;
 import com.roofingcrm.service.exception.EstimateLinkExpiredException;
 import com.roofingcrm.service.exception.InviteConflictException;
 import com.roofingcrm.service.exception.LeadConversionNotAllowedException;
@@ -105,6 +106,19 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(EstimateConflictException.class)
     public ResponseEntity<ApiErrorResponse> handleEstimateConflict(EstimateConflictException ex,
                                                                    HttpServletRequest request) {
+        ApiErrorResponse body = new ApiErrorResponse(
+                Instant.now(),
+                HttpStatus.CONFLICT.value(),
+                HttpStatus.CONFLICT.getReasonPhrase(),
+                ex.getMessage(),
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+    }
+
+    @ExceptionHandler(InvoiceConflictException.class)
+    public ResponseEntity<ApiErrorResponse> handleInvoiceConflict(InvoiceConflictException ex,
+                                                                  HttpServletRequest request) {
         ApiErrorResponse body = new ApiErrorResponse(
                 Instant.now(),
                 HttpStatus.CONFLICT.value(),
