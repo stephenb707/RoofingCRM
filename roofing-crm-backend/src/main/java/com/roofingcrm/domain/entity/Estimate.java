@@ -9,6 +9,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 
 /**
@@ -64,4 +65,25 @@ public class Estimate extends TenantAuditedEntity {
 
     @OneToMany(mappedBy = "estimate", cascade = CascadeType.ALL, orphanRemoval = true)
     private java.util.List<EstimateItem> items = new java.util.ArrayList<>();
+
+    @Column(name = "public_token", length = 64)
+    private String publicToken;
+
+    @Column(name = "public_enabled", nullable = false)
+    private boolean publicEnabled = false;
+
+    @Column(name = "public_expires_at")
+    private Instant publicExpiresAt;
+
+    @Column(name = "public_last_shared_at")
+    private Instant publicLastSharedAt;
+
+    @Column(name = "decision_at")
+    private Instant decisionAt;
+
+    @Column(name = "decision_by_name", length = 255)
+    private String decisionByName;
+
+    @Column(name = "decision_by_email", length = 255)
+    private String decisionByEmail;
 }

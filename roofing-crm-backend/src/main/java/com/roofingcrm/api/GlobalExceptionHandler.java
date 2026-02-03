@@ -1,5 +1,9 @@
 package com.roofingcrm.api;
 
+import com.roofingcrm.service.exception.EstimateConflictException;
+import com.roofingcrm.service.exception.InvoiceConflictException;
+import com.roofingcrm.service.exception.EstimateLinkExpiredException;
+import com.roofingcrm.service.exception.InviteConflictException;
 import com.roofingcrm.service.exception.LeadConversionNotAllowedException;
 import com.roofingcrm.service.exception.ResourceNotFoundException;
 import com.roofingcrm.service.tenant.TenantAccessDeniedException;
@@ -84,6 +88,58 @@ public class GlobalExceptionHandler {
                 request.getRequestURI()
         );
         return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+    }
+
+    @ExceptionHandler(InviteConflictException.class)
+    public ResponseEntity<ApiErrorResponse> handleInviteConflict(InviteConflictException ex,
+                                                                HttpServletRequest request) {
+        ApiErrorResponse body = new ApiErrorResponse(
+                Instant.now(),
+                HttpStatus.CONFLICT.value(),
+                HttpStatus.CONFLICT.getReasonPhrase(),
+                ex.getMessage(),
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+    }
+
+    @ExceptionHandler(EstimateConflictException.class)
+    public ResponseEntity<ApiErrorResponse> handleEstimateConflict(EstimateConflictException ex,
+                                                                   HttpServletRequest request) {
+        ApiErrorResponse body = new ApiErrorResponse(
+                Instant.now(),
+                HttpStatus.CONFLICT.value(),
+                HttpStatus.CONFLICT.getReasonPhrase(),
+                ex.getMessage(),
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+    }
+
+    @ExceptionHandler(InvoiceConflictException.class)
+    public ResponseEntity<ApiErrorResponse> handleInvoiceConflict(InvoiceConflictException ex,
+                                                                  HttpServletRequest request) {
+        ApiErrorResponse body = new ApiErrorResponse(
+                Instant.now(),
+                HttpStatus.CONFLICT.value(),
+                HttpStatus.CONFLICT.getReasonPhrase(),
+                ex.getMessage(),
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+    }
+
+    @ExceptionHandler(EstimateLinkExpiredException.class)
+    public ResponseEntity<ApiErrorResponse> handleEstimateLinkExpired(EstimateLinkExpiredException ex,
+                                                                      HttpServletRequest request) {
+        ApiErrorResponse body = new ApiErrorResponse(
+                Instant.now(),
+                HttpStatus.GONE.value(),
+                HttpStatus.GONE.getReasonPhrase(),
+                ex.getMessage(),
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.GONE).body(body);
     }
 
     private String formatFieldError(FieldError error) {

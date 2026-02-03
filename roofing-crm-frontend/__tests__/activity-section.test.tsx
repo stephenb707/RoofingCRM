@@ -65,8 +65,19 @@ const mockEvents = {
       createdByName: "Jane Doe",
       metadata: { attachmentId: "att-1", fileName: "damage.jpg", tag: "DAMAGE" },
     },
+    {
+      activityId: "evt-schedule",
+      entityType: "JOB" as const,
+      entityId: "job-1",
+      eventType: "JOB_SCHEDULE_CHANGED" as const,
+      message: "Schedule updated to 2026-01-15",
+      createdAt: "2024-01-10T12:00:00Z",
+      createdByUserId: "user-1",
+      createdByName: "Jane Doe",
+      metadata: { fromStartDate: null, toStartDate: "2026-01-15" },
+    },
   ],
-  totalElements: 5,
+  totalElements: 6,
   totalPages: 1,
   number: 0,
   size: 20,
@@ -96,6 +107,7 @@ describe("ActivitySection", () => {
     expect(screen.getByText(/System/)).toBeInTheDocument();
     expect(screen.getByText(/You/)).toBeInTheDocument();
     expect(screen.getByText("Attachment added")).toBeInTheDocument();
+    expect(screen.getByText("Schedule updated")).toBeInTheDocument();
     expect(screen.getByText(/Added photo\/doc \(DAMAGE\): damage\.jpg/)).toBeInTheDocument();
     expect(mockedActivityApi.listActivity).toHaveBeenCalledWith(
       expect.anything(),

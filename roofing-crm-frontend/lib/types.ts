@@ -1,8 +1,35 @@
+export type UserRole = "OWNER" | "ADMIN" | "SALES" | "FIELD_TECH";
+
 export interface TenantSummary {
   tenantId: string;
   tenantName: string;
   tenantSlug: string;
   role: string; // UserRole string from backend
+}
+
+export interface TeamMember {
+  userId: string;
+  email: string;
+  fullName?: string | null;
+  role: UserRole;
+}
+
+export interface TenantInvite {
+  inviteId: string;
+  email: string;
+  role: UserRole;
+  token: string;
+  expiresAt: string;
+  acceptedAt?: string | null;
+  createdAt: string;
+  createdByName?: string | null;
+}
+
+export interface AcceptInviteResponse {
+  tenantId: string;
+  tenantName: string;
+  tenantSlug?: string | null;
+  role: UserRole;
 }
 
 export interface AuthResponse {
@@ -80,6 +107,7 @@ export interface LeadDto {
   source: LeadSource | null;
   leadNotes: string | null;
   propertyAddress: AddressDto | null;
+  pipelinePosition: number;
   createdAt: string;
   updatedAt: string;
   // Enriched fields from backend (customer data)
@@ -110,6 +138,7 @@ export interface CreateLeadRequest {
 
 export interface UpdateLeadStatusRequest {
   status: LeadStatus;
+  position?: number;
 }
 
 export interface ConvertLeadToJobRequest {
@@ -248,6 +277,71 @@ export interface UpdateEstimateStatusRequest {
   status: EstimateStatus;
 }
 
+export interface ShareEstimateResponse {
+  token: string;
+  expiresAt: string;
+}
+
+export interface PublicEstimateItemDto {
+  name: string;
+  description?: string | null;
+  quantity: number;
+  unitPrice: number;
+  unit?: string | null;
+  lineTotal: number;
+}
+
+export interface PublicEstimateDto {
+  estimateNumber: string;
+  status: EstimateStatus;
+  title?: string | null;
+  notes?: string | null;
+  issueDate?: string | null;
+  validUntil?: string | null;
+  subtotal?: number | null;
+  total?: number | null;
+  publicExpiresAt?: string | null;
+  customerName?: string | null;
+  customerAddress?: string | null;
+  items: PublicEstimateItemDto[];
+}
+
+export interface PublicEstimateDecisionRequest {
+  decision: EstimateStatus;
+  signerName: string;
+  signerEmail?: string | null;
+}
+
+// Invoice types
+export type InvoiceStatus = "DRAFT" | "SENT" | "PAID" | "VOID";
+
+export interface InvoiceItemDto {
+  id: string;
+  name: string;
+  description?: string | null;
+  quantity: number;
+  unitPrice: number;
+  lineTotal: number;
+  sortOrder?: number;
+}
+
+export interface InvoiceDto {
+  id: string;
+  invoiceNumber: string;
+  status: InvoiceStatus;
+  issuedAt?: string | null;
+  sentAt?: string | null;
+  dueAt?: string | null;
+  paidAt?: string | null;
+  total: number;
+  notes?: string | null;
+  jobId: string;
+  estimateId?: string | null;
+  items?: InvoiceItemDto[];
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
 // Attachment types
 export type AttachmentTag =
   | "BEFORE"
@@ -352,7 +446,12 @@ export type ActivityEventType =
   | "TASK_CREATED"
   | "TASK_STATUS_CHANGED"
   | "LEAD_CONVERTED_TO_JOB"
-  | "ATTACHMENT_ADDED";
+  | "ATTACHMENT_ADDED"
+  | "ESTIMATE_SHARED"
+  | "ESTIMATE_ACCEPTED"
+  | "ESTIMATE_REJECTED"
+  | "INVOICE_CREATED"
+  | "INVOICE_STATUS_CHANGED";
 
 export interface ActivityEventDto {
   activityId: string;

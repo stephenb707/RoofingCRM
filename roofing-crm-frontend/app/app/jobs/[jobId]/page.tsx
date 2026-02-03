@@ -25,6 +25,7 @@ import { AttachmentSection } from "@/components/AttachmentSection";
 import { CommunicationLogSection } from "@/components/CommunicationLogSection";
 import { ActivitySection } from "@/components/ActivitySection";
 import { TasksSection } from "@/components/TasksSection";
+import { InvoicesSection } from "@/components/InvoicesSection";
 import { StatusBadge } from "@/components/StatusBadge";
 import type { JobStatus, CreateCommunicationLogRequest, AttachmentTag } from "@/lib/types";
 import { PREFERRED_CONTACT_LABELS } from "@/lib/preferredContactConstants";
@@ -325,6 +326,9 @@ export default function JobDetailPage() {
 
           {/* Tasks */}
           <TasksSection entityType="job" entityId={jobId} />
+
+          {/* Invoices */}
+          <InvoicesSection jobId={jobId} />
 
           {/* Attachments */}
           <AttachmentSection

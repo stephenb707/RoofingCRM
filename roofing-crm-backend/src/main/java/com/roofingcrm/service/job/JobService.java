@@ -28,6 +28,11 @@ public interface JobService {
                                   JobStatus status, String crewName, boolean includeUnscheduled,
                                   @NonNull Pageable pageable);
 
+    /** Returns jobs for schedule view (non-paged, sorted by scheduledStartDate asc nulls last, createdAt desc). */
+    List<JobDto> listSchedule(@NonNull UUID tenantId, @NonNull UUID userId,
+                              @NonNull LocalDate from, @NonNull LocalDate to,
+                              JobStatus status, String crewName, boolean includeUnscheduled);
+
     JobDto updateJobStatus(@NonNull UUID tenantId, @NonNull UUID userId, UUID jobId, JobStatus newStatus);
 
     List<PickerItemDto> searchJobsForPicker(@NonNull UUID tenantId, @NonNull UUID userId, String q, int limit);

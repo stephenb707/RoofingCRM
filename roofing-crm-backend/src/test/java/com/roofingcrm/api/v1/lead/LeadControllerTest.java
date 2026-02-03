@@ -23,6 +23,7 @@ import java.util.UUID;
 import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -108,5 +109,29 @@ class LeadControllerTest {
                 .andExpect(jsonPath("$.customerFirstName", is("Jane")))
                 .andExpect(jsonPath("$.customerLastName", is("Doe")))
                 .andExpect(jsonPath("$.convertedJobId", is(convertedJobId.toString())));
+    }
+
+    @Test
+    void updateLeadStatus_withPosition_passesToService() throws Exception {
+        UUID tenantId = UUID.randomUUID();
+        UUID leadId = UUID.randomUUID();
+
+        LeadDto dto = new LeadDto();
+        dto.setId(leadId);
+        dto.setStatus(LeadStatus.CONTACTED);
+        dto.setCreatedAt(Instant.now());
+
+        when(leadService.updateLeadStatus(eq(tenantId), eq(userId), eq(leadId), eq(LeadStatus.CONTACTED), eq(1)))
+                .thenReturn(dto);
+
+        String body = "{\"status\":\"CONTACTED\",\"position\":1}";
+        mockMvc.perform(post("/api/v1/leads/{id}/status", leadId)
+                        .header("X-Tenant-Id", tenantId.toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status", is("CONTACTED")));
+
+        verify(leadService).updateLeadStatus(eq(tenantId), eq(userId), eq(leadId), eq(LeadStatus.CONTACTED), eq(1));
     }
 }

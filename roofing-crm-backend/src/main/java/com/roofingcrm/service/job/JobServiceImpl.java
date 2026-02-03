@@ -10,6 +10,7 @@ import com.roofingcrm.domain.entity.Job;
 import com.roofingcrm.domain.entity.Lead;
 import com.roofingcrm.domain.entity.Tenant;
 import com.roofingcrm.domain.enums.ActivityEntityType;
+import com.roofingcrm.domain.repository.spec.JobSpecifications;
 import com.roofingcrm.domain.enums.ActivityEventType;
 import com.roofingcrm.service.activity.ActivityEventService;
 import com.roofingcrm.domain.enums.JobStatus;
@@ -23,6 +24,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -97,12 +99,35 @@ public class JobServiceImpl implements JobService {
         }
 
         job.setScheduledStartDate(request.getScheduledStartDate());
-        job.setScheduledEndDate(request.getScheduledEndDate());
+        LocalDate reqStart = request.getScheduledStartDate();
+        LocalDate reqEnd = request.getScheduledEndDate();
+        if (reqStart != null && reqEnd == null) {
+            job.setScheduledEndDate(reqStart);
+        } else {
+            job.setScheduledEndDate(reqEnd);
+        }
         job.setJobNotes(request.getInternalNotes());
         job.setAssignedCrew(request.getCrewName());
 
+        normalizeSchedulingStatus(job);
+
         Job saved = jobRepository.save(job);
         return toDto(saved);
+    }
+
+    /**
+     * Normalize scheduling status: ensure status reflects schedule state.
+     * scheduled → SCHEDULED; unscheduled → UNSCHEDULED.
+     * Idempotent; only flips between SCHEDULED and UNSCHEDULED.
+     */
+    private void normalizeSchedulingStatus(Job job) {
+        boolean isScheduled = job.getScheduledStartDate() != null;
+        JobStatus current = job.getStatus();
+        if (isScheduled && current == JobStatus.UNSCHEDULED) {
+            job.setStatus(JobStatus.SCHEDULED);
+        } else if (!isScheduled && current == JobStatus.SCHEDULED) {
+            job.setStatus(JobStatus.UNSCHEDULED);
+        }
     }
 
     @Override
@@ -157,13 +182,7 @@ public class JobServiceImpl implements JobService {
             job.setAssignedCrew(request.getCrewName());
         }
 
-        // Sync status with schedule: UNSCHEDULED <-> SCHEDULED based on dates
-        JobStatus currentStatus = job.getStatus();
-        if (currentStatus == JobStatus.SCHEDULED && newStart == null) {
-            job.setStatus(JobStatus.UNSCHEDULED);
-        } else if (currentStatus == JobStatus.UNSCHEDULED && newStart != null) {
-            job.setStatus(JobStatus.SCHEDULED);
-        }
+        normalizeSchedulingStatus(job);
 
         Job saved = jobRepository.save(job);
 
@@ -175,12 +194,12 @@ public class JobServiceImpl implements JobService {
             String message = buildScheduleChangeMessage(prevStart, prevEnd, prevCrew,
                     saved.getScheduledStartDate(), saved.getScheduledEndDate(), saved.getAssignedCrew());
             Map<String, Object> metadata = new HashMap<>();
-            metadata.put("fromStart", prevStart);
-            metadata.put("fromEnd", prevEnd);
-            metadata.put("fromCrew", prevCrew);
-            metadata.put("toStart", saved.getScheduledStartDate());
-            metadata.put("toEnd", saved.getScheduledEndDate());
-            metadata.put("toCrew", saved.getAssignedCrew());
+            metadata.put("fromStartDate", prevStart != null ? prevStart.toString() : null);
+            metadata.put("toStartDate", saved.getScheduledStartDate() != null ? saved.getScheduledStartDate().toString() : null);
+            metadata.put("fromEndDate", prevEnd != null ? prevEnd.toString() : null);
+            metadata.put("toEndDate", saved.getScheduledEndDate() != null ? saved.getScheduledEndDate().toString() : null);
+            metadata.put("fromCrewName", prevCrew);
+            metadata.put("toCrewName", saved.getAssignedCrew());
             activityEventService.recordEvent(tenant, userId, ActivityEntityType.JOB,
                     Objects.requireNonNull(saved.getId()),
                     ActivityEventType.JOB_SCHEDULE_CHANGED, message, metadata);
@@ -270,6 +289,24 @@ public class JobServiceImpl implements JobService {
         Page<Job> page = jobRepository.searchSchedule(
                 tenant, status, crewName != null ? crewName : "", startDate, endDate, includeUnscheduled, pageable);
         return page.map(this::toDto);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<JobDto> listSchedule(@NonNull UUID tenantId, @NonNull UUID userId,
+                                    @NonNull LocalDate from, @NonNull LocalDate to,
+                                    JobStatus status, String crewName, boolean includeUnscheduled) {
+        if (from.isAfter(to)) {
+            throw new IllegalArgumentException("from must be before or equal to to");
+        }
+        Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
+        var spec = JobSpecifications.forSchedule(tenant, from, to, status, crewName, includeUnscheduled);
+        Sort sort = Sort.by(
+                Sort.Order.asc("scheduledStartDate").nullsLast(),
+                Sort.Order.desc("createdAt")
+        );
+        List<Job> jobs = jobRepository.findAll(spec, sort);
+        return jobs.stream().map(this::toDto).toList();
     }
 
     @Override

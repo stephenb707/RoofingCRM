@@ -20,14 +20,19 @@ public class SecurityConfig {
 
         @Bean
         public SecurityFilterChain securityFilterChain(HttpSecurity http,
-                                                       JwtService jwtService) throws Exception {
+                                                       JwtService jwtService,
+                                                       SecurityErrorHandlers errorHandlers) throws Exception {
             http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(Customizer.withDefaults())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .exceptionHandling(ex -> ex
+                    .authenticationEntryPoint(errorHandlers.authenticationEntryPoint())
+                    .accessDeniedHandler(errorHandlers.accessDeniedHandler()))
                 .authorizeHttpRequests(auth -> auth
                     .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                     .requestMatchers("/api/v1/auth/**").permitAll()
+                    .requestMatchers("/api/public/**").permitAll()
                     .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
                     .requestMatchers("/actuator/health").permitAll()
                     .requestMatchers("/ws", "/ws/**").permitAll()

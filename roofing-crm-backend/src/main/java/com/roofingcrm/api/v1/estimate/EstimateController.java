@@ -66,6 +66,18 @@ public class EstimateController {
         return ResponseEntity.ok(updated);
     }
 
+    @PostMapping("/api/v1/estimates/{id}/share")
+    public ResponseEntity<ShareEstimateResponse> shareEstimate(
+            @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
+            @PathVariable("id") UUID estimateId,
+            @RequestBody(required = false) ShareEstimateRequest request) {
+
+        UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
+        ShareEstimateResponse response = estimateService.shareEstimate(tenantId, userId, estimateId,
+                request != null ? request : new ShareEstimateRequest());
+        return ResponseEntity.ok(response);
+    }
+
     @PostMapping("/api/v1/estimates/{id}/status")
     public ResponseEntity<EstimateDto> updateEstimateStatus(
             @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,

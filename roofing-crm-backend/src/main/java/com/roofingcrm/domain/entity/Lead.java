@@ -38,6 +38,9 @@ public class Lead extends TenantAuditedEntity {
     @Column(nullable = false, length = 50)
     private LeadSource source;
 
+    @Column(name = "pipeline_position", nullable = false)
+    private int pipelinePosition = 0;
+
     @Column(columnDefinition = "text")
     private String leadNotes;
 

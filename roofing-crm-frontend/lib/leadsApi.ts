@@ -106,14 +106,18 @@ export async function updateLead(
 }
 
 /**
- * Update the status of an existing lead.
+ * Update the status of an existing lead. Optionally specify position for Kanban reordering.
  */
 export async function updateLeadStatus(
   api: AxiosInstance,
   leadId: string,
-  status: LeadStatus
+  status: LeadStatus,
+  position?: number
 ): Promise<LeadDto> {
   const payload: UpdateLeadStatusRequest = { status };
+  if (position !== undefined) {
+    payload.position = position;
+  }
   const response = await api.post<LeadDto>(
     `/api/v1/leads/${leadId}/status`,
     payload

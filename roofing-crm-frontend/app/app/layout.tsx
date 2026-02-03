@@ -58,7 +58,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
           <div>
             <div className="font-semibold text-slate-800 text-sm">
-              Roofing CRM
+              Viva Roofing
             </div>
             {currentTenant && (
               <div className="text-xs text-slate-500">
@@ -150,6 +150,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             }`}
           >
             Reports
+          </Link>
+          <Link
+            href="/app/team"
+            className={`px-4 py-3 text-sm font-medium transition-colors ${
+              pathname.startsWith("/app/team")
+                ? "text-sky-600 border-b-2 border-sky-600"
+                : "text-slate-600 hover:text-slate-800 border-b-2 border-transparent"
+            }`}
+          >
+            Team
           </Link>
         </div>
       </nav>

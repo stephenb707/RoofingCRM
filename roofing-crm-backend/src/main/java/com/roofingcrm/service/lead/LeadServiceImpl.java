@@ -18,6 +18,7 @@ import com.roofingcrm.service.activity.ActivityEventService;
 import com.roofingcrm.domain.enums.JobStatus;
 import com.roofingcrm.domain.enums.LeadSource;
 import com.roofingcrm.domain.enums.LeadStatus;
+import com.roofingcrm.domain.enums.UserRole;
 import com.roofingcrm.domain.repository.CustomerRepository;
 import com.roofingcrm.domain.repository.JobRepository;
 import com.roofingcrm.domain.repository.LeadRepository;
@@ -33,11 +34,13 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -65,6 +68,8 @@ public class LeadServiceImpl implements LeadService {
 
     @Override
     public LeadDto createLead(@NonNull UUID tenantId, @NonNull UUID userId, CreateLeadRequest request) {
+        tenantAccessService.requireAnyRole(tenantId, userId, Objects.requireNonNull(Set.of(UserRole.OWNER, UserRole.ADMIN, UserRole.SALES)),
+                "You do not have permission to create leads.");
         Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
 
         Customer customer = resolveCustomerForLead(tenant, userId, request);
@@ -79,6 +84,9 @@ public class LeadServiceImpl implements LeadService {
         lead.setSource(request.getSource() != null ? request.getSource() : LeadSource.OTHER);
         lead.setLeadNotes(request.getLeadNotes());
 
+        int maxPos = leadRepository.findMaxPipelinePositionByTenantAndStatusAndArchivedFalse(tenant, LeadStatus.NEW);
+        lead.setPipelinePosition(maxPos + 1);
+
         Address propertyAddress = new Address();
         applyAddress(propertyAddress, request.getPropertyAddress());
         lead.setPropertyAddress(propertyAddress);
@@ -89,6 +97,8 @@ public class LeadServiceImpl implements LeadService {
 
     @Override
     public LeadDto updateLead(@NonNull UUID tenantId, @NonNull UUID userId, UUID leadId, UpdateLeadRequest request) {
+        tenantAccessService.requireAnyRole(tenantId, userId, Objects.requireNonNull(Set.of(UserRole.OWNER, UserRole.ADMIN, UserRole.SALES)),
+                "You do not have permission to edit leads.");
         Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
 
         Lead lead = leadRepository.findByIdAndTenantAndArchivedFalse(leadId, tenant)
@@ -149,33 +159,67 @@ public class LeadServiceImpl implements LeadService {
     }
 
     @Override
-    public LeadDto updateLeadStatus(@NonNull UUID tenantId, @NonNull UUID userId, UUID leadId, LeadStatus newStatus) {
+    public LeadDto updateLeadStatus(@NonNull UUID tenantId, @NonNull UUID userId, UUID leadId, LeadStatus newStatus, Integer position) {
+        tenantAccessService.requireAnyRole(tenantId, userId, Objects.requireNonNull(Set.of(UserRole.OWNER, UserRole.ADMIN, UserRole.SALES)),
+                "You do not have permission to edit the lead pipeline.");
         Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
 
         Lead lead = leadRepository.findByIdAndTenantAndArchivedFalse(leadId, tenant)
                 .orElseThrow(() -> new ResourceNotFoundException("Lead not found"));
 
-        LeadStatus prevStatus = lead.getStatus();
-        lead.setStatus(newStatus);
-        lead.setUpdatedByUserId(userId);
+        LeadStatus oldStatus = lead.getStatus();
+        boolean statusChanged = oldStatus != newStatus;
 
-        Lead saved = leadRepository.save(lead);
+        if (!statusChanged && position == null) {
+            return toDto(lead);
+        }
 
-        if (prevStatus != newStatus) {
+        List<Lead> oldColumn = leadRepository.findByTenantAndStatusAndArchivedFalseOrderByPipelinePositionAscCreatedAtAsc(tenant, oldStatus);
+        List<Lead> oldList = new ArrayList<>(oldColumn);
+        oldList.removeIf(l -> Objects.equals(l.getId(), leadId));
+
+        for (int i = 0; i < oldList.size(); i++) {
+            oldList.get(i).setPipelinePosition(i);
+        }
+
+        if (statusChanged) {
+            lead.setStatus(newStatus);
+            lead.setUpdatedByUserId(userId);
+            List<Lead> newColumn = leadRepository.findByTenantAndStatusAndArchivedFalseOrderByPipelinePositionAscCreatedAtAsc(tenant, newStatus);
+            List<Lead> newList = new ArrayList<>(newColumn);
+            int insertIdx = (position != null && position >= 0 && position <= newList.size()) ? position : newList.size();
+            newList.add(insertIdx, lead);
+            for (int i = 0; i < newList.size(); i++) {
+                newList.get(i).setPipelinePosition(i);
+            }
+            leadRepository.saveAll(oldList);
+            leadRepository.saveAll(newList);
+
             Map<String, Object> meta = new HashMap<>();
             meta.put("leadId", leadId);
-            meta.put("fromStatus", prevStatus.name());
+            meta.put("fromStatus", oldStatus.name());
             meta.put("toStatus", newStatus.name());
             activityEventService.recordEvent(tenant, userId, ActivityEntityType.LEAD,
                     Objects.requireNonNull(lead.getId()),
-                    ActivityEventType.LEAD_STATUS_CHANGED, "Lead status changed from " + prevStatus + " to " + newStatus, meta);
+                    ActivityEventType.LEAD_STATUS_CHANGED, "Lead status changed from " + oldStatus + " to " + newStatus, meta);
+        } else {
+            List<Lead> sameList = new ArrayList<>(oldColumn);
+            sameList.removeIf(l -> Objects.equals(l.getId(), leadId));
+            int insertIdx = (position != null && position >= 0 && position <= sameList.size()) ? position : sameList.size();
+            sameList.add(insertIdx, lead);
+            for (int i = 0; i < sameList.size(); i++) {
+                sameList.get(i).setPipelinePosition(i);
+            }
+            leadRepository.saveAll(sameList);
         }
 
-        return toDto(saved);
+        return toDto(lead);
     }
 
     @Override
     public JobDto convertLeadToJob(@NonNull UUID tenantId, @NonNull UUID userId, UUID leadId, ConvertLeadToJobRequest request) {
+        tenantAccessService.requireAnyRole(tenantId, userId, Objects.requireNonNull(Set.of(UserRole.OWNER, UserRole.ADMIN, UserRole.SALES)),
+                "You do not have permission to convert leads.");
         Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
 
         Lead lead = leadRepository.findByIdAndTenantAndArchivedFalse(leadId, tenant)
@@ -219,8 +263,10 @@ public class LeadServiceImpl implements LeadService {
 
         Job saved = jobRepository.save(job);
 
-        // Update lead status to WON
+        // Update lead status to WON and assign pipeline position in WON column
+        int maxPos = leadRepository.findMaxPipelinePositionByTenantAndStatusAndArchivedFalse(tenant, LeadStatus.WON);
         lead.setStatus(LeadStatus.WON);
+        lead.setPipelinePosition(maxPos + 1);
         lead.setUpdatedByUserId(userId);
         leadRepository.save(lead);
 
@@ -305,6 +351,7 @@ public class LeadServiceImpl implements LeadService {
         dto.setId(entity.getId());
         dto.setStatus(entity.getStatus());
         dto.setSource(entity.getSource());
+        dto.setPipelinePosition(entity.getPipelinePosition());
         dto.setLeadNotes(entity.getLeadNotes());
         dto.setCreatedAt(entity.getCreatedAt());
         dto.setUpdatedAt(entity.getUpdatedAt());

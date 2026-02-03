@@ -1,5 +1,8 @@
 package com.roofingcrm.api.v1.job;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.roofingcrm.api.v1.common.PickerItemDto;
 import com.roofingcrm.domain.enums.JobStatus;
 import com.roofingcrm.security.SecurityUtils;
@@ -13,8 +16,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.lang.NonNull;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -22,6 +27,8 @@ import java.util.UUID;
 @RequestMapping("/api/v1/jobs")
 @Validated
 public class JobController {
+
+    private static final Logger log = LoggerFactory.getLogger(JobController.class);
 
     private final JobService jobService;
 
@@ -40,7 +47,7 @@ public class JobController {
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
-    @PutMapping("/{id}")
+    @PutMapping("/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}")
     public ResponseEntity<JobDto> updateJob(
             @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
             @PathVariable("id") UUID jobId,
@@ -51,7 +58,7 @@ public class JobController {
         return ResponseEntity.ok(updated);
     }
 
-    @GetMapping("/{id}")
+    @GetMapping("/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}")
     public ResponseEntity<JobDto> getJob(
             @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
             @PathVariable("id") UUID jobId) {
@@ -59,6 +66,21 @@ public class JobController {
         UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
         JobDto dto = jobService.getJob(tenantId, userId, jobId);
         return ResponseEntity.ok(dto);
+    }
+
+    @GetMapping("/schedule")
+    public ResponseEntity<List<JobDto>> listSchedule(
+            @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
+            @RequestParam("from") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) @NonNull LocalDate from,
+            @RequestParam("to") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) @NonNull LocalDate to,
+            @RequestParam(value = "status", required = false) JobStatus status,
+            @RequestParam(value = "crewName", required = false) String crewName,
+            @RequestParam(value = "includeUnscheduled", defaultValue = "true") boolean includeUnscheduled) {
+
+        UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
+        log.debug("listSchedule: tenantId={} from={} to={} userId={}", tenantId, from, to, userId);
+        List<JobDto> jobs = jobService.listSchedule(tenantId, userId, from, to, status, crewName, includeUnscheduled);
+        return ResponseEntity.ok(jobs);
     }
 
     @GetMapping("/picker")
@@ -84,7 +106,7 @@ public class JobController {
         return ResponseEntity.ok(page);
     }
 
-    @PostMapping("/{id}/status")
+    @PostMapping("/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}/status")
     public ResponseEntity<JobDto> updateJobStatus(
             @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
             @PathVariable("id") UUID jobId,

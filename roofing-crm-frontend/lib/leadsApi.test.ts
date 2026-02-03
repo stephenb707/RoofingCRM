@@ -1,5 +1,5 @@
 import axios from "axios";
-import { convertLeadToJob } from "./leadsApi";
+import { convertLeadToJob, updateLeadStatus } from "./leadsApi";
 import type { ConvertLeadToJobRequest, JobDto } from "./types";
 
 jest.mock("axios");
@@ -51,6 +51,34 @@ describe("leadsApi", () => {
 
       expect(mockApi.post).toHaveBeenCalledWith("/api/v1/leads/lead-1/convert", payload);
       expect(result).toEqual(mockJob);
+    });
+  });
+
+  describe("updateLeadStatus", () => {
+    it("sends status and position when position provided", async () => {
+      mockApi.post.mockResolvedValue({
+        data: { id: "lead-1", status: "CONTACTED", pipelinePosition: 2 },
+      });
+
+      await updateLeadStatus(mockApi, "lead-1", "CONTACTED", 2);
+
+      expect(mockApi.post).toHaveBeenCalledWith(
+        "/api/v1/leads/lead-1/status",
+        expect.objectContaining({ status: "CONTACTED", position: 2 })
+      );
+    });
+
+    it("sends only status when position omitted", async () => {
+      mockApi.post.mockResolvedValue({
+        data: { id: "lead-1", status: "CONTACTED" },
+      });
+
+      await updateLeadStatus(mockApi, "lead-1", "CONTACTED");
+
+      expect(mockApi.post).toHaveBeenCalledWith(
+        "/api/v1/leads/lead-1/status",
+        { status: "CONTACTED" }
+      );
     });
   });
 });
