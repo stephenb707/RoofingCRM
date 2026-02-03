@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -51,6 +51,8 @@ export default function EstimateDetailPage() {
   const [editForm, setEditForm] = useState<EstimateItemRequest | null>(null);
   const [shareLink, setShareLink] = useState<string | null>(null);
   const [shareExpiresAt, setShareExpiresAt] = useState<string | null>(null);
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const canShare =
     auth.tenants.find((t) => t.tenantId === auth.selectedTenantId)?.role === "OWNER" ||
@@ -83,6 +85,58 @@ export default function EstimateDetailPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sync only when server status changes
   }, [estimate?.status]);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    };
+  }, []);
+
+  const handleCopyLink = async () => {
+    if (!shareLink) return;
+    if (copyTimerRef.current) {
+      clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = null;
+    }
+
+    const copyToClipboard = (): Promise<void> => {
+      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+        return navigator.clipboard.writeText(shareLink);
+      }
+      // Fallback for older browsers
+      return new Promise((resolve, reject) => {
+        const ta = document.createElement("textarea");
+        ta.value = shareLink;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        try {
+          document.execCommand("copy");
+          resolve();
+        } catch (e) {
+          reject(e);
+        } finally {
+          document.body.removeChild(ta);
+        }
+      });
+    };
+
+    try {
+      await copyToClipboard();
+      setCopyState("copied");
+      copyTimerRef.current = setTimeout(() => {
+        copyTimerRef.current = null;
+        setCopyState("idle");
+      }, 1500);
+    } catch {
+      setCopyState("error");
+      copyTimerRef.current = setTimeout(() => {
+        copyTimerRef.current = null;
+        setCopyState("idle");
+      }, 2000);
+    }
+  };
 
   const statusMutation = useMutation({
     mutationFn: (status: EstimateStatus) => updateEstimateStatus(api, estimateId, status),
@@ -462,10 +516,30 @@ export default function EstimateDetailPage() {
                     />
                     <button
                       type="button"
-                      onClick={() => navigator.clipboard?.writeText(shareLink)}
-                      className="w-full shrink-0 px-4 py-2 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50 sm:w-auto"
+                      onClick={handleCopyLink}
+                      disabled={copyState === "copied"}
+                      data-testid="share-copy-button"
+                      className={`min-w-[96px] w-full shrink-0 px-4 py-2 text-sm font-medium rounded-lg sm:w-auto inline-flex items-center justify-center gap-1.5 ${
+                        copyState === "copied"
+                          ? "border border-green-300 bg-green-50 text-green-700"
+                          : copyState === "error"
+                            ? "border border-red-300 bg-red-50 text-red-700"
+                            : "border border-slate-300 text-slate-700 hover:bg-slate-50"
+                      }`}
                     >
-                      Copy
+                      {copyState === "copied" && (
+                        <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                      {copyState === "error" && (
+                        <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      )}
+                      {copyState === "idle" && "Copy"}
+                      {copyState === "copied" && "Copied!"}
+                      {copyState === "error" && "Copy failed"}
                     </button>
                   </div>
                   {shareExpiresAt && (

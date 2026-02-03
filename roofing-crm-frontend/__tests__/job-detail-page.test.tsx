@@ -7,9 +7,11 @@ import * as attachmentsApi from "@/lib/attachmentsApi";
 import * as communicationLogsApi from "@/lib/communicationLogsApi";
 import * as tasksApi from "@/lib/tasksApi";
 import * as activityApi from "@/lib/activityApi";
+import * as invoicesApi from "@/lib/invoicesApi";
 import { JobDto } from "@/lib/types";
 
 jest.mock("@/lib/jobsApi");
+jest.mock("@/lib/invoicesApi");
 jest.mock("@/lib/attachmentsApi");
 jest.mock("@/lib/communicationLogsApi");
 jest.mock("@/lib/tasksApi");
@@ -26,6 +28,7 @@ const mockedAttachmentsApi = attachmentsApi as jest.Mocked<typeof attachmentsApi
 const mockedCommLogsApi = communicationLogsApi as jest.Mocked<typeof communicationLogsApi>;
 const mockedTasksApi = tasksApi as jest.Mocked<typeof tasksApi>;
 const mockedActivityApi = activityApi as jest.Mocked<typeof activityApi>;
+const mockedInvoicesApi = invoicesApi as jest.Mocked<typeof invoicesApi>;
 
 const mockJob: JobDto = {
   id: "job-1",
@@ -60,6 +63,7 @@ describe("JobDetailPage", () => {
       first: true,
       last: true,
     });
+    mockedInvoicesApi.listInvoicesForJob.mockResolvedValue([]);
   });
 
   it("renders job overview and status", async () => {

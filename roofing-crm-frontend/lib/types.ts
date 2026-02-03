@@ -312,6 +312,36 @@ export interface PublicEstimateDecisionRequest {
   signerEmail?: string | null;
 }
 
+// Invoice types
+export type InvoiceStatus = "DRAFT" | "SENT" | "PAID" | "VOID";
+
+export interface InvoiceItemDto {
+  id: string;
+  name: string;
+  description?: string | null;
+  quantity: number;
+  unitPrice: number;
+  lineTotal: number;
+  sortOrder?: number;
+}
+
+export interface InvoiceDto {
+  id: string;
+  invoiceNumber: string;
+  status: InvoiceStatus;
+  issuedAt?: string | null;
+  sentAt?: string | null;
+  dueAt?: string | null;
+  paidAt?: string | null;
+  total: number;
+  notes?: string | null;
+  jobId: string;
+  estimateId?: string | null;
+  items?: InvoiceItemDto[];
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
 // Attachment types
 export type AttachmentTag =
   | "BEFORE"
@@ -419,7 +449,9 @@ export type ActivityEventType =
   | "ATTACHMENT_ADDED"
   | "ESTIMATE_SHARED"
   | "ESTIMATE_ACCEPTED"
-  | "ESTIMATE_REJECTED";
+  | "ESTIMATE_REJECTED"
+  | "INVOICE_CREATED"
+  | "INVOICE_STATUS_CHANGED";
 
 export interface ActivityEventDto {
   activityId: string;

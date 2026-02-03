@@ -192,7 +192,7 @@ export default function PublicEstimatePage() {
                     type="text"
                     value={signerName}
                     onChange={(e) => setSignerName(e.target.value)}
-                    placeholder="John Smith"
+                    placeholder="John Doe"
                     className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
                   />
                 </div>

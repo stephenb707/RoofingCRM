@@ -39,6 +39,8 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   ESTIMATE_SHARED: "Estimate shared",
   ESTIMATE_ACCEPTED: "Estimate accepted",
   ESTIMATE_REJECTED: "Estimate rejected",
+  INVOICE_CREATED: "Invoice created",
+  INVOICE_STATUS_CHANGED: "Invoice status changed",
 };
 
 export interface ActivitySectionProps {

@@ -162,7 +162,41 @@ describe("EstimateDetailPage", () => {
       const linkInput = screen.getByTestId("share-link-input") as HTMLInputElement;
       expect(linkInput.value).toContain("/estimate/abc123");
     });
-    expect(screen.getByRole("button", { name: /Copy/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Copy$/i })).toBeInTheDocument();
+  });
+
+  it("shows Copied! when Copy button clicked successfully", async () => {
+    const shareResponse = { token: "abc123", expiresAt: "2026-02-16T00:00:00Z" };
+    mockedEstimatesApi.shareEstimate.mockResolvedValue(shareResponse);
+
+    const writeTextMock = jest.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: writeTextMock },
+      configurable: true,
+    });
+
+    render(<EstimateDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Estimate 1")).toBeInTheDocument();
+    });
+
+    const generateBtn = screen.getByRole("button", { name: /Generate link/i });
+    fireEvent.click(generateBtn);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("share-link-input")).toBeInTheDocument();
+    });
+
+    const copyBtn = screen.getByTestId("share-copy-button");
+    fireEvent.click(copyBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText("Copied!")).toBeInTheDocument();
+    });
+    expect(writeTextMock).toHaveBeenCalledWith(
+      expect.stringContaining("/estimate/abc123")
+    );
   });
 
   it("renders Edit Estimate link in Actions section", async () => {
