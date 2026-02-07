@@ -1,6 +1,8 @@
 package com.roofingcrm.config;
 
 import com.roofingcrm.security.JwtAuthenticationFilter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.roofingcrm.security.JwtService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -9,7 +11,6 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.security.config.Customizer;
 import org.springframework.http.HttpMethod;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -18,13 +19,16 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @Configuration
 public class SecurityConfig {
 
+        private static final Logger log = LoggerFactory.getLogger(SecurityConfig.class);
+
         @Bean
         public SecurityFilterChain securityFilterChain(HttpSecurity http,
                                                        JwtService jwtService,
-                                                       SecurityErrorHandlers errorHandlers) throws Exception {
+                                                       SecurityErrorHandlers errorHandlers,
+                                                       CorsProperties corsProperties) throws Exception {
             http
                 .csrf(AbstractHttpConfigurer::disable)
-                .cors(Customizer.withDefaults())
+                .cors(cors -> cors.configurationSource(corsConfigurationSource(corsProperties)))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(ex -> ex
                     .authenticationEntryPoint(errorHandlers.authenticationEntryPoint())
@@ -45,6 +49,11 @@ public class SecurityConfig {
 
         @Bean
         public CorsConfigurationSource corsConfigurationSource(CorsProperties corsProperties) {
+                log.info("CORS configured: allowedOrigins={}, allowedHeaders={}, allowCredentials={}",
+                        corsProperties.getAllowedOrigins(),
+                        corsProperties.getAllowedHeaders(),
+                        corsProperties.isAllowCredentials());
+
                 if (corsProperties.isAllowCredentials()
                         && corsProperties.getAllowedOrigins().contains("*")) {
                     throw new IllegalStateException(

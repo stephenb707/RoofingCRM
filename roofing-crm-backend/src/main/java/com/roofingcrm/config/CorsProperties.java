@@ -17,7 +17,7 @@ public class CorsProperties {
         "https://roofing-crm-xi.vercel.app");
     private List<String> allowedOriginPatterns = List.of();
     private List<String> allowedMethods = List.of("GET", "POST", "PUT", "DELETE", "OPTIONS");
-    private List<String> allowedHeaders = List.of("*");
+    private List<String> allowedHeaders = List.of("Authorization", "Content-Type", "X-Tenant-Id", "Location");
     private boolean allowCredentials = true;
     private Long maxAge = 3600L;
 
