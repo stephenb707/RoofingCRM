@@ -39,11 +39,12 @@ app:
     allowed-origins:
       - "http://localhost:3000"
       - "http://127.0.0.1:3000"
+      - "https://roofing-crm-xi.vercel.app"
     # If you need wildcards in the future, prefer patterns:
     # allowed-origin-patterns:
     #   - "https://*.example.com"
     allowed-methods: [GET, POST, PUT, DELETE, OPTIONS]
-    allowed-headers: ["*"]
+    allowed-headers: [Authorization, Content-Type, X-Tenant-Id, Location]
     allow-credentials: true
     max-age: 3600
   security:
