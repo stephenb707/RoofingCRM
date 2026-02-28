@@ -4,6 +4,7 @@ import com.roofingcrm.api.v1.estimate.CreateEstimateRequest;
 import com.roofingcrm.api.v1.estimate.EstimateDto;
 import com.roofingcrm.api.v1.estimate.EstimateItemDto;
 import com.roofingcrm.api.v1.estimate.EstimateItemRequest;
+import com.roofingcrm.api.v1.estimate.EstimateSummaryDto;
 import com.roofingcrm.api.v1.estimate.ShareEstimateRequest;
 import com.roofingcrm.api.v1.estimate.ShareEstimateResponse;
 import com.roofingcrm.api.v1.estimate.UpdateEstimateRequest;
@@ -106,7 +107,7 @@ public class EstimateServiceImpl implements EstimateService {
     public EstimateDto updateEstimate(@NonNull UUID tenantId, @NonNull UUID userId, UUID estimateId, UpdateEstimateRequest request) {
         Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
 
-        Estimate estimate = estimateRepository.findByIdAndTenantAndArchivedFalse(estimateId, tenant)
+        Estimate estimate = estimateRepository.findDetailedByIdAndTenantAndArchivedFalse(estimateId, tenant)
                 .orElseThrow(() -> new ResourceNotFoundException("Estimate not found"));
 
         estimate.setUpdatedByUserId(userId);
@@ -162,14 +163,14 @@ public class EstimateServiceImpl implements EstimateService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<EstimateDto> listEstimatesForJob(@NonNull UUID tenantId, @NonNull UUID userId, UUID jobId) {
+    public List<EstimateSummaryDto> listEstimatesForJob(@NonNull UUID tenantId, @NonNull UUID userId, UUID jobId) {
         Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
 
         Job job = jobRepository.findByIdAndTenantAndArchivedFalse(jobId, tenant)
                 .orElseThrow(() -> new ResourceNotFoundException("Job not found"));
 
         List<Estimate> estimates = estimateRepository.findByJobAndArchivedFalse(job);
-        return estimates.stream().map(this::toDto).toList();
+        return estimates.stream().map(this::toSummaryDto).toList();
     }
 
     @Override
@@ -291,6 +292,28 @@ public class EstimateServiceImpl implements EstimateService {
         dto.setSubtotal(subtotal);
         dto.setTotal(subtotal); // No tax calculation for now
 
+        return dto;
+    }
+
+    private EstimateSummaryDto toSummaryDto(Estimate entity) {
+        EstimateSummaryDto dto = new EstimateSummaryDto();
+        dto.setId(entity.getId());
+        dto.setStatus(entity.getStatus());
+        dto.setTitle(entity.getTitle());
+        dto.setNotes(entity.getNotesForCustomer());
+        dto.setIssueDate(entity.getIssueDate());
+        dto.setValidUntil(entity.getValidUntil());
+        dto.setCreatedAt(entity.getCreatedAt());
+        dto.setUpdatedAt(entity.getUpdatedAt());
+        dto.setSubtotal(entity.getSubtotal());
+        dto.setTotal(entity.getTotal());
+
+        if (entity.getJob() != null) {
+            dto.setJobId(entity.getJob().getId());
+            if (entity.getJob().getCustomer() != null) {
+                dto.setCustomerId(entity.getJob().getCustomer().getId());
+            }
+        }
         return dto;
     }
 }

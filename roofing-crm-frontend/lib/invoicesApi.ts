@@ -1,6 +1,7 @@
 import type { AxiosInstance } from "axios";
 import type {
   InvoiceDto,
+  InvoiceSummaryDto,
   InvoiceStatus,
   PageResponse,
 } from "./types";
@@ -38,13 +39,13 @@ export async function createInvoiceFromEstimate(
 export async function listInvoices(
   api: AxiosInstance,
   params: ListInvoicesParams = {}
-): Promise<PageResponse<InvoiceDto>> {
+): Promise<PageResponse<InvoiceSummaryDto>> {
   const queryParams: Record<string, string | number> = {};
   if (params.jobId != null && params.jobId !== "") queryParams.jobId = params.jobId;
   if (params.status != null) queryParams.status = params.status;
   if (params.page !== undefined) queryParams.page = params.page;
   if (params.size !== undefined) queryParams.size = params.size;
-  const res = await api.get<PageResponse<InvoiceDto>>("/api/v1/invoices", {
+  const res = await api.get<PageResponse<InvoiceSummaryDto>>("/api/v1/invoices", {
     params: queryParams,
   });
   return res.data;
@@ -56,8 +57,8 @@ export async function listInvoices(
 export async function listInvoicesForJob(
   api: AxiosInstance,
   jobId: string
-): Promise<InvoiceDto[]> {
-  const res = await api.get<InvoiceDto[]>(`/api/v1/invoices/job/${jobId}`);
+): Promise<InvoiceSummaryDto[]> {
+  const res = await api.get<InvoiceSummaryDto[]>(`/api/v1/invoices/job/${jobId}`);
   return res.data;
 }
 

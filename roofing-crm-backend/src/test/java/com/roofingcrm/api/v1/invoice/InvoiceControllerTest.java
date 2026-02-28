@@ -93,15 +93,13 @@ class InvoiceControllerTest {
         UUID tenantId = UUID.randomUUID();
         UUID jobId = UUID.randomUUID();
 
-        InvoiceDto dto = new InvoiceDto();
+        InvoiceSummaryDto dto = new InvoiceSummaryDto();
         dto.setId(UUID.randomUUID());
         dto.setInvoiceNumber("INV-1");
         dto.setStatus(InvoiceStatus.DRAFT);
         dto.setJobId(jobId);
         dto.setTotal(new BigDecimal("5000"));
         dto.setIssuedAt(Instant.now());
-        dto.setItems(List.of());
-
         when(invoiceService.listInvoices(eq(tenantId), eq(userId), eq(jobId), isNull(), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(dto), org.springframework.data.domain.PageRequest.of(0, 20), 1));
 
@@ -118,7 +116,7 @@ class InvoiceControllerTest {
         UUID tenantId = UUID.randomUUID();
         UUID jobId = UUID.randomUUID();
 
-        InvoiceDto dto = new InvoiceDto();
+        InvoiceSummaryDto dto = new InvoiceSummaryDto();
         dto.setId(UUID.randomUUID());
         dto.setInvoiceNumber("INV-1");
         dto.setStatus(InvoiceStatus.SENT);

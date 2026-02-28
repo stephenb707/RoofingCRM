@@ -3,6 +3,7 @@ package com.roofingcrm.service.invoice;
 import com.roofingcrm.api.v1.invoice.CreateInvoiceFromEstimateRequest;
 import com.roofingcrm.api.v1.invoice.InvoiceDto;
 import com.roofingcrm.api.v1.invoice.InvoiceItemDto;
+import com.roofingcrm.api.v1.invoice.InvoiceSummaryDto;
 import com.roofingcrm.domain.entity.Estimate;
 import com.roofingcrm.domain.entity.EstimateItem;
 import com.roofingcrm.domain.entity.Invoice;
@@ -115,25 +116,25 @@ public class InvoiceServiceImpl implements InvoiceService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<InvoiceDto> listInvoices(@NonNull UUID tenantId, @NonNull UUID userId, UUID jobId, InvoiceStatus status, @NonNull Pageable pageable) {
+    public Page<InvoiceSummaryDto> listInvoices(@NonNull UUID tenantId, @NonNull UUID userId, UUID jobId, InvoiceStatus status, @NonNull Pageable pageable) {
         Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
         return invoiceRepository.findByTenantAndArchivedFalseWithFilters(tenant, jobId, status, pageable)
-                .map(this::toDto);
+                .map(this::toSummaryDto);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<InvoiceDto> listInvoicesForJob(@NonNull UUID tenantId, @NonNull UUID userId, UUID jobId) {
+    public List<InvoiceSummaryDto> listInvoicesForJob(@NonNull UUID tenantId, @NonNull UUID userId, UUID jobId) {
         Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
         List<Invoice> invoices = invoiceRepository.findByTenantAndJobIdAndArchivedFalseOrderByCreatedAtDesc(tenant, jobId);
-        return invoices.stream().map(this::toDto).toList();
+        return invoices.stream().map(this::toSummaryDto).toList();
     }
 
     @Override
     @Transactional(readOnly = true)
     public InvoiceDto getInvoice(@NonNull UUID tenantId, @NonNull UUID userId, UUID invoiceId) {
         Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
-        Invoice invoice = invoiceRepository.findByIdAndTenantAndArchivedFalse(invoiceId, tenant)
+        Invoice invoice = invoiceRepository.findByIdAndTenantAndArchivedFalseWithItems(invoiceId, tenant)
                 .orElseThrow(() -> new ResourceNotFoundException("Invoice not found"));
         return toDto(invoice);
     }
@@ -222,6 +223,24 @@ public class InvoiceServiceImpl implements InvoiceService {
             }
             dto.setItems(itemDtos);
         }
+        return dto;
+    }
+
+    private InvoiceSummaryDto toSummaryDto(Invoice i) {
+        InvoiceSummaryDto dto = new InvoiceSummaryDto();
+        dto.setId(i.getId());
+        dto.setInvoiceNumber(i.getInvoiceNumber());
+        dto.setStatus(i.getStatus());
+        dto.setIssuedAt(i.getIssuedAt());
+        dto.setSentAt(i.getSentAt());
+        dto.setDueAt(i.getDueAt());
+        dto.setPaidAt(i.getPaidAt());
+        dto.setTotal(i.getTotal());
+        dto.setNotes(i.getNotes());
+        dto.setJobId(i.getJob() != null ? i.getJob().getId() : null);
+        dto.setEstimateId(i.getEstimate() != null ? i.getEstimate().getId() : null);
+        dto.setCreatedAt(i.getCreatedAt());
+        dto.setUpdatedAt(i.getUpdatedAt());
         return dto;
     }
 }

@@ -247,6 +247,21 @@ export interface EstimateDto {
   updatedAt?: string | null;
 }
 
+export interface EstimateSummaryDto {
+  id: string;
+  jobId: string;
+  customerId?: string | null;
+  status: EstimateStatus;
+  title?: string | null;
+  notes?: string | null;
+  issueDate?: string | null; // YYYY-MM-DD
+  validUntil?: string | null; // YYYY-MM-DD
+  subtotal?: number | null;
+  total?: number | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
 export interface EstimateItemRequest {
   name: string;
   description?: string | null;
@@ -338,6 +353,22 @@ export interface InvoiceDto {
   jobId: string;
   estimateId?: string | null;
   items?: InvoiceItemDto[];
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface InvoiceSummaryDto {
+  id: string;
+  invoiceNumber: string;
+  status: InvoiceStatus;
+  issuedAt?: string | null;
+  sentAt?: string | null;
+  dueAt?: string | null;
+  paidAt?: string | null;
+  total: number;
+  notes?: string | null;
+  jobId: string;
+  estimateId?: string | null;
   createdAt?: string | null;
   updatedAt?: string | null;
 }

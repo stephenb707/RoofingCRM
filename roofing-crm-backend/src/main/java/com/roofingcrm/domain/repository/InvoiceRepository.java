@@ -16,8 +16,10 @@ import java.util.UUID;
 
 public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
 
-    @EntityGraph(attributePaths = {"job", "estimate", "items"})
     Optional<Invoice> findByIdAndTenantAndArchivedFalse(UUID id, Tenant tenant);
+
+    @EntityGraph(attributePaths = {"job", "estimate", "items"})
+    Optional<Invoice> findByIdAndTenantAndArchivedFalseWithItems(UUID id, Tenant tenant);
 
     List<Invoice> findByTenantAndJobIdAndArchivedFalseOrderByCreatedAtDesc(Tenant tenant, UUID jobId);
 

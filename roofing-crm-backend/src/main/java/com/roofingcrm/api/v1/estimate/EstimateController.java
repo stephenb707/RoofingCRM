@@ -36,12 +36,12 @@ public class EstimateController {
     }
 
     @GetMapping("/api/v1/jobs/{jobId}/estimates")
-    public ResponseEntity<List<EstimateDto>> listEstimatesForJob(
+    public ResponseEntity<List<EstimateSummaryDto>> listEstimatesForJob(
             @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
             @PathVariable("jobId") UUID jobId) {
 
         UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
-        List<EstimateDto> estimates = estimateService.listEstimatesForJob(tenantId, userId, jobId);
+        List<EstimateSummaryDto> estimates = estimateService.listEstimatesForJob(tenantId, userId, jobId);
         return ResponseEntity.ok(estimates);
     }
 

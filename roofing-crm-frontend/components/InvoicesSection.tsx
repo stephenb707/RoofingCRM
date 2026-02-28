@@ -19,7 +19,11 @@ import { ESTIMATE_STATUS_LABELS } from "@/lib/estimatesConstants";
 import { queryKeys } from "@/lib/queryKeys";
 import { formatDateTime, formatMoney } from "@/lib/format";
 import { StatusBadge } from "@/components/StatusBadge";
-import type { InvoiceDto, InvoiceStatus, EstimateDto } from "@/lib/types";
+import type {
+  EstimateSummaryDto,
+  InvoiceStatus,
+  InvoiceSummaryDto,
+} from "@/lib/types";
 
 export interface InvoicesSectionProps {
   jobId: string;
@@ -57,7 +61,7 @@ export function InvoicesSection({ jobId }: InvoicesSectionProps) {
   });
 
   const acceptedEstimates = (estimatesQuery.data ?? []).filter(
-    (e: EstimateDto) => e.status === "ACCEPTED"
+    (e: EstimateSummaryDto) => e.status === "ACCEPTED"
   );
 
   const createMutation = useMutation({
@@ -147,7 +151,7 @@ export function InvoicesSection({ jobId }: InvoicesSectionProps) {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
-              {invoices.map((inv: InvoiceDto) => (
+              {invoices.map((inv: InvoiceSummaryDto) => (
                 <tr key={inv.id} className="hover:bg-slate-50">
                   <td className="px-4 py-3 text-sm">
                     <Link
@@ -226,7 +230,7 @@ export function InvoicesSection({ jobId }: InvoicesSectionProps) {
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
                 >
                   <option value="">Select estimate…</option>
-                  {acceptedEstimates.map((est: EstimateDto) => (
+                  {acceptedEstimates.map((est: EstimateSummaryDto) => (
                     <option key={est.id} value={est.id}>
                       {est.title || `Estimate ${est.id.slice(0, 8)}`} — {ESTIMATE_STATUS_LABELS[est.status]}
                     </option>
