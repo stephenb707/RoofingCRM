@@ -15,6 +15,7 @@ import com.roofingcrm.domain.enums.InvoiceStatus;
 import com.roofingcrm.domain.repository.EstimateRepository;
 import com.roofingcrm.domain.repository.InvoiceRepository;
 import com.roofingcrm.service.activity.ActivityEventService;
+import com.roofingcrm.service.audit.AuditSupport;
 import com.roofingcrm.service.exception.InvoiceConflictException;
 import com.roofingcrm.service.exception.ResourceNotFoundException;
 import com.roofingcrm.service.tenant.TenantAccessService;
@@ -83,7 +84,7 @@ public class InvoiceServiceImpl implements InvoiceService {
         invoice.setIssuedAt(Instant.now());
         invoice.setDueAt(request.getDueAt());
         invoice.setNotes(request.getNotes());
-        invoice.setCreatedByUserId(userId);
+        AuditSupport.touchForCreate(invoice, userId);
 
         BigDecimal total = estimate.getTotal() != null ? estimate.getTotal() : BigDecimal.ZERO;
         invoice.setTotal(total);
@@ -165,6 +166,7 @@ public class InvoiceServiceImpl implements InvoiceService {
             invoice.setPaidAt(now);
         }
         invoice.setStatus(newStatus);
+        AuditSupport.touchForUpdate(invoice, userId);
 
         Invoice saved = invoiceRepository.save(invoice);
 

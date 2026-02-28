@@ -23,6 +23,7 @@ import com.roofingcrm.domain.repository.CustomerRepository;
 import com.roofingcrm.domain.repository.JobRepository;
 import com.roofingcrm.domain.repository.LeadRepository;
 import com.roofingcrm.domain.value.Address;
+import com.roofingcrm.service.audit.AuditSupport;
 import com.roofingcrm.service.exception.LeadConversionNotAllowedException;
 import com.roofingcrm.service.exception.ResourceNotFoundException;
 import com.roofingcrm.service.tenant.TenantAccessService;
@@ -77,8 +78,7 @@ public class LeadServiceImpl implements LeadService {
         Lead lead = new Lead();
         lead.setTenant(tenant);
         lead.setCustomer(customer);
-        lead.setCreatedByUserId(userId);
-        lead.setUpdatedByUserId(userId);
+        AuditSupport.touchForCreate(lead, userId);
 
         lead.setStatus(LeadStatus.NEW);
         lead.setSource(request.getSource() != null ? request.getSource() : LeadSource.OTHER);
@@ -91,11 +91,12 @@ public class LeadServiceImpl implements LeadService {
         applyAddress(propertyAddress, request.getPropertyAddress());
         lead.setPropertyAddress(propertyAddress);
 
-        Lead saved = leadRepository.save(lead);
+        Lead saved = Objects.requireNonNull(leadRepository.save(lead));
         return toDto(saved);
     }
 
     @Override
+    @SuppressWarnings("null")
     public LeadDto updateLead(@NonNull UUID tenantId, @NonNull UUID userId, UUID leadId, UpdateLeadRequest request) {
         tenantAccessService.requireAnyRole(tenantId, userId, Objects.requireNonNull(Set.of(UserRole.OWNER, UserRole.ADMIN, UserRole.SALES)),
                 "You do not have permission to edit leads.");
@@ -104,7 +105,7 @@ public class LeadServiceImpl implements LeadService {
         Lead lead = leadRepository.findByIdAndTenantAndArchivedFalse(leadId, tenant)
                 .orElseThrow(() -> new ResourceNotFoundException("Lead not found"));
 
-        lead.setUpdatedByUserId(userId);
+        AuditSupport.touchForUpdate(lead, userId);
 
         if (request.getSource() != null) {
             lead.setSource(request.getSource());
@@ -121,7 +122,7 @@ public class LeadServiceImpl implements LeadService {
             applyAddress(lead.getPropertyAddress(), request.getPropertyAddress());
         }
 
-        Lead saved = leadRepository.save(lead);
+        Lead saved = Objects.requireNonNull(leadRepository.save(lead));
         return toDto(saved);
     }
 
@@ -184,7 +185,7 @@ public class LeadServiceImpl implements LeadService {
 
         if (statusChanged) {
             lead.setStatus(newStatus);
-            lead.setUpdatedByUserId(userId);
+            AuditSupport.touchForUpdate(lead, userId);
             List<Lead> newColumn = leadRepository.findByTenantAndStatusAndArchivedFalseOrderByPipelinePositionAscCreatedAtAsc(tenant, newStatus);
             List<Lead> newList = new ArrayList<>(newColumn);
             int insertIdx = (position != null && position >= 0 && position <= newList.size()) ? position : newList.size();
@@ -203,6 +204,7 @@ public class LeadServiceImpl implements LeadService {
                     Objects.requireNonNull(lead.getId()),
                     ActivityEventType.LEAD_STATUS_CHANGED, "Lead status changed from " + oldStatus + " to " + newStatus, meta);
         } else {
+            AuditSupport.touchForUpdate(lead, userId);
             List<Lead> sameList = new ArrayList<>(oldColumn);
             sameList.removeIf(l -> Objects.equals(l.getId(), leadId));
             int insertIdx = (position != null && position >= 0 && position <= sameList.size()) ? position : sameList.size();
@@ -245,8 +247,7 @@ public class LeadServiceImpl implements LeadService {
         job.setTenant(tenant);
         job.setCustomer(customer);
         job.setLead(lead);
-        job.setCreatedByUserId(userId);
-        job.setUpdatedByUserId(userId);
+        AuditSupport.touchForCreate(job, userId);
         job.setJobType(request.getType());
         job.setScheduledStartDate(request.getScheduledStartDate());
         job.setScheduledEndDate(request.getScheduledEndDate());
@@ -267,7 +268,7 @@ public class LeadServiceImpl implements LeadService {
         int maxPos = leadRepository.findMaxPipelinePositionByTenantAndStatusAndArchivedFalse(tenant, LeadStatus.WON);
         lead.setStatus(LeadStatus.WON);
         lead.setPipelinePosition(maxPos + 1);
-        lead.setUpdatedByUserId(userId);
+        AuditSupport.touchForUpdate(lead, userId);
         leadRepository.save(lead);
 
         Map<String, Object> meta = new HashMap<>();
@@ -310,8 +311,7 @@ public class LeadServiceImpl implements LeadService {
         if (newCustomer != null) {
             Customer customer = new Customer();
             customer.setTenant(tenant);
-            customer.setCreatedByUserId(userId);
-            customer.setUpdatedByUserId(userId);
+            AuditSupport.touchForCreate(customer, userId);
             customer.setFirstName(newCustomer.getFirstName());
             customer.setLastName(newCustomer.getLastName());
             customer.setPrimaryPhone(newCustomer.getPrimaryPhone());

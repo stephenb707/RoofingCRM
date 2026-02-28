@@ -22,6 +22,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -99,5 +100,19 @@ class EstimateServiceImplUnitTest {
                 service.shareEstimate(tenantId, userId, estimateId, req));
 
         verify(estimateRepository, never()).save(any());
+    }
+
+    @Test
+    void updateEstimateStatus_setsUpdatedByUserId() {
+        when(tenantAccessService.loadTenantForUserOrThrow(tenantId, userId)).thenReturn(tenant);
+        when(estimateRepository.findByIdAndTenantAndArchivedFalse(estimateId, tenant)).thenReturn(Optional.of(estimate));
+        when(estimateRepository.save(any(Estimate.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        var result = service.updateEstimateStatus(tenantId, userId, estimateId, EstimateStatus.ACCEPTED);
+
+        assertEquals(EstimateStatus.ACCEPTED, result.getStatus());
+        assertEquals(userId, estimate.getUpdatedByUserId());
+        verify(estimateRepository).findByIdAndTenantAndArchivedFalse(eq(estimateId), eq(tenant));
+        verify(estimateRepository).save(eq(estimate));
     }
 }

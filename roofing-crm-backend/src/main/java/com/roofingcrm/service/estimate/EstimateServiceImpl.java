@@ -18,6 +18,7 @@ import com.roofingcrm.domain.enums.EstimateStatus;
 import com.roofingcrm.domain.repository.EstimateRepository;
 import com.roofingcrm.domain.repository.JobRepository;
 import com.roofingcrm.service.activity.ActivityEventService;
+import com.roofingcrm.service.audit.AuditSupport;
 import com.roofingcrm.service.exception.ResourceNotFoundException;
 import com.roofingcrm.service.tenant.TenantAccessService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -76,8 +77,7 @@ public class EstimateServiceImpl implements EstimateService {
         Estimate estimate = new Estimate();
         estimate.setTenant(tenant);
         estimate.setJob(job);
-        estimate.setCreatedByUserId(userId);
-        estimate.setUpdatedByUserId(userId);
+        AuditSupport.touchForCreate(estimate, userId);
 
         // Generate a unique estimate number
         estimate.setEstimateNumber("EST-" + estimateCounter.incrementAndGet());
@@ -101,18 +101,19 @@ public class EstimateServiceImpl implements EstimateService {
         estimate.setSubtotal(subtotal);
         estimate.setTotal(subtotal); // No tax calculation for now
 
-        Estimate saved = estimateRepository.save(estimate);
+        Estimate saved = Objects.requireNonNull(estimateRepository.save(estimate));
         return estimateMapper.toDto(saved);
     }
 
     @Override
+    @SuppressWarnings("null")
     public EstimateDto updateEstimate(@NonNull UUID tenantId, @NonNull UUID userId, UUID estimateId, UpdateEstimateRequest request) {
         Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
 
         Estimate estimate = estimateRepository.findDetailedByIdAndTenantAndArchivedFalse(estimateId, tenant)
                 .orElseThrow(() -> new ResourceNotFoundException("Estimate not found"));
 
-        estimate.setUpdatedByUserId(userId);
+        AuditSupport.touchForUpdate(estimate, userId);
 
         if (request.getTitle() != null) {
             estimate.setTitle(request.getTitle());
@@ -148,7 +149,7 @@ public class EstimateServiceImpl implements EstimateService {
             estimate.setTotal(subtotal);
         }
 
-        Estimate saved = estimateRepository.save(estimate);
+        Estimate saved = Objects.requireNonNull(estimateRepository.save(estimate));
         return estimateMapper.toDto(saved);
     }
 
@@ -183,7 +184,7 @@ public class EstimateServiceImpl implements EstimateService {
                 .orElseThrow(() -> new ResourceNotFoundException("Estimate not found"));
 
         estimate.setStatus(newStatus);
-        estimate.setUpdatedByUserId(userId);
+        AuditSupport.touchForUpdate(estimate, userId);
 
         Estimate saved = estimateRepository.save(estimate);
         return estimateMapper.toDto(saved);
@@ -217,7 +218,7 @@ public class EstimateServiceImpl implements EstimateService {
         estimate.setPublicEnabled(true);
         estimate.setPublicExpiresAt(expiresAt);
         estimate.setPublicLastSharedAt(now);
-        estimate.setUpdatedByUserId(userId);
+        AuditSupport.touchForUpdate(estimate, userId);
         Estimate saved = estimateRepository.save(estimate);
 
         Map<String, Object> metadata = new HashMap<>();

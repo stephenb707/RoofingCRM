@@ -152,6 +152,7 @@ class InvoiceServiceImplUnitTest {
 
         assertEquals(InvoiceStatus.SENT, result.getStatus());
         assertNotNull(invoice.getSentAt());
+        assertEquals(userId, invoice.getUpdatedByUserId());
     }
 
     @Test
@@ -193,6 +194,7 @@ class InvoiceServiceImplUnitTest {
 
         assertEquals(InvoiceStatus.PAID, result.getStatus());
         assertNotNull(invoice.getPaidAt());
+        assertEquals(userId, invoice.getUpdatedByUserId());
     }
 
     @Test
