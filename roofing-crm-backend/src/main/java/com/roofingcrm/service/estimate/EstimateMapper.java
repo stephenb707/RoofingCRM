@@ -47,9 +47,17 @@ public class EstimateMapper {
         }
         dto.setItems(itemDtos);
 
-        BigDecimal subtotal = entity.getItems() != null ? computeSubtotal(entity.getItems()) : BigDecimal.ZERO;
+        BigDecimal subtotal = entity.getSubtotal();
+        if (subtotal == null && entity.getItems() != null) {
+            subtotal = computeSubtotal(entity.getItems());
+        }
         dto.setSubtotal(subtotal);
-        dto.setTotal(subtotal);
+
+        BigDecimal total = entity.getTotal();
+        if (total == null) {
+            total = subtotal;
+        }
+        dto.setTotal(total);
 
         return dto;
     }
