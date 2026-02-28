@@ -53,7 +53,12 @@ class InvoiceServiceImplUnitTest {
 
     @BeforeEach
     void setUp() {
-        service = new InvoiceServiceImpl(tenantAccessService, invoiceRepository, estimateRepository, activityEventService);
+        service = new InvoiceServiceImpl(
+                tenantAccessService,
+                invoiceRepository,
+                estimateRepository,
+                activityEventService,
+                new InvoiceMapper());
         tenantId = UUID.randomUUID();
         userId = UUID.randomUUID();
         estimateId = UUID.randomUUID();

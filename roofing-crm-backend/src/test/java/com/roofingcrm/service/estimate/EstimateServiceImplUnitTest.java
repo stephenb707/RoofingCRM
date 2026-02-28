@@ -47,7 +47,12 @@ class EstimateServiceImplUnitTest {
 
     @BeforeEach
     void setUp() {
-        service = new EstimateServiceImpl(tenantAccessService, jobRepository, estimateRepository, activityEventService);
+        service = new EstimateServiceImpl(
+                tenantAccessService,
+                jobRepository,
+                estimateRepository,
+                activityEventService,
+                new EstimateMapper());
         tenantId = UUID.randomUUID();
         userId = UUID.randomUUID();
         estimateId = UUID.randomUUID();

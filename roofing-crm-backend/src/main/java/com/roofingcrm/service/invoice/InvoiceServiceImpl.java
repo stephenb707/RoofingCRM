@@ -2,7 +2,6 @@ package com.roofingcrm.service.invoice;
 
 import com.roofingcrm.api.v1.invoice.CreateInvoiceFromEstimateRequest;
 import com.roofingcrm.api.v1.invoice.InvoiceDto;
-import com.roofingcrm.api.v1.invoice.InvoiceItemDto;
 import com.roofingcrm.api.v1.invoice.InvoiceSummaryDto;
 import com.roofingcrm.domain.entity.Estimate;
 import com.roofingcrm.domain.entity.EstimateItem;
@@ -44,16 +43,19 @@ public class InvoiceServiceImpl implements InvoiceService {
     private final InvoiceRepository invoiceRepository;
     private final EstimateRepository estimateRepository;
     private final ActivityEventService activityEventService;
+    private final InvoiceMapper invoiceMapper;
 
     @Autowired
     public InvoiceServiceImpl(TenantAccessService tenantAccessService,
                               InvoiceRepository invoiceRepository,
                               EstimateRepository estimateRepository,
-                              ActivityEventService activityEventService) {
+                              ActivityEventService activityEventService,
+                              InvoiceMapper invoiceMapper) {
         this.tenantAccessService = tenantAccessService;
         this.invoiceRepository = invoiceRepository;
         this.estimateRepository = estimateRepository;
         this.activityEventService = activityEventService;
+        this.invoiceMapper = invoiceMapper;
     }
 
     @Override
@@ -111,7 +113,7 @@ public class InvoiceServiceImpl implements InvoiceService {
                 Objects.requireNonNull(saved.getJob().getId()),
                 ActivityEventType.INVOICE_CREATED, "Invoice " + saved.getInvoiceNumber() + " created", metadata);
 
-        return toDto(saved);
+        return invoiceMapper.toDto(saved);
     }
 
     @Override
@@ -119,7 +121,7 @@ public class InvoiceServiceImpl implements InvoiceService {
     public Page<InvoiceSummaryDto> listInvoices(@NonNull UUID tenantId, @NonNull UUID userId, UUID jobId, InvoiceStatus status, @NonNull Pageable pageable) {
         Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
         return invoiceRepository.findByTenantAndArchivedFalseWithFilters(tenant, jobId, status, pageable)
-                .map(this::toSummaryDto);
+                .map(invoiceMapper::toSummaryDto);
     }
 
     @Override
@@ -127,7 +129,7 @@ public class InvoiceServiceImpl implements InvoiceService {
     public List<InvoiceSummaryDto> listInvoicesForJob(@NonNull UUID tenantId, @NonNull UUID userId, UUID jobId) {
         Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
         List<Invoice> invoices = invoiceRepository.findByTenantAndJobIdAndArchivedFalseOrderByCreatedAtDesc(tenant, jobId);
-        return invoices.stream().map(this::toSummaryDto).toList();
+        return invoices.stream().map(invoiceMapper::toSummaryDto).toList();
     }
 
     @Override
@@ -136,7 +138,7 @@ public class InvoiceServiceImpl implements InvoiceService {
         Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
         Invoice invoice = invoiceRepository.findByIdAndTenantAndArchivedFalseWithItems(invoiceId, tenant)
                 .orElseThrow(() -> new ResourceNotFoundException("Invoice not found"));
-        return toDto(invoice);
+        return invoiceMapper.toDto(invoice);
     }
 
     @Override
@@ -175,7 +177,7 @@ public class InvoiceServiceImpl implements InvoiceService {
                 Objects.requireNonNull(saved.getJob().getId()),
                 ActivityEventType.INVOICE_STATUS_CHANGED, "Invoice " + saved.getInvoiceNumber() + " status: " + fromStatus + " → " + newStatus, metadata);
 
-        return toDto(saved);
+        return invoiceMapper.toDto(saved);
     }
 
     private void validateTransition(InvoiceStatus from, InvoiceStatus to) {
@@ -192,55 +194,4 @@ public class InvoiceServiceImpl implements InvoiceService {
         }
     }
 
-    private InvoiceDto toDto(Invoice i) {
-        InvoiceDto dto = new InvoiceDto();
-        dto.setId(i.getId());
-        dto.setInvoiceNumber(i.getInvoiceNumber());
-        dto.setStatus(i.getStatus());
-        dto.setIssuedAt(i.getIssuedAt());
-        dto.setSentAt(i.getSentAt());
-        dto.setDueAt(i.getDueAt());
-        dto.setPaidAt(i.getPaidAt());
-        dto.setTotal(i.getTotal());
-        dto.setNotes(i.getNotes());
-        dto.setJobId(i.getJob() != null ? i.getJob().getId() : null);
-        dto.setEstimateId(i.getEstimate() != null ? i.getEstimate().getId() : null);
-        dto.setCreatedAt(i.getCreatedAt());
-        dto.setUpdatedAt(i.getUpdatedAt());
-
-        if (i.getItems() != null) {
-            List<InvoiceItemDto> itemDtos = new ArrayList<>();
-            for (InvoiceItem it : i.getItems()) {
-                InvoiceItemDto idto = new InvoiceItemDto();
-                idto.setId(it.getId());
-                idto.setName(it.getName());
-                idto.setDescription(it.getDescription());
-                idto.setQuantity(it.getQuantity());
-                idto.setUnitPrice(it.getUnitPrice());
-                idto.setLineTotal(it.getLineTotal());
-                idto.setSortOrder(it.getSortOrder());
-                itemDtos.add(idto);
-            }
-            dto.setItems(itemDtos);
-        }
-        return dto;
-    }
-
-    private InvoiceSummaryDto toSummaryDto(Invoice i) {
-        InvoiceSummaryDto dto = new InvoiceSummaryDto();
-        dto.setId(i.getId());
-        dto.setInvoiceNumber(i.getInvoiceNumber());
-        dto.setStatus(i.getStatus());
-        dto.setIssuedAt(i.getIssuedAt());
-        dto.setSentAt(i.getSentAt());
-        dto.setDueAt(i.getDueAt());
-        dto.setPaidAt(i.getPaidAt());
-        dto.setTotal(i.getTotal());
-        dto.setNotes(i.getNotes());
-        dto.setJobId(i.getJob() != null ? i.getJob().getId() : null);
-        dto.setEstimateId(i.getEstimate() != null ? i.getEstimate().getId() : null);
-        dto.setCreatedAt(i.getCreatedAt());
-        dto.setUpdatedAt(i.getUpdatedAt());
-        return dto;
-    }
 }

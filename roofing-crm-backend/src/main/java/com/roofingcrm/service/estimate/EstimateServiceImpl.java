@@ -2,7 +2,6 @@ package com.roofingcrm.service.estimate;
 
 import com.roofingcrm.api.v1.estimate.CreateEstimateRequest;
 import com.roofingcrm.api.v1.estimate.EstimateDto;
-import com.roofingcrm.api.v1.estimate.EstimateItemDto;
 import com.roofingcrm.api.v1.estimate.EstimateItemRequest;
 import com.roofingcrm.api.v1.estimate.EstimateSummaryDto;
 import com.roofingcrm.api.v1.estimate.ShareEstimateRequest;
@@ -47,6 +46,7 @@ public class EstimateServiceImpl implements EstimateService {
     private final JobRepository jobRepository;
     private final EstimateRepository estimateRepository;
     private final ActivityEventService activityEventService;
+    private final EstimateMapper estimateMapper;
 
     private static final SecureRandom secureRandom = new SecureRandom();
 
@@ -57,11 +57,13 @@ public class EstimateServiceImpl implements EstimateService {
     public EstimateServiceImpl(TenantAccessService tenantAccessService,
                                JobRepository jobRepository,
                                EstimateRepository estimateRepository,
-                               ActivityEventService activityEventService) {
+                               ActivityEventService activityEventService,
+                               EstimateMapper estimateMapper) {
         this.tenantAccessService = tenantAccessService;
         this.jobRepository = jobRepository;
         this.estimateRepository = estimateRepository;
         this.activityEventService = activityEventService;
+        this.estimateMapper = estimateMapper;
     }
 
     @Override
@@ -100,7 +102,7 @@ public class EstimateServiceImpl implements EstimateService {
         estimate.setTotal(subtotal); // No tax calculation for now
 
         Estimate saved = estimateRepository.save(estimate);
-        return toDto(saved);
+        return estimateMapper.toDto(saved);
     }
 
     @Override
@@ -147,7 +149,7 @@ public class EstimateServiceImpl implements EstimateService {
         }
 
         Estimate saved = estimateRepository.save(estimate);
-        return toDto(saved);
+        return estimateMapper.toDto(saved);
     }
 
     @Override
@@ -155,10 +157,10 @@ public class EstimateServiceImpl implements EstimateService {
     public EstimateDto getEstimate(@NonNull UUID tenantId, @NonNull UUID userId, UUID estimateId) {
         Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
 
-        Estimate estimate = estimateRepository.findByIdAndTenantAndArchivedFalse(estimateId, tenant)
+        Estimate estimate = estimateRepository.findDetailedByIdAndTenantAndArchivedFalse(estimateId, tenant)
                 .orElseThrow(() -> new ResourceNotFoundException("Estimate not found"));
 
-        return toDto(estimate);
+        return estimateMapper.toDto(estimate);
     }
 
     @Override
@@ -170,7 +172,7 @@ public class EstimateServiceImpl implements EstimateService {
                 .orElseThrow(() -> new ResourceNotFoundException("Job not found"));
 
         List<Estimate> estimates = estimateRepository.findByJobAndArchivedFalse(job);
-        return estimates.stream().map(this::toSummaryDto).toList();
+        return estimates.stream().map(estimateMapper::toSummaryDto).toList();
     }
 
     @Override
@@ -184,7 +186,7 @@ public class EstimateServiceImpl implements EstimateService {
         estimate.setUpdatedByUserId(userId);
 
         Estimate saved = estimateRepository.save(estimate);
-        return toDto(saved);
+        return estimateMapper.toDto(saved);
     }
 
     @Override
@@ -253,67 +255,4 @@ public class EstimateServiceImpl implements EstimateService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
-    private EstimateDto toDto(Estimate entity) {
-        EstimateDto dto = new EstimateDto();
-        dto.setId(entity.getId());
-        dto.setStatus(entity.getStatus());
-        dto.setTitle(entity.getTitle());
-        dto.setNotes(entity.getNotesForCustomer());
-        dto.setIssueDate(entity.getIssueDate());
-        dto.setValidUntil(entity.getValidUntil());
-        dto.setCreatedAt(entity.getCreatedAt());
-        dto.setUpdatedAt(entity.getUpdatedAt());
-
-        if (entity.getJob() != null) {
-            dto.setJobId(entity.getJob().getId());
-            if (entity.getJob().getCustomer() != null) {
-                dto.setCustomerId(entity.getJob().getCustomer().getId());
-            }
-        }
-
-        // Map items
-        List<EstimateItemDto> itemDtos = new ArrayList<>();
-        if (entity.getItems() != null) {
-            for (EstimateItem item : entity.getItems()) {
-                EstimateItemDto itemDto = new EstimateItemDto();
-                itemDto.setId(item.getId());
-                itemDto.setName(item.getName());
-                itemDto.setDescription(item.getDescription());
-                itemDto.setQuantity(item.getQuantity());
-                itemDto.setUnitPrice(item.getUnitPrice());
-                itemDto.setUnit(item.getUnit());
-                itemDtos.add(itemDto);
-            }
-        }
-        dto.setItems(itemDtos);
-
-        // Compute totals from items
-        BigDecimal subtotal = entity.getItems() != null ? computeSubtotal(entity.getItems()) : BigDecimal.ZERO;
-        dto.setSubtotal(subtotal);
-        dto.setTotal(subtotal); // No tax calculation for now
-
-        return dto;
-    }
-
-    private EstimateSummaryDto toSummaryDto(Estimate entity) {
-        EstimateSummaryDto dto = new EstimateSummaryDto();
-        dto.setId(entity.getId());
-        dto.setStatus(entity.getStatus());
-        dto.setTitle(entity.getTitle());
-        dto.setNotes(entity.getNotesForCustomer());
-        dto.setIssueDate(entity.getIssueDate());
-        dto.setValidUntil(entity.getValidUntil());
-        dto.setCreatedAt(entity.getCreatedAt());
-        dto.setUpdatedAt(entity.getUpdatedAt());
-        dto.setSubtotal(entity.getSubtotal());
-        dto.setTotal(entity.getTotal());
-
-        if (entity.getJob() != null) {
-            dto.setJobId(entity.getJob().getId());
-            if (entity.getJob().getCustomer() != null) {
-                dto.setCustomerId(entity.getJob().getCustomer().getId());
-            }
-        }
-        return dto;
-    }
 }
