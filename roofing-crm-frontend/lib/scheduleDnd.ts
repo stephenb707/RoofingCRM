@@ -44,7 +44,11 @@ export function applyOptimisticSchedulingTagChange(
   scheduleUpdate: UpdateJobRequest
 ): JobDto {
   const clearSchedule = scheduleUpdate.clearSchedule === true;
-  const newStatus: JobStatus = clearSchedule ? "UNSCHEDULED" : "SCHEDULED";
+  const shouldFlipSchedulingStatus =
+    job.status === "SCHEDULED" || job.status === "UNSCHEDULED";
+  const newStatus: JobStatus = shouldFlipSchedulingStatus
+    ? (clearSchedule ? "UNSCHEDULED" : "SCHEDULED")
+    : job.status;
   return {
     ...job,
     status: newStatus,
