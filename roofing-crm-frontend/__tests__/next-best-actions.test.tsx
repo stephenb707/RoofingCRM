@@ -17,6 +17,27 @@ describe("NextBestActions", () => {
     );
   });
 
+  it("does not render Convert to job for LOST lead", () => {
+    render(<NextBestActions entityType="lead" status="LOST" leadId="lead-1" />);
+    expect(screen.queryByRole("link", { name: /convert to job/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /create task/i })).toHaveAttribute(
+      "href",
+      "/app/tasks/new?leadId=lead-1"
+    );
+  });
+
+  it("does not render Convert to job when lead already converted", () => {
+    render(
+      <NextBestActions
+        entityType="lead"
+        status="NEW"
+        leadId="lead-1"
+        leadConvertedJobId="job-1"
+      />
+    );
+    expect(screen.queryByRole("link", { name: /convert to job/i })).not.toBeInTheDocument();
+  });
+
   it("renders estimate SENT action set", () => {
     render(
       <NextBestActions

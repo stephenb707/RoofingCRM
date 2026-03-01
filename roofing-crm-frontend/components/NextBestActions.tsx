@@ -9,6 +9,7 @@ interface NextBestActionsProps {
   entityType: EntityType;
   status: string;
   leadId?: string;
+  leadConvertedJobId?: string | null;
   jobId?: string;
   estimateId?: string;
 }
@@ -19,18 +20,18 @@ interface ActionLink {
   primary?: boolean;
 }
 
-function leadActions(status: LeadStatus, leadId: string): ActionLink[] {
+function leadActions(status: LeadStatus, leadId: string, convertedJobId?: string | null): ActionLink[] {
+  const canConvert = status !== "LOST" && !convertedJobId;
   if (status === "NEW") {
     return [
       { label: "Call customer", href: `/app/leads/${leadId}` },
       { label: "Schedule inspection", href: `/app/tasks/new?leadId=${leadId}` },
-      { label: "Convert to job", href: `/app/leads/${leadId}/convert`, primary: true },
+      ...(canConvert
+        ? [{ label: "Convert to job", href: `/app/leads/${leadId}/convert`, primary: true } satisfies ActionLink]
+        : []),
     ];
   }
-  return [
-    { label: "Create task", href: `/app/tasks/new?leadId=${leadId}`, primary: true },
-    { label: "Edit lead", href: `/app/leads/${leadId}/edit` },
-  ];
+  return [{ label: "Create task", href: `/app/tasks/new?leadId=${leadId}`, primary: true }];
 }
 
 function estimateActions(status: EstimateStatus, estimateId: string, jobId: string): ActionLink[] {
@@ -77,13 +78,14 @@ export function NextBestActions({
   entityType,
   status,
   leadId,
+  leadConvertedJobId,
   jobId,
   estimateId,
 }: NextBestActionsProps) {
   let actions: ActionLink[] = [];
 
   if (entityType === "lead" && leadId) {
-    actions = leadActions(status as LeadStatus, leadId);
+    actions = leadActions(status as LeadStatus, leadId, leadConvertedJobId);
   } else if (entityType === "job" && jobId) {
     actions = jobActions(status as JobStatus, jobId);
   } else if (entityType === "estimate" && estimateId && jobId) {

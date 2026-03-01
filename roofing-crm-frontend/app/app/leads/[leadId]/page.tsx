@@ -455,7 +455,12 @@ export default function LeadDetailPage() {
 
         {/* Sidebar */}
         <div className="space-y-6">
-          <NextBestActions entityType="lead" status={lead.status} leadId={leadId} />
+          <NextBestActions
+            entityType="lead"
+            status={lead.status}
+            leadId={leadId}
+            leadConvertedJobId={lead.convertedJobId ?? null}
+          />
 
           {/* Status Update */}
           <div className="bg-white rounded-xl border border-slate-200 p-6">
