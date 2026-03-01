@@ -82,4 +82,16 @@ public class InvoiceController {
         InvoiceDto updated = invoiceService.updateStatus(tenantId, userId, invoiceId, request.getStatus());
         return ResponseEntity.ok(updated);
     }
+
+    @PostMapping("/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}/share")
+    public ResponseEntity<ShareInvoiceResponse> shareInvoice(
+            @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
+            @PathVariable("id") UUID invoiceId,
+            @RequestBody(required = false) ShareInvoiceRequest request) {
+
+        UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
+        ShareInvoiceResponse response = invoiceService.shareInvoice(tenantId, userId, invoiceId,
+                request != null ? request : new ShareInvoiceRequest());
+        return ResponseEntity.ok(response);
+    }
 }

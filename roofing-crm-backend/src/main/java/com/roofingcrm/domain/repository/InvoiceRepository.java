@@ -12,14 +12,18 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
+import java.time.Instant;
 import java.util.UUID;
 
 public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
 
     Optional<Invoice> findByIdAndTenantAndArchivedFalse(UUID id, Tenant tenant);
 
-    @EntityGraph(attributePaths = {"job", "estimate", "items"})
-    Optional<Invoice> findByIdAndTenantAndArchivedFalseWithItems(UUID id, Tenant tenant);
+    @EntityGraph(attributePaths = {"job", "job.customer", "estimate", "items"})
+    Optional<Invoice> findDetailedByIdAndTenantAndArchivedFalse(UUID id, Tenant tenant);
+
+    @EntityGraph(attributePaths = {"job", "job.customer", "items"})
+    Optional<Invoice> findByPublicTokenAndPublicEnabledTrueAndArchivedFalse(String token);
 
     List<Invoice> findByTenantAndJobIdAndArchivedFalseOrderByCreatedAtDesc(Tenant tenant, UUID jobId);
 
@@ -39,4 +43,31 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
 
     @Query(value = "SELECT COALESCE(MAX(CAST(SUBSTRING(i.invoice_number FROM 5) AS bigint)), 0) FROM invoices i WHERE i.tenant_id = :tenantId", nativeQuery = true)
     long findMaxInvoiceNumberSuffix(@Param("tenantId") UUID tenantId);
+
+    @Query(value = """
+            SELECT DISTINCT CAST(EXTRACT(YEAR FROM i.paid_at) AS int) AS year
+            FROM invoices i
+            WHERE i.tenant_id = :tenantId
+              AND i.archived = false
+              AND i.status = 'PAID'
+              AND i.paid_at IS NOT NULL
+            ORDER BY year DESC
+            """, nativeQuery = true)
+    List<Integer> findPaidInvoiceYears(@Param("tenantId") UUID tenantId);
+
+    @Query("""
+            select i from Invoice i
+            join fetch i.job j
+            join fetch j.customer c
+            where i.tenant = :tenant
+              and i.archived = false
+              and i.status = com.roofingcrm.domain.enums.InvoiceStatus.PAID
+              and i.paidAt >= :start
+              and i.paidAt < :end
+            order by i.paidAt asc, i.invoiceNumber asc
+            """)
+    List<Invoice> findPaidInvoicesForYear(
+            @Param("tenant") Tenant tenant,
+            @Param("start") Instant start,
+            @Param("end") Instant end);
 }

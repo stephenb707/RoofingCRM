@@ -96,7 +96,6 @@ public class LeadServiceImpl implements LeadService {
     }
 
     @Override
-    @SuppressWarnings("null")
     public LeadDto updateLead(@NonNull UUID tenantId, @NonNull UUID userId, UUID leadId, UpdateLeadRequest request) {
         tenantAccessService.requireAnyRole(tenantId, userId, Objects.requireNonNull(Set.of(UserRole.OWNER, UserRole.ADMIN, UserRole.SALES)),
                 "You do not have permission to edit leads.");
@@ -122,7 +121,7 @@ public class LeadServiceImpl implements LeadService {
             applyAddress(lead.getPropertyAddress(), request.getPropertyAddress());
         }
 
-        Lead saved = Objects.requireNonNull(leadRepository.save(lead));
+        Lead saved = Objects.requireNonNull(leadRepository.save(Objects.requireNonNull(lead)));
         return toDto(saved);
     }
 

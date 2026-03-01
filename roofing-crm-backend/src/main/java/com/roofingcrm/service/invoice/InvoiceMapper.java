@@ -5,6 +5,7 @@ import com.roofingcrm.api.v1.invoice.InvoiceItemDto;
 import com.roofingcrm.api.v1.invoice.InvoiceSummaryDto;
 import com.roofingcrm.domain.entity.Invoice;
 import com.roofingcrm.domain.entity.InvoiceItem;
+import org.hibernate.Hibernate;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -29,9 +30,10 @@ public class InvoiceMapper {
         dto.setCreatedAt(invoice.getCreatedAt());
         dto.setUpdatedAt(invoice.getUpdatedAt());
 
-        if (invoice.getItems() != null) {
+        List<InvoiceItem> items = invoice.getItems();
+        if (items != null && Hibernate.isInitialized(items)) {
             List<InvoiceItemDto> itemDtos = new ArrayList<>();
-            for (InvoiceItem item : invoice.getItems()) {
+            for (InvoiceItem item : items) {
                 InvoiceItemDto itemDto = new InvoiceItemDto();
                 itemDto.setId(item.getId());
                 itemDto.setName(item.getName());

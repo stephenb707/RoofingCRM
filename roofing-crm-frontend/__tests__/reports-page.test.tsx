@@ -12,6 +12,7 @@ describe("ReportsPage", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockedReportsApi.getPaidInvoiceYears.mockResolvedValue([]);
   });
 
   it("renders both sections and download buttons", async () => {

@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useAuthReady } from "@/lib/AuthContext";
 import {
   downloadLeadsCsv,
   downloadJobsCsv,
+  downloadPaidInvoicesPdf,
+  getPaidInvoiceYears,
   triggerBrowserDownload,
   LIMIT_OPTIONS,
 } from "@/lib/reportsApi";
@@ -33,6 +35,13 @@ export default function ReportsPage() {
 
   const [jobsStatus, setJobsStatus] = useState<JobStatus | "">("");
   const [jobsLimit, setJobsLimit] = useState(2000);
+
+  const [invoiceYears, setInvoiceYears] = useState<number[] | null>(null);
+  const [invoiceYearLoading, setInvoiceYearLoading] = useState(false);
+  const [invoiceYearError, setInvoiceYearError] = useState<string | null>(null);
+  const [selectedInvoiceYear, setSelectedInvoiceYear] = useState<number | null>(null);
+  const [invoicePdfLoading, setInvoicePdfLoading] = useState(false);
+  const [invoicePdfError, setInvoicePdfError] = useState<string | null>(null);
 
   const handleDownloadLeads = useCallback(async () => {
     if (!ready) return;
@@ -68,6 +77,53 @@ export default function ReportsPage() {
       setJobsLoading(false);
     }
   }, [api, ready, jobsStatus, jobsLimit]);
+
+  useEffect(() => {
+    if (!ready) return;
+    let cancelled = false;
+    const loadYears = async () => {
+      setInvoiceYearError(null);
+      setInvoiceYearLoading(true);
+      try {
+        const years = await getPaidInvoiceYears(api);
+        if (cancelled) return;
+        setInvoiceYears(years);
+        setSelectedInvoiceYear(years.length > 0 ? years[0] : null);
+      } catch (err) {
+        if (cancelled) return;
+        setInvoiceYears([]);
+        setSelectedInvoiceYear(null);
+        setInvoiceYearError("Failed to load paid invoice years.");
+      } finally {
+        if (!cancelled) setInvoiceYearLoading(false);
+      }
+    };
+    loadYears();
+    return () => {
+      cancelled = true;
+    };
+  }, [api, ready]);
+
+  const handleDownloadPaidInvoicesPdf = useCallback(async () => {
+    if (!ready || selectedInvoiceYear == null) return;
+    setInvoicePdfError(null);
+    setInvoicePdfLoading(true);
+    try {
+      const { blob, filename } = await downloadPaidInvoicesPdf(api, selectedInvoiceYear);
+      triggerBrowserDownload(blob, filename);
+    } catch (err) {
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status === 404) {
+        setInvoicePdfError("No paid invoices found for that year.");
+      } else if (status === 403) {
+        setInvoicePdfError("You do not have permission to generate this report.");
+      } else {
+        setInvoicePdfError("Failed to download. Check backend is running.");
+      }
+    } finally {
+      setInvoicePdfLoading(false);
+    }
+  }, [api, ready, selectedInvoiceYear]);
 
   if (!ready) {
     return (
@@ -204,6 +260,61 @@ export default function ReportsPage() {
         </div>
         {jobsError && (
           <p className="text-sm text-red-600">{jobsError}</p>
+        )}
+      </div>
+
+      {/* Paid Invoices Annual PDF */}
+      <div className="bg-white rounded-xl border border-slate-200 p-6 mt-6">
+        <h2 className="text-lg font-semibold text-slate-800 mb-4">
+          Paid Invoices Annual Report
+        </h2>
+        {invoiceYearLoading || invoiceYears === null ? (
+          <p className="text-sm text-slate-500">Loading available years…</p>
+        ) : invoiceYears.length === 0 ? (
+          <div className="space-y-3">
+            <p className="text-sm text-slate-500">No paid invoices available yet.</p>
+            <button
+              type="button"
+              disabled
+              className="px-4 py-2 bg-sky-400 text-white text-sm font-medium rounded-lg"
+            >
+              Download PDF
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-end gap-4">
+            <div>
+              <label htmlFor="paid-invoices-year" className="block text-sm font-medium text-slate-700 mb-1">
+                Year
+              </label>
+              <select
+                id="paid-invoices-year"
+                value={selectedInvoiceYear ?? ""}
+                onChange={(e) => setSelectedInvoiceYear(Number(e.target.value))}
+                className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+              >
+                {invoiceYears.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              type="button"
+              onClick={handleDownloadPaidInvoicesPdf}
+              disabled={invoicePdfLoading || selectedInvoiceYear == null}
+              className="px-4 py-2 bg-sky-600 hover:bg-sky-700 disabled:bg-sky-400 text-white text-sm font-medium rounded-lg transition-colors"
+            >
+              {invoicePdfLoading ? "Downloading…" : "Download PDF"}
+            </button>
+          </div>
+        )}
+        {invoiceYearError && (
+          <p className="text-sm text-red-600 mt-3">{invoiceYearError}</p>
+        )}
+        {invoicePdfError && (
+          <p className="text-sm text-red-600 mt-3">{invoicePdfError}</p>
         )}
       </div>
     </div>

@@ -42,8 +42,7 @@ describe("NewEstimatePage", () => {
     render(<NewEstimatePage />);
 
     fireEvent.change(screen.getByPlaceholderText("Item name"), { target: { value: "Labor" } });
-    const spinbuttons = screen.getAllByRole("spinbutton");
-    fireEvent.change(spinbuttons[1], { target: { value: "1000" } }); // unit price
+    fireEvent.change(screen.getByTestId("new-estimate-unitprice-0"), { target: { value: "1000" } });
 
     const submit = screen.getByRole("button", { name: /Create estimate/i });
     fireEvent.click(submit);
@@ -60,6 +59,48 @@ describe("NewEstimatePage", () => {
 
     await waitFor(() => {
       expect(mockPush).toHaveBeenCalledWith("/app/estimates/est-new");
+    });
+  });
+
+  it("quantity and unit price stay empty while editing then normalize to 0 on blur", async () => {
+    render(<NewEstimatePage />);
+
+    const qtyInput = screen.getByTestId("new-estimate-quantity-0") as HTMLInputElement;
+    const priceInput = screen.getByTestId("new-estimate-unitprice-0") as HTMLInputElement;
+
+    fireEvent.change(qtyInput, { target: { value: "" } });
+    fireEvent.change(priceInput, { target: { value: "" } });
+    expect(qtyInput.value).toBe("");
+    expect(priceInput.value).toBe("");
+
+    fireEvent.blur(qtyInput);
+    fireEvent.blur(priceInput);
+    expect(qtyInput.value).toBe("0");
+    expect(priceInput.value).toBe("0");
+  });
+
+  it("submit parses empty quantity/unit price as 0", async () => {
+    render(<NewEstimatePage />);
+
+    fireEvent.change(screen.getByPlaceholderText("Item name"), { target: { value: "Labor" } });
+    fireEvent.change(screen.getByTestId("new-estimate-quantity-0"), { target: { value: "" } });
+    fireEvent.change(screen.getByTestId("new-estimate-unitprice-0"), { target: { value: "" } });
+
+    fireEvent.click(screen.getByRole("button", { name: /Create estimate/i }));
+
+    await waitFor(() => {
+      expect(mockedEstimatesApi.createEstimateForJob).toHaveBeenCalledWith(
+        expect.anything(),
+        "job-1",
+        expect.objectContaining({
+          items: expect.arrayContaining([
+            expect.objectContaining({
+              quantity: 0,
+              unitPrice: 0,
+            }),
+          ]),
+        })
+      );
     });
   });
 });

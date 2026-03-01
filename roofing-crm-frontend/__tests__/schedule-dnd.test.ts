@@ -49,6 +49,21 @@ describe("computeScheduleUpdate", () => {
     expect(result.scheduledStartDate).toBe("2026-02-10");
     expect(result.scheduledEndDate).toBe("2026-02-12");
   });
+
+  it("drop job with no end date keeps single-day behavior", () => {
+    const noEndJob: JobDto = {
+      ...baseJob,
+      scheduledStartDate: "2026-02-01",
+      scheduledEndDate: null,
+    };
+    const result = computeScheduleUpdate(noEndJob, {
+      type: "date",
+      dateKey: "2026-02-10",
+    });
+    expect(result.clearSchedule).toBe(false);
+    expect(result.scheduledStartDate).toBe("2026-02-10");
+    expect(result.scheduledEndDate).toBe("2026-02-10");
+  });
 });
 
 describe("applyOptimisticSchedulingTagChange", () => {

@@ -8,6 +8,10 @@ import type { InvoiceDto, EstimateDto } from "@/lib/types";
 
 jest.mock("@/lib/invoicesApi");
 jest.mock("@/lib/estimatesApi");
+const mockPush = jest.fn();
+jest.mock("next/navigation", () => ({
+  useRouter: () => ({ push: mockPush, replace: jest.fn(), back: jest.fn() }),
+}));
 
 const mockedInvoicesApi = invoicesApi as jest.Mocked<typeof invoicesApi>;
 const mockedEstimatesApi = estimatesApi as jest.Mocked<typeof estimatesApi>;
@@ -39,6 +43,7 @@ const mockAcceptedEstimate: EstimateDto = {
 describe("InvoicesSection", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockPush.mockClear();
     mockedInvoicesApi.listInvoicesForJob.mockResolvedValue([]);
   });
 
@@ -84,13 +89,14 @@ describe("InvoicesSection", () => {
         expect.objectContaining({ estimateId: "est-1" })
       );
     });
+    expect(mockPush).toHaveBeenCalledWith("/app/invoices/inv-new");
   });
 
   it("status change calls updateInvoiceStatus", async () => {
-    mockedInvoicesApi.listInvoicesForJob.mockResolvedValue([mockInvoice]);
+    mockedInvoicesApi.listInvoicesForJob.mockResolvedValue([{ ...mockInvoice, status: "SENT" }]);
     mockedInvoicesApi.updateInvoiceStatus.mockResolvedValue({
       ...mockInvoice,
-      status: "SENT",
+      status: "PAID",
     });
 
     render(<InvoicesSection jobId="job-1" />);
@@ -99,14 +105,14 @@ describe("InvoicesSection", () => {
       expect(screen.getByText("INV-1")).toBeInTheDocument();
     });
 
-    const markSentBtn = screen.getByRole("button", { name: /Mark sent/i });
-    fireEvent.click(markSentBtn);
+    const markPaidBtn = screen.getByRole("button", { name: /Mark paid/i });
+    fireEvent.click(markPaidBtn);
 
     await waitFor(() => {
       expect(mockedInvoicesApi.updateInvoiceStatus).toHaveBeenCalledWith(
         expect.anything(),
         "inv-1",
-        "SENT"
+        "PAID"
       );
     });
   });

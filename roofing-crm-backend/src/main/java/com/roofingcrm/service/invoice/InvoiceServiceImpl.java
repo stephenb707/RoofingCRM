@@ -3,6 +3,8 @@ package com.roofingcrm.service.invoice;
 import com.roofingcrm.api.v1.invoice.CreateInvoiceFromEstimateRequest;
 import com.roofingcrm.api.v1.invoice.InvoiceDto;
 import com.roofingcrm.api.v1.invoice.InvoiceSummaryDto;
+import com.roofingcrm.api.v1.invoice.ShareInvoiceRequest;
+import com.roofingcrm.api.v1.invoice.ShareInvoiceResponse;
 import com.roofingcrm.domain.entity.Estimate;
 import com.roofingcrm.domain.entity.EstimateItem;
 import com.roofingcrm.domain.entity.Invoice;
@@ -12,6 +14,7 @@ import com.roofingcrm.domain.enums.ActivityEntityType;
 import com.roofingcrm.domain.enums.ActivityEventType;
 import com.roofingcrm.domain.enums.EstimateStatus;
 import com.roofingcrm.domain.enums.InvoiceStatus;
+import com.roofingcrm.domain.enums.UserRole;
 import com.roofingcrm.domain.repository.EstimateRepository;
 import com.roofingcrm.domain.repository.InvoiceRepository;
 import com.roofingcrm.service.activity.ActivityEventService;
@@ -27,8 +30,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -45,6 +50,7 @@ public class InvoiceServiceImpl implements InvoiceService {
     private final EstimateRepository estimateRepository;
     private final ActivityEventService activityEventService;
     private final InvoiceMapper invoiceMapper;
+    private static final SecureRandom secureRandom = new SecureRandom();
 
     @Autowired
     public InvoiceServiceImpl(TenantAccessService tenantAccessService,
@@ -137,7 +143,7 @@ public class InvoiceServiceImpl implements InvoiceService {
     @Transactional(readOnly = true)
     public InvoiceDto getInvoice(@NonNull UUID tenantId, @NonNull UUID userId, UUID invoiceId) {
         Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
-        Invoice invoice = invoiceRepository.findByIdAndTenantAndArchivedFalseWithItems(invoiceId, tenant)
+        Invoice invoice = invoiceRepository.findDetailedByIdAndTenantAndArchivedFalse(invoiceId, tenant)
                 .orElseThrow(() -> new ResourceNotFoundException("Invoice not found"));
         return invoiceMapper.toDto(invoice);
     }
@@ -179,7 +185,63 @@ public class InvoiceServiceImpl implements InvoiceService {
                 Objects.requireNonNull(saved.getJob().getId()),
                 ActivityEventType.INVOICE_STATUS_CHANGED, "Invoice " + saved.getInvoiceNumber() + " status: " + fromStatus + " → " + newStatus, metadata);
 
-        return invoiceMapper.toDto(saved);
+        Invoice detailed = invoiceRepository.findDetailedByIdAndTenantAndArchivedFalse(saved.getId(), tenant)
+                .orElseThrow(() -> new ResourceNotFoundException("Invoice not found after status update"));
+        return invoiceMapper.toDto(detailed);
+    }
+
+    @Override
+    public ShareInvoiceResponse shareInvoice(@NonNull UUID tenantId, @NonNull UUID userId, UUID invoiceId, ShareInvoiceRequest request) {
+        tenantAccessService.requireAnyRole(tenantId, userId, Objects.requireNonNull(Set.of(UserRole.OWNER, UserRole.ADMIN, UserRole.SALES)),
+                "You do not have permission to share invoices.");
+        Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
+
+        Invoice invoice = invoiceRepository.findByIdAndTenantAndArchivedFalse(invoiceId, tenant)
+                .orElseThrow(() -> new ResourceNotFoundException("Invoice not found"));
+
+        if (invoice.getStatus() == InvoiceStatus.VOID) {
+            throw new InvoiceConflictException("Cannot share a VOID invoice");
+        }
+
+        Instant now = Instant.now();
+        if (invoice.getStatus() == InvoiceStatus.DRAFT) {
+            invoice.setStatus(InvoiceStatus.SENT);
+            if (invoice.getSentAt() == null) {
+                invoice.setSentAt(now);
+            }
+        }
+
+        int days = (request != null && request.getExpiresInDays() != null) ? request.getExpiresInDays() : 14;
+        days = Math.min(365, Math.max(1, days));
+        Instant expiresAt = now.plusSeconds(days * 86400L);
+
+        boolean needNewToken = invoice.getPublicToken() == null || invoice.getPublicToken().isBlank()
+                || (invoice.getPublicExpiresAt() != null && invoice.getPublicExpiresAt().isBefore(now));
+        if (needNewToken) {
+            byte[] bytes = new byte[32];
+            secureRandom.nextBytes(bytes);
+            String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+            invoice.setPublicToken(token);
+        }
+
+        invoice.setPublicEnabled(true);
+        invoice.setPublicExpiresAt(expiresAt);
+        invoice.setPublicLastSharedAt(now);
+        AuditSupport.touchForUpdate(invoice, userId);
+        Invoice saved = invoiceRepository.save(invoice);
+
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("invoiceId", saved.getId().toString());
+        metadata.put("invoiceNumber", saved.getInvoiceNumber());
+        metadata.put("expiresAt", expiresAt.toString());
+        activityEventService.recordEvent(tenant, userId, ActivityEntityType.JOB,
+                Objects.requireNonNull(saved.getJob().getId()),
+                ActivityEventType.INVOICE_SHARED, "Invoice shared via public link", metadata);
+
+        ShareInvoiceResponse response = new ShareInvoiceResponse();
+        response.setToken(saved.getPublicToken());
+        response.setExpiresAt(expiresAt);
+        return response;
     }
 
     private void validateTransition(InvoiceStatus from, InvoiceStatus to) {

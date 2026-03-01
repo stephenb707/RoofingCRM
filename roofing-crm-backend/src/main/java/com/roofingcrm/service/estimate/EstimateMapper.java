@@ -5,6 +5,7 @@ import com.roofingcrm.api.v1.estimate.EstimateItemDto;
 import com.roofingcrm.api.v1.estimate.EstimateSummaryDto;
 import com.roofingcrm.domain.entity.Estimate;
 import com.roofingcrm.domain.entity.EstimateItem;
+import org.hibernate.Hibernate;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -32,9 +33,10 @@ public class EstimateMapper {
             }
         }
 
-        List<EstimateItemDto> itemDtos = new ArrayList<>();
-        if (entity.getItems() != null) {
-            for (EstimateItem item : entity.getItems()) {
+        List<EstimateItem> items = entity.getItems();
+        if (items != null && Hibernate.isInitialized(items)) {
+            List<EstimateItemDto> itemDtos = new ArrayList<>();
+            for (EstimateItem item : items) {
                 EstimateItemDto itemDto = new EstimateItemDto();
                 itemDto.setId(item.getId());
                 itemDto.setName(item.getName());
@@ -44,12 +46,12 @@ public class EstimateMapper {
                 itemDto.setUnit(item.getUnit());
                 itemDtos.add(itemDto);
             }
+            dto.setItems(itemDtos);
         }
-        dto.setItems(itemDtos);
 
         BigDecimal subtotal = entity.getSubtotal();
-        if (subtotal == null && entity.getItems() != null) {
-            subtotal = computeSubtotal(entity.getItems());
+        if (subtotal == null && items != null && Hibernate.isInitialized(items)) {
+            subtotal = computeSubtotal(items);
         }
         dto.setSubtotal(subtotal);
 

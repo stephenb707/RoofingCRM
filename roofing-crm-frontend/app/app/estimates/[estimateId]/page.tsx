@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { useParams } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuthReady } from "@/lib/AuthContext";
 import { getEstimate, updateEstimate, updateEstimateStatus, shareEstimate } from "@/lib/estimatesApi";
+import { createTask } from "@/lib/tasksApi";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { queryKeys } from "@/lib/queryKeys";
 import {
@@ -16,6 +17,16 @@ import {
 import type { EstimateDto, EstimateItemDto, EstimateItemRequest, EstimateStatus } from "@/lib/types";
 import { formatDate, formatMoney } from "@/lib/format";
 import { StatusBadge } from "@/components/StatusBadge";
+import { NextBestActions } from "@/components/NextBestActions";
+import { NextStepPromptDialog } from "@/components/NextStepPromptDialog";
+
+type ItemDraft = {
+  name: string;
+  description: string | null;
+  quantity: string;
+  unitPrice: string;
+  unit: string | null;
+};
 
 function toItemRequest(it: EstimateItemDto | EstimateItemRequest): EstimateItemRequest {
   return {
@@ -27,12 +38,40 @@ function toItemRequest(it: EstimateItemDto | EstimateItemRequest): EstimateItemR
   };
 }
 
+function toDraft(it: EstimateItemDto | EstimateItemRequest): ItemDraft {
+  return {
+    name: it.name,
+    description: it.description ?? null,
+    quantity: String(it.quantity ?? 0),
+    unitPrice: String(it.unitPrice ?? 0),
+    unit: it.unit ?? null,
+  };
+}
+
+function parseDecimal(value: string): number {
+  const trimmed = value.trim();
+  if (!trimmed || trimmed === ".") return 0;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function draftToRequest(draft: ItemDraft): EstimateItemRequest {
+  return {
+    name: draft.name.trim() || "Item",
+    description: draft.description || null,
+    quantity: parseDecimal(draft.quantity),
+    unitPrice: parseDecimal(draft.unitPrice),
+    unit: draft.unit || null,
+  };
+}
+
 function lineTotal(it: { quantity: number; unitPrice: number }): number {
   return Number(it.quantity) * Number(it.unitPrice);
 }
 
 export default function EstimateDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const estimateId = params.estimateId as string;
   const { api, auth, ready } = useAuthReady();
   const queryClient = useQueryClient();
@@ -41,18 +80,17 @@ export default function EstimateDetailPage() {
   const [statusError, setStatusError] = useState<string | null>(null);
   const [itemsError, setItemsError] = useState<string | null>(null);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
-  const [addForm, setAddForm] = useState<EstimateItemRequest>({
+  const [addForm, setAddForm] = useState<ItemDraft>({
     name: "",
     description: null,
-    quantity: 1,
-    unitPrice: 0,
+    quantity: "0",
+    unitPrice: "0",
     unit: "ea",
   });
-  const [editForm, setEditForm] = useState<EstimateItemRequest | null>(null);
+  const [editForm, setEditForm] = useState<ItemDraft | null>(null);
   const [shareLink, setShareLink] = useState<string | null>(null);
   const [shareExpiresAt, setShareExpiresAt] = useState<string | null>(null);
-  const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
-  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [showSharePrompt, setShowSharePrompt] = useState(false);
 
   const canShare =
     auth.tenants.find((t) => t.tenantId === auth.selectedTenantId)?.role === "OWNER" ||
@@ -61,15 +99,47 @@ export default function EstimateDetailPage() {
 
   const shareMutation = useMutation({
     mutationFn: () => shareEstimate(api, estimateId, { expiresInDays: 14 }),
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       const url = typeof window !== "undefined"
         ? `${window.location.origin}/estimate/${data.token}`
         : "";
       setShareLink(url);
       setShareExpiresAt(data.expiresAt ?? null);
-      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-        navigator.clipboard.writeText(url).catch(() => {});
+      queryClient.invalidateQueries({ queryKey: queryKeys.estimate(auth.selectedTenantId, estimateId) });
+      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText && url) {
+        try {
+          await navigator.clipboard.writeText(url);
+        } catch {
+          // no-op
+        }
       }
+      setShowSharePrompt(true);
+    },
+  });
+
+  const followUpMutation = useMutation({
+    mutationFn: async () => {
+      if (!estimate) {
+        throw new Error("Estimate unavailable");
+      }
+      const dueAt = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString();
+      return createTask(api, {
+        title: `Follow up on ${estimate.title || "estimate"}`,
+        description: shareLink ? `Shared estimate link: ${shareLink}` : "Follow up on shared estimate.",
+        priority: "MEDIUM",
+        status: "TODO",
+        dueAt,
+        jobId: estimate.jobId,
+        customerId: estimate.customerId ?? null,
+      });
+    },
+    onSuccess: (task) => {
+      router.push(`/app/tasks/${task.taskId}`);
+    },
+    onError: () => {
+      if (!estimate) return;
+      const customer = estimate.customerId ? `&customerId=${estimate.customerId}` : "";
+      router.push(`/app/tasks/new?jobId=${estimate.jobId}${customer}`);
     },
   });
 
@@ -86,56 +156,16 @@ export default function EstimateDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sync only when server status changes
   }, [estimate?.status]);
 
-  useEffect(() => {
-    return () => {
-      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
-    };
-  }, []);
-
   const handleCopyLink = async () => {
     if (!shareLink) return;
-    if (copyTimerRef.current) {
-      clearTimeout(copyTimerRef.current);
-      copyTimerRef.current = null;
-    }
-
-    const copyToClipboard = (): Promise<void> => {
-      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-        return navigator.clipboard.writeText(shareLink);
-      }
-      // Fallback for older browsers
-      return new Promise((resolve, reject) => {
-        const ta = document.createElement("textarea");
-        ta.value = shareLink;
-        ta.style.position = "fixed";
-        ta.style.opacity = "0";
-        document.body.appendChild(ta);
-        ta.select();
-        try {
-          document.execCommand("copy");
-          resolve();
-        } catch (e) {
-          reject(e);
-        } finally {
-          document.body.removeChild(ta);
-        }
-      });
-    };
-
     try {
-      await copyToClipboard();
-      setCopyState("copied");
-      copyTimerRef.current = setTimeout(() => {
-        copyTimerRef.current = null;
-        setCopyState("idle");
-      }, 1500);
+      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(shareLink);
+      }
     } catch {
-      setCopyState("error");
-      copyTimerRef.current = setTimeout(() => {
-        copyTimerRef.current = null;
-        setCopyState("idle");
-      }, 2000);
+      // no-op
     }
+    setShowSharePrompt(true);
   };
 
   const statusMutation = useMutation({
@@ -160,7 +190,7 @@ export default function EstimateDetailPage() {
       setItemsError(null);
       setEditingItemId(null);
       setEditForm(null);
-      setAddForm({ name: "", description: null, quantity: 1, unitPrice: 0, unit: "ea" });
+      setAddForm({ name: "", description: null, quantity: "0", unitPrice: "0", unit: "ea" });
       queryClient.invalidateQueries({ queryKey: queryKeys.estimate(auth.selectedTenantId, estimateId) });
       if (estimate?.jobId) {
         queryClient.invalidateQueries({ queryKey: queryKeys.estimatesForJob(auth.selectedTenantId, estimate.jobId) });
@@ -180,14 +210,14 @@ export default function EstimateDetailPage() {
 
   const startEdit = (item: EstimateItemDto) => {
     setEditingItemId(item.id);
-    setEditForm(toItemRequest(item));
+    setEditForm(toDraft(item));
   };
 
   const saveEdit = () => {
     if (!estimate || !editForm || !editingItemId) return;
     const list = estimate.items ?? [];
     const items: EstimateItemRequest[] = list.map((it) =>
-      it.id === editingItemId ? editForm : toItemRequest(it)
+      it.id === editingItemId ? draftToRequest(editForm) : toItemRequest(it)
     );
     updateMutation.mutate({ items });
   };
@@ -205,13 +235,7 @@ export default function EstimateDetailPage() {
 
   const addItem = () => {
     if (!estimate) return;
-    const newItem: EstimateItemRequest = {
-      name: addForm.name.trim() || "Item",
-      description: addForm.description || null,
-      quantity: Number(addForm.quantity) || 0,
-      unitPrice: Number(addForm.unitPrice) || 0,
-      unit: addForm.unit || null,
-    };
+    const newItem: EstimateItemRequest = draftToRequest(addForm);
     const list = estimate.items ?? [];
     const items = [...list.map(toItemRequest), newItem];
     updateMutation.mutate({ items });
@@ -242,6 +266,7 @@ export default function EstimateDetailPage() {
   const jobId = estimate.jobId;
 
   return (
+    <>
     <div className="max-w-4xl mx-auto">
       <div className="mb-6">
         <Link
@@ -379,19 +404,29 @@ export default function EstimateDetailPage() {
                     className="col-span-2 border border-slate-300 rounded-lg px-3 py-2 text-sm"
                   />
                   <input
-                    type="number"
-                    min={0}
-                    step="any"
+                    type="text"
+                    inputMode="decimal"
                     value={editForm.quantity}
-                    onChange={(e) => setEditForm({ ...editForm, quantity: Number(e.target.value) || 0 })}
+                    onChange={(e) => setEditForm({ ...editForm, quantity: e.target.value })}
+                    onBlur={() => {
+                      if (!editForm.quantity.trim()) {
+                        setEditForm({ ...editForm, quantity: "0" });
+                      }
+                    }}
+                    data-testid="edit-quantity-input"
                     className="border border-slate-300 rounded-lg px-3 py-2 text-sm"
                   />
                   <input
-                    type="number"
-                    min={0}
-                    step="0.01"
+                    type="text"
+                    inputMode="decimal"
                     value={editForm.unitPrice}
-                    onChange={(e) => setEditForm({ ...editForm, unitPrice: Number(e.target.value) || 0 })}
+                    onChange={(e) => setEditForm({ ...editForm, unitPrice: e.target.value })}
+                    onBlur={() => {
+                      if (!editForm.unitPrice.trim()) {
+                        setEditForm({ ...editForm, unitPrice: "0" });
+                      }
+                    }}
+                    data-testid="edit-unitprice-input"
                     className="border border-slate-300 rounded-lg px-3 py-2 text-sm"
                   />
                   <input
@@ -431,20 +466,30 @@ export default function EstimateDetailPage() {
                   className="border border-slate-300 rounded-lg px-3 py-2 text-sm"
                 />
                 <input
-                  type="number"
-                  min={0}
-                  step="any"
+                  type="text"
+                  inputMode="decimal"
                   value={addForm.quantity}
-                  onChange={(e) => setAddForm({ ...addForm, quantity: Number(e.target.value) || 0 })}
+                  onChange={(e) => setAddForm({ ...addForm, quantity: e.target.value })}
+                  onBlur={() => {
+                    if (!addForm.quantity.trim()) {
+                      setAddForm({ ...addForm, quantity: "0" });
+                    }
+                  }}
+                  data-testid="add-quantity-input"
                   placeholder="Qty"
                   className="border border-slate-300 rounded-lg px-3 py-2 text-sm"
                 />
                 <input
-                  type="number"
-                  min={0}
-                  step="0.01"
+                  type="text"
+                  inputMode="decimal"
                   value={addForm.unitPrice}
-                  onChange={(e) => setAddForm({ ...addForm, unitPrice: Number(e.target.value) || 0 })}
+                  onChange={(e) => setAddForm({ ...addForm, unitPrice: e.target.value })}
+                  onBlur={() => {
+                    if (!addForm.unitPrice.trim()) {
+                      setAddForm({ ...addForm, unitPrice: "0" });
+                    }
+                  }}
+                  data-testid="add-unitprice-input"
                   placeholder="Unit price"
                   className="border border-slate-300 rounded-lg px-3 py-2 text-sm"
                 />
@@ -468,6 +513,13 @@ export default function EstimateDetailPage() {
         </div>
 
         <div className="space-y-6">
+          <NextBestActions
+            entityType="estimate"
+            status={estimate.status}
+            estimateId={estimateId}
+            jobId={jobId}
+          />
+
           <div className="bg-white rounded-xl border border-slate-200 p-6">
             <h2 className="text-lg font-semibold text-slate-800 mb-4">Update status</h2>
             {statusError && (
@@ -499,12 +551,28 @@ export default function EstimateDetailPage() {
               </h2>
               <button
                 type="button"
-                onClick={() => shareMutation.mutate()}
+                onClick={() => {
+                  if (shareLink) {
+                    handleCopyLink();
+                  } else {
+                    shareMutation.mutate();
+                  }
+                }}
                 disabled={shareMutation.isPending}
                 className="w-full px-4 py-2.5 text-sm font-medium text-sky-600 border border-sky-300 rounded-lg hover:bg-sky-50 disabled:opacity-60"
               >
-                {shareMutation.isPending ? "Generating…" : shareLink ? "Refresh link" : "Generate link"}
+                {shareMutation.isPending ? "Generating…" : shareLink ? "Copy link" : "Generate link"}
               </button>
+              {shareLink && (
+                <button
+                  type="button"
+                  onClick={() => shareMutation.mutate()}
+                  disabled={shareMutation.isPending}
+                  className="mt-2 w-full px-4 py-2.5 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-60"
+                >
+                  Refresh link
+                </button>
+              )}
               {shareLink && (
                 <div className="mt-4 space-y-2">
                   <div className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-center">
@@ -514,33 +582,7 @@ export default function EstimateDetailPage() {
                       data-testid="share-link-input"
                       className="w-full min-w-0 truncate border border-slate-300 rounded-lg px-3 py-2 text-sm bg-slate-50"
                     />
-                    <button
-                      type="button"
-                      onClick={handleCopyLink}
-                      disabled={copyState === "copied"}
-                      data-testid="share-copy-button"
-                      className={`min-w-[96px] w-full shrink-0 px-4 py-2 text-sm font-medium rounded-lg sm:w-auto inline-flex items-center justify-center gap-1.5 ${
-                        copyState === "copied"
-                          ? "border border-green-300 bg-green-50 text-green-700"
-                          : copyState === "error"
-                            ? "border border-red-300 bg-red-50 text-red-700"
-                            : "border border-slate-300 text-slate-700 hover:bg-slate-50"
-                      }`}
-                    >
-                      {copyState === "copied" && (
-                        <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                      )}
-                      {copyState === "error" && (
-                        <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      )}
-                      {copyState === "idle" && "Copy"}
-                      {copyState === "copied" && "Copied!"}
-                      {copyState === "error" && "Copy failed"}
-                    </button>
+                    <span className="hidden sm:block" />
                   </div>
                   {shareExpiresAt && (
                     <p className="text-xs text-slate-500">
@@ -575,5 +617,38 @@ export default function EstimateDetailPage() {
         </div>
       </div>
     </div>
+    {showSharePrompt && estimate && (
+      <NextStepPromptDialog
+        title="Link copied"
+        description="Your estimate link is ready."
+        actions={[
+          {
+            label: "Preview customer view",
+            onClick: () => {
+              if (shareLink) {
+                window.open(shareLink, "_blank", "noopener,noreferrer");
+              }
+            },
+            testId: "share-next-step-preview",
+          },
+          {
+            label: followUpMutation.isPending ? "Creating follow-up..." : "Set follow-up in 2 days",
+            onClick: () => followUpMutation.mutate(),
+            variant: "secondary",
+            disabled: followUpMutation.isPending,
+            testId: "share-next-step-followup",
+          },
+          {
+            label: "Done",
+            onClick: () => setShowSharePrompt(false),
+            variant: "secondary",
+            testId: "share-next-step-done",
+          },
+        ]}
+        onClose={() => setShowSharePrompt(false)}
+        showDismissButton={false}
+      />
+    )}
+    </>
   );
 }

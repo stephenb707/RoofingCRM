@@ -1,8 +1,11 @@
 package com.roofingcrm.service.invoice;
 
 import com.roofingcrm.api.v1.invoice.CreateInvoiceFromEstimateRequest;
+import com.roofingcrm.api.v1.invoice.ShareInvoiceRequest;
 import com.roofingcrm.domain.entity.Estimate;
 import com.roofingcrm.domain.entity.EstimateItem;
+import com.roofingcrm.domain.entity.Invoice;
+import com.roofingcrm.domain.entity.InvoiceItem;
 import com.roofingcrm.domain.entity.Job;
 import com.roofingcrm.domain.entity.Tenant;
 import com.roofingcrm.domain.enums.EstimateStatus;
@@ -133,7 +136,7 @@ class InvoiceServiceImplUnitTest {
 
     @Test
     void updateStatus_draftToSent_ok() {
-        var invoice = new com.roofingcrm.domain.entity.Invoice();
+        var invoice = new Invoice();
         invoice.setId(UUID.randomUUID());
         invoice.setTenant(tenant);
         invoice.setJob(job);
@@ -147,12 +150,16 @@ class InvoiceServiceImplUnitTest {
         when(tenantAccessService.loadTenantForUserOrThrow(tenantId, userId)).thenReturn(tenant);
         when(invoiceRepository.findByIdAndTenantAndArchivedFalse(invoice.getId(), tenant)).thenReturn(Optional.of(invoice));
         when(invoiceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        Invoice detailed = withSingleInvoiceItem(invoice);
+        when(invoiceRepository.findDetailedByIdAndTenantAndArchivedFalse(invoice.getId(), tenant)).thenReturn(Optional.of(detailed));
 
         var result = service.updateStatus(tenantId, userId, invoice.getId(), InvoiceStatus.SENT);
 
         assertEquals(InvoiceStatus.SENT, result.getStatus());
         assertNotNull(invoice.getSentAt());
         assertEquals(userId, invoice.getUpdatedByUserId());
+        assertNotNull(result.getItems());
+        assertEquals(1, result.getItems().size());
     }
 
     @Test
@@ -175,7 +182,7 @@ class InvoiceServiceImplUnitTest {
 
     @Test
     void updateStatus_sentToPaid_ok() {
-        var invoice = new com.roofingcrm.domain.entity.Invoice();
+        var invoice = new Invoice();
         invoice.setId(UUID.randomUUID());
         invoice.setTenant(tenant);
         invoice.setJob(job);
@@ -189,12 +196,29 @@ class InvoiceServiceImplUnitTest {
         when(tenantAccessService.loadTenantForUserOrThrow(tenantId, userId)).thenReturn(tenant);
         when(invoiceRepository.findByIdAndTenantAndArchivedFalse(invoice.getId(), tenant)).thenReturn(Optional.of(invoice));
         when(invoiceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        Invoice detailed = withSingleInvoiceItem(invoice);
+        when(invoiceRepository.findDetailedByIdAndTenantAndArchivedFalse(invoice.getId(), tenant)).thenReturn(Optional.of(detailed));
 
         var result = service.updateStatus(tenantId, userId, invoice.getId(), InvoiceStatus.PAID);
 
         assertEquals(InvoiceStatus.PAID, result.getStatus());
         assertNotNull(invoice.getPaidAt());
         assertEquals(userId, invoice.getUpdatedByUserId());
+        assertNotNull(result.getItems());
+        assertEquals(1, result.getItems().size());
+    }
+
+    private Invoice withSingleInvoiceItem(Invoice invoice) {
+        InvoiceItem item = new InvoiceItem();
+        item.setId(UUID.randomUUID());
+        item.setInvoice(invoice);
+        item.setName("Mapped Item");
+        item.setQuantity(new BigDecimal("1"));
+        item.setUnitPrice(new BigDecimal("10.00"));
+        item.setLineTotal(new BigDecimal("10.00"));
+        item.setSortOrder(0);
+        invoice.setItems(new ArrayList<>(List.of(item)));
+        return invoice;
     }
 
     @Test
@@ -214,5 +238,97 @@ class InvoiceServiceImplUnitTest {
 
         assertThrows(InvoiceConflictException.class, () -> service.updateStatus(tenantId, userId, invoice.getId(), InvoiceStatus.SENT));
         verify(invoiceRepository, never()).save(any());
+    }
+
+    @Test
+    void shareInvoice_whenDraft_transitionsToSent_setsSentAt_setsToken_andExpires() {
+        Invoice invoice = new Invoice();
+        invoice.setId(UUID.randomUUID());
+        invoice.setTenant(tenant);
+        invoice.setJob(job);
+        invoice.setInvoiceNumber("INV-200");
+        invoice.setStatus(InvoiceStatus.DRAFT);
+        invoice.setIssuedAt(Instant.now());
+        invoice.setTotal(BigDecimal.valueOf(1200));
+
+        when(tenantAccessService.requireAnyRole(eq(tenantId), eq(userId), any(), anyString()))
+                .thenReturn(mock(com.roofingcrm.domain.entity.TenantUserMembership.class));
+        when(tenantAccessService.loadTenantForUserOrThrow(tenantId, userId)).thenReturn(tenant);
+        when(invoiceRepository.findByIdAndTenantAndArchivedFalse(invoice.getId(), tenant)).thenReturn(Optional.of(invoice));
+        when(invoiceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        ShareInvoiceRequest request = new ShareInvoiceRequest();
+        request.setExpiresInDays(14);
+        var response = service.shareInvoice(tenantId, userId, invoice.getId(), request);
+
+        assertNotNull(response.getToken());
+        assertNotNull(response.getExpiresAt());
+        assertEquals(InvoiceStatus.SENT, invoice.getStatus());
+        assertNotNull(invoice.getSentAt());
+        assertTrue(invoice.isPublicEnabled());
+        assertEquals(userId, invoice.getUpdatedByUserId());
+        verify(invoiceRepository).save(eq(invoice));
+        verify(activityEventService).recordEvent(eq(tenant), eq(userId), eq(com.roofingcrm.domain.enums.ActivityEntityType.JOB), any(),
+                eq(com.roofingcrm.domain.enums.ActivityEventType.INVOICE_SHARED), any(), any());
+    }
+
+    @Test
+    void shareInvoice_whenTokenPresentNotExpired_reusesToken_updatesExpires() {
+        Invoice invoice = new Invoice();
+        invoice.setId(UUID.randomUUID());
+        invoice.setTenant(tenant);
+        invoice.setJob(job);
+        invoice.setInvoiceNumber("INV-201");
+        invoice.setStatus(InvoiceStatus.SENT);
+        invoice.setIssuedAt(Instant.now());
+        invoice.setTotal(BigDecimal.valueOf(1200));
+        invoice.setPublicToken("existing-token");
+        invoice.setPublicEnabled(true);
+        invoice.setPublicExpiresAt(Instant.now().plusSeconds(3600));
+
+        when(tenantAccessService.requireAnyRole(eq(tenantId), eq(userId), any(), anyString()))
+                .thenReturn(mock(com.roofingcrm.domain.entity.TenantUserMembership.class));
+        when(tenantAccessService.loadTenantForUserOrThrow(tenantId, userId)).thenReturn(tenant);
+        when(invoiceRepository.findByIdAndTenantAndArchivedFalse(invoice.getId(), tenant)).thenReturn(Optional.of(invoice));
+        when(invoiceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        ShareInvoiceRequest request = new ShareInvoiceRequest();
+        request.setExpiresInDays(30);
+        var response = service.shareInvoice(tenantId, userId, invoice.getId(), request);
+
+        assertEquals("existing-token", response.getToken());
+        assertEquals("existing-token", invoice.getPublicToken());
+        assertNotNull(invoice.getPublicExpiresAt());
+        verify(invoiceRepository).save(eq(invoice));
+    }
+
+    @Test
+    void shareInvoice_whenExpired_generatesNewToken() {
+        Invoice invoice = new Invoice();
+        invoice.setId(UUID.randomUUID());
+        invoice.setTenant(tenant);
+        invoice.setJob(job);
+        invoice.setInvoiceNumber("INV-202");
+        invoice.setStatus(InvoiceStatus.SENT);
+        invoice.setIssuedAt(Instant.now());
+        invoice.setTotal(BigDecimal.valueOf(1200));
+        invoice.setPublicToken("expired-token");
+        invoice.setPublicEnabled(true);
+        invoice.setPublicExpiresAt(Instant.now().minusSeconds(60));
+
+        when(tenantAccessService.requireAnyRole(eq(tenantId), eq(userId), any(), anyString()))
+                .thenReturn(mock(com.roofingcrm.domain.entity.TenantUserMembership.class));
+        when(tenantAccessService.loadTenantForUserOrThrow(tenantId, userId)).thenReturn(tenant);
+        when(invoiceRepository.findByIdAndTenantAndArchivedFalse(invoice.getId(), tenant)).thenReturn(Optional.of(invoice));
+        when(invoiceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        ShareInvoiceRequest request = new ShareInvoiceRequest();
+        request.setExpiresInDays(14);
+        var response = service.shareInvoice(tenantId, userId, invoice.getId(), request);
+
+        assertNotNull(response.getToken());
+        assertNotEquals("expired-token", response.getToken());
+        assertEquals(response.getToken(), invoice.getPublicToken());
+        verify(invoiceRepository).save(eq(invoice));
     }
 }

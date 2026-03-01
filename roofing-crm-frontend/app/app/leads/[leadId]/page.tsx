@@ -26,6 +26,7 @@ import { CommunicationLogSection } from "@/components/CommunicationLogSection";
 import { ActivitySection } from "@/components/ActivitySection";
 import { TasksSection } from "@/components/TasksSection";
 import { StatusBadge } from "@/components/StatusBadge";
+import { NextBestActions } from "@/components/NextBestActions";
 import { JOB_TYPES, JOB_TYPE_LABELS } from "@/lib/jobsConstants";
 import {
   LeadStatus,
@@ -454,6 +455,8 @@ export default function LeadDetailPage() {
 
         {/* Sidebar */}
         <div className="space-y-6">
+          <NextBestActions entityType="lead" status={lead.status} leadId={leadId} />
+
           {/* Status Update */}
           <div className="bg-white rounded-xl border border-slate-200 p-6">
             <h2 className="text-lg font-semibold text-slate-800 mb-4">
@@ -588,7 +591,7 @@ export default function LeadDetailPage() {
                 <button
                   type="button"
                   onClick={() => setShowConvertModal(true)}
-                  className="w-full inline-flex justify-center px-4 py-2.5 text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 rounded-lg transition-colors"
+                  className="w-full inline-flex justify-center px-4 py-2.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors"
                 >
                   Convert to Job
                 </button>

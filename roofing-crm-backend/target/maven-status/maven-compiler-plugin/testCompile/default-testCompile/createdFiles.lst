@@ -2,8 +2,10 @@ com\roofingcrm\api\v1\attachment\AttachmentControllerTest.class
 com\roofingcrm\service\job\JobServiceImplUnitTest.class
 com\roofingcrm\service\invoice\InvoiceServiceImplUnitTest.class
 com\roofingcrm\api\v1\auth\AuthControllerTest.class
+com\roofingcrm\service\invoice\InvoiceMapperTest.class
 com\roofingcrm\api\v1\estimate\EstimateControllerTest.class
 com\roofingcrm\InvoiceSchemaIntegrationTest.class
+com\roofingcrm\service\estimate\EstimateMapperTest.class
 com\roofingcrm\service\estimate\EstimateServiceImplTest.class
 com\roofingcrm\service\estimate\EstimateServiceImplUnitTest.class
 com\roofingcrm\service\auth\AuthServiceImplTest.class

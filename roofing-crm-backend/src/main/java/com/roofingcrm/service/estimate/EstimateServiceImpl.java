@@ -106,7 +106,6 @@ public class EstimateServiceImpl implements EstimateService {
     }
 
     @Override
-    @SuppressWarnings("null")
     public EstimateDto updateEstimate(@NonNull UUID tenantId, @NonNull UUID userId, UUID estimateId, UpdateEstimateRequest request) {
         Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
 
@@ -149,7 +148,7 @@ public class EstimateServiceImpl implements EstimateService {
             estimate.setTotal(subtotal);
         }
 
-        Estimate saved = Objects.requireNonNull(estimateRepository.save(estimate));
+        Estimate saved = Objects.requireNonNull(estimateRepository.save(Objects.requireNonNull(estimate)));
         return estimateMapper.toDto(saved);
     }
 
@@ -187,7 +186,9 @@ public class EstimateServiceImpl implements EstimateService {
         AuditSupport.touchForUpdate(estimate, userId);
 
         Estimate saved = estimateRepository.save(estimate);
-        return estimateMapper.toDto(saved);
+        Estimate detailed = estimateRepository.findDetailedByIdAndTenantAndArchivedFalse(saved.getId(), tenant)
+                .orElseThrow(() -> new ResourceNotFoundException("Estimate not found after status update"));
+        return estimateMapper.toDto(detailed);
     }
 
     @Override
@@ -198,6 +199,10 @@ public class EstimateServiceImpl implements EstimateService {
 
         Estimate estimate = estimateRepository.findByIdAndTenantAndArchivedFalse(estimateId, tenant)
                 .orElseThrow(() -> new ResourceNotFoundException("Estimate not found"));
+
+        if (estimate.getStatus() == EstimateStatus.DRAFT) {
+            estimate.setStatus(EstimateStatus.SENT);
+        }
 
         int days = (request != null && request.getExpiresInDays() != null) ? request.getExpiresInDays() : 14;
         days = Math.min(365, Math.max(1, days));

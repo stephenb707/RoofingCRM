@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuthReady } from "@/lib/AuthContext";
 import {
@@ -27,15 +28,21 @@ import type {
 
 export interface InvoicesSectionProps {
   jobId: string;
+  createFromEstimateId?: string | null;
+  onCreateFromEstimateHandled?: () => void;
 }
 
 function getNextStatus(current: InvoiceStatus): InvoiceStatus | null {
-  if (current === "DRAFT") return "SENT";
   if (current === "SENT") return "PAID";
   return null;
 }
 
-export function InvoicesSection({ jobId }: InvoicesSectionProps) {
+export function InvoicesSection({
+  jobId,
+  createFromEstimateId,
+  onCreateFromEstimateHandled,
+}: InvoicesSectionProps) {
+  const router = useRouter();
   const { api, auth, ready } = useAuthReady();
   const queryClient = useQueryClient();
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -71,13 +78,14 @@ export function InvoicesSection({ jobId }: InvoicesSectionProps) {
         dueAt: createDueAt ? `${createDueAt}T12:00:00Z` : undefined,
         notes: createNotes || undefined,
       }),
-    onSuccess: () => {
+    onSuccess: (created) => {
       setShowCreateModal(false);
       setCreateEstimateId("");
       setCreateDueAt("");
       setCreateNotes("");
       queryClient.invalidateQueries({ queryKey: queryKeys.invoicesForJob(auth.selectedTenantId, jobId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.activityForEntity(auth.selectedTenantId, "JOB", jobId) });
+      router.push(`/app/invoices/${created.id}`);
     },
   });
 
@@ -95,6 +103,13 @@ export function InvoicesSection({ jobId }: InvoicesSectionProps) {
     if (!createEstimateId) return;
     createMutation.mutate();
   };
+
+  useEffect(() => {
+    if (!createFromEstimateId) return;
+    setCreateEstimateId(createFromEstimateId);
+    setShowCreateModal(true);
+    onCreateFromEstimateHandled?.();
+  }, [createFromEstimateId, onCreateFromEstimateHandled]);
 
   if (invoicesQuery.isLoading) {
     return (

@@ -3,6 +3,7 @@ import { render, screen, waitFor, fireEvent } from "./test-utils";
 import userEvent from "@testing-library/user-event";
 import JobDetailPage from "@/app/app/jobs/[jobId]/page";
 import * as jobsApi from "@/lib/jobsApi";
+import * as estimatesApi from "@/lib/estimatesApi";
 import * as attachmentsApi from "@/lib/attachmentsApi";
 import * as communicationLogsApi from "@/lib/communicationLogsApi";
 import * as tasksApi from "@/lib/tasksApi";
@@ -11,19 +12,22 @@ import * as invoicesApi from "@/lib/invoicesApi";
 import { JobDto } from "@/lib/types";
 
 jest.mock("@/lib/jobsApi");
+jest.mock("@/lib/estimatesApi");
 jest.mock("@/lib/invoicesApi");
 jest.mock("@/lib/attachmentsApi");
 jest.mock("@/lib/communicationLogsApi");
 jest.mock("@/lib/tasksApi");
 jest.mock("@/lib/activityApi");
+const mockPush = jest.fn();
 jest.mock("next/navigation", () => ({
-  useRouter: () => ({ push: jest.fn(), replace: jest.fn(), back: jest.fn() }),
+  useRouter: () => ({ push: mockPush, replace: jest.fn(), back: jest.fn() }),
   usePathname: () => "/app/jobs/job-1",
   useParams: () => ({ jobId: "job-1" }),
   useSearchParams: () => new URLSearchParams(),
 }));
 
 const mockedJobsApi = jobsApi as jest.Mocked<typeof jobsApi>;
+const mockedEstimatesApi = estimatesApi as jest.Mocked<typeof estimatesApi>;
 const mockedAttachmentsApi = attachmentsApi as jest.Mocked<typeof attachmentsApi>;
 const mockedCommLogsApi = communicationLogsApi as jest.Mocked<typeof communicationLogsApi>;
 const mockedTasksApi = tasksApi as jest.Mocked<typeof tasksApi>;
@@ -50,7 +54,9 @@ describe("JobDetailPage", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockPush.mockClear();
     mockedJobsApi.getJob.mockResolvedValue(mockJob);
+    mockedEstimatesApi.listEstimatesForJob.mockResolvedValue([]);
     mockedAttachmentsApi.listJobAttachments.mockResolvedValue([]);
     mockedCommLogsApi.listJobCommunicationLogs.mockResolvedValue([]);
     mockedTasksApi.listTasks.mockImplementation(() => Promise.resolve(emptyTasksResponse));
@@ -85,14 +91,128 @@ describe("JobDetailPage", () => {
       expect(screen.getByText("123 Main St, Denver, CO, 80202")).toBeInTheDocument();
     });
 
-    const createEstimateLink = screen.getByRole("link", { name: /Create Estimate/i });
-    expect(createEstimateLink).toHaveAttribute("href", "/app/jobs/job-1/estimates/new");
+    const createEstimateLinks = screen.getAllByRole("link", { name: /Create Estimate/i });
+    expect(createEstimateLinks[0]).toHaveAttribute("href", "/app/jobs/job-1/estimates/new");
 
     const viewEstimatesLink = screen.getByRole("link", { name: /View Estimates/i });
     expect(viewEstimatesLink).toHaveAttribute("href", "/app/jobs/job-1/estimates");
 
     const editLink = screen.getByRole("link", { name: /Edit Job/i });
     expect(editLink).toHaveAttribute("href", "/app/jobs/job-1/edit");
+  });
+
+  it("latest estimate card shows status-aware primary action", async () => {
+    const writeTextMock = jest.fn().mockResolvedValue(undefined);
+    const openMock = jest.fn();
+    Object.defineProperty(window, "open", { value: openMock, configurable: true });
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: writeTextMock },
+      configurable: true,
+    });
+    mockedEstimatesApi.shareEstimate.mockResolvedValue({
+      token: "abc123",
+      expiresAt: "2026-02-16T00:00:00Z",
+    });
+    mockedEstimatesApi.listEstimatesForJob.mockResolvedValue([
+      {
+        id: "est-1",
+        jobId: "job-1",
+        status: "SENT",
+        total: 4200,
+        updatedAt: "2026-02-01T00:00:00Z",
+      },
+    ]);
+
+    render(<JobDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: /latest estimate/i })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /share link/i }));
+    await waitFor(() => {
+      expect(mockedEstimatesApi.shareEstimate).toHaveBeenCalledWith(
+        expect.anything(),
+        "est-1",
+        expect.any(Object)
+      );
+    });
+    expect(screen.getByText("Link copied")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("job-share-next-step-preview"));
+    expect(openMock).toHaveBeenCalledWith(
+      expect.stringContaining("/estimate/abc123"),
+      "_blank",
+      "noopener,noreferrer"
+    );
+  });
+
+  it("latest estimate ACCEPTED create invoice opens invoice modal first", async () => {
+    mockedEstimatesApi.listEstimatesForJob.mockResolvedValue([
+      {
+        id: "est-1",
+        jobId: "job-1",
+        status: "ACCEPTED",
+        total: 4200,
+        updatedAt: "2026-02-01T00:00:00Z",
+      },
+    ]);
+
+    render(<JobDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Create invoice")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText("Create invoice"));
+    await waitFor(() => {
+      expect(screen.getByLabelText(/due date \(optional\)/i)).toBeInTheDocument();
+    });
+    expect(mockedInvoicesApi.createInvoiceFromEstimate).not.toHaveBeenCalled();
+  });
+
+  it("creating invoice from modal redirects to invoice detail", async () => {
+    mockedEstimatesApi.listEstimatesForJob.mockResolvedValue([
+      {
+        id: "est-1",
+        jobId: "job-1",
+        status: "ACCEPTED",
+        total: 4200,
+        updatedAt: "2026-02-01T00:00:00Z",
+      },
+    ]);
+    mockedInvoicesApi.createInvoiceFromEstimate.mockResolvedValue({
+      id: "inv-new",
+      invoiceNumber: "INV-2",
+      status: "DRAFT",
+      total: 4200,
+      jobId: "job-1",
+      estimateId: "est-1",
+      issuedAt: "2026-02-01T00:00:00Z",
+      items: [],
+    });
+
+    render(<JobDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Create invoice")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByText("Create invoice"));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/estimate \(must be accepted\)/i)).toBeInTheDocument();
+    });
+    fireEvent.change(screen.getByLabelText(/estimate \(must be accepted\)/i), {
+      target: { value: "est-1" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /^Create$/ }));
+
+    await waitFor(() => {
+      expect(mockedInvoicesApi.createInvoiceFromEstimate).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ estimateId: "est-1" })
+      );
+    });
+    expect(mockPush).toHaveBeenCalledWith("/app/invoices/inv-new");
   });
 
   it("when job.leadId exists shows Created from Lead and View Lead link", async () => {

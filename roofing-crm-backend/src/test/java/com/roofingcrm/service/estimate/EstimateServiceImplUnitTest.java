@@ -2,6 +2,7 @@ package com.roofingcrm.service.estimate;
 
 import com.roofingcrm.api.v1.estimate.ShareEstimateRequest;
 import com.roofingcrm.domain.entity.Estimate;
+import com.roofingcrm.domain.entity.EstimateItem;
 import com.roofingcrm.domain.entity.Job;
 import com.roofingcrm.domain.entity.Tenant;
 import com.roofingcrm.domain.enums.EstimateStatus;
@@ -17,6 +18,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -107,12 +111,68 @@ class EstimateServiceImplUnitTest {
         when(tenantAccessService.loadTenantForUserOrThrow(tenantId, userId)).thenReturn(tenant);
         when(estimateRepository.findByIdAndTenantAndArchivedFalse(estimateId, tenant)).thenReturn(Optional.of(estimate));
         when(estimateRepository.save(any(Estimate.class))).thenAnswer(inv -> inv.getArgument(0));
+        Estimate detailed = withSingleEstimateItem(estimate);
+        when(estimateRepository.findDetailedByIdAndTenantAndArchivedFalse(estimateId, tenant)).thenReturn(Optional.of(detailed));
 
         var result = service.updateEstimateStatus(tenantId, userId, estimateId, EstimateStatus.ACCEPTED);
 
         assertEquals(EstimateStatus.ACCEPTED, result.getStatus());
         assertEquals(userId, estimate.getUpdatedByUserId());
+        assertNotNull(result.getItems());
+        assertEquals(1, result.getItems().size());
         verify(estimateRepository).findByIdAndTenantAndArchivedFalse(eq(estimateId), eq(tenant));
         verify(estimateRepository).save(eq(estimate));
+        verify(estimateRepository).findDetailedByIdAndTenantAndArchivedFalse(eq(estimateId), eq(tenant));
+    }
+
+    @Test
+    void shareEstimate_whenDraft_transitionsToSentAndReturnsLinkData() {
+        estimate.setStatus(EstimateStatus.DRAFT);
+        when(tenantAccessService.requireAnyRole(eq(tenantId), eq(userId), any(), anyString()))
+                .thenReturn(mock(com.roofingcrm.domain.entity.TenantUserMembership.class));
+        when(tenantAccessService.loadTenantForUserOrThrow(tenantId, userId)).thenReturn(tenant);
+        when(estimateRepository.findByIdAndTenantAndArchivedFalse(estimateId, tenant)).thenReturn(Optional.of(estimate));
+        when(estimateRepository.save(any(Estimate.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ShareEstimateRequest req = new ShareEstimateRequest();
+        req.setExpiresInDays(14);
+
+        var response = service.shareEstimate(tenantId, userId, estimateId, req);
+
+        assertNotNull(response.getToken());
+        assertNotNull(response.getExpiresAt());
+        assertEquals(EstimateStatus.SENT, estimate.getStatus());
+        assertTrue(estimate.isPublicEnabled());
+        assertEquals(userId, estimate.getUpdatedByUserId());
+        verify(estimateRepository).save(eq(estimate));
+    }
+
+    @Test
+    void shareEstimate_whenAlreadySent_keepsSentStatus() {
+        estimate.setStatus(EstimateStatus.SENT);
+        estimate.setPublicToken("existing-token");
+        when(tenantAccessService.requireAnyRole(eq(tenantId), eq(userId), any(), anyString()))
+                .thenReturn(mock(com.roofingcrm.domain.entity.TenantUserMembership.class));
+        when(tenantAccessService.loadTenantForUserOrThrow(tenantId, userId)).thenReturn(tenant);
+        when(estimateRepository.findByIdAndTenantAndArchivedFalse(estimateId, tenant)).thenReturn(Optional.of(estimate));
+        when(estimateRepository.save(any(Estimate.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        var response = service.shareEstimate(tenantId, userId, estimateId, new ShareEstimateRequest());
+
+        assertEquals(EstimateStatus.SENT, estimate.getStatus());
+        assertEquals("existing-token", response.getToken());
+        verify(estimateRepository).save(eq(estimate));
+    }
+
+    private Estimate withSingleEstimateItem(Estimate base) {
+        EstimateItem item = new EstimateItem();
+        item.setId(UUID.randomUUID());
+        item.setEstimate(base);
+        item.setName("Estimate Item");
+        item.setQuantity(new BigDecimal("2"));
+        item.setUnitPrice(new BigDecimal("15.00"));
+        item.setLineTotal(new BigDecimal("30.00"));
+        base.setItems(new ArrayList<>(List.of(item)));
+        return base;
     }
 }

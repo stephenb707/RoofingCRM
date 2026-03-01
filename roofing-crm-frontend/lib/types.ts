@@ -297,6 +297,11 @@ export interface ShareEstimateResponse {
   expiresAt: string;
 }
 
+export interface ShareInvoiceResponse {
+  token: string;
+  expiresAt: string;
+}
+
 export interface PublicEstimateItemDto {
   name: string;
   description?: string | null;
@@ -371,6 +376,29 @@ export interface InvoiceSummaryDto {
   estimateId?: string | null;
   createdAt?: string | null;
   updatedAt?: string | null;
+}
+
+export interface PublicInvoiceItemDto {
+  name: string;
+  description?: string | null;
+  quantity: number;
+  unitPrice: number;
+  unit?: string | null;
+  lineTotal: number;
+}
+
+export interface PublicInvoiceDto {
+  invoiceNumber: string;
+  status: InvoiceStatus;
+  issuedAt?: string | null;
+  dueAt?: string | null;
+  sentAt?: string | null;
+  total: number;
+  notes?: string | null;
+  publicExpiresAt?: string | null;
+  customerName?: string | null;
+  customerAddress?: string | null;
+  items: PublicInvoiceItemDto[];
 }
 
 // Attachment types
@@ -482,6 +510,7 @@ export type ActivityEventType =
   | "ESTIMATE_ACCEPTED"
   | "ESTIMATE_REJECTED"
   | "INVOICE_CREATED"
+  | "INVOICE_SHARED"
   | "INVOICE_STATUS_CHANGED";
 
 export interface ActivityEventDto {
