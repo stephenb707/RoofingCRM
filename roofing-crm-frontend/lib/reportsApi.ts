@@ -65,3 +65,25 @@ export async function downloadJobsCsv(
     `jobs-${new Date().toISOString().slice(0, 10)}.csv`;
   return { blob, filename };
 }
+
+export async function getPaidInvoiceYears(
+  api: AxiosInstance
+): Promise<number[]> {
+  const response = await api.get<number[]>("/api/v1/reports/invoices/paid/years");
+  return response.data ?? [];
+}
+
+export async function downloadPaidInvoicesPdf(
+  api: AxiosInstance,
+  year: number
+): Promise<{ blob: Blob; filename: string }> {
+  const response = await api.get(`/api/v1/reports/invoices/paid?year=${year}`, {
+    responseType: "blob",
+  });
+  const blob = response.data as Blob;
+  const contentDisposition = response.headers["content-disposition"];
+  const filename =
+    parseFilenameFromContentDisposition(contentDisposition) ??
+    `paid-invoices-${year}.pdf`;
+  return { blob, filename };
+}

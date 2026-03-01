@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuthReady } from "@/lib/AuthContext";
 import { getJob, updateJobStatus } from "@/lib/jobsApi";
+import { listEstimatesForJob, shareEstimate } from "@/lib/estimatesApi";
 import { getCustomer } from "@/lib/customersApi";
 import { getApiErrorMessage } from "@/lib/apiError";
 import {
@@ -15,7 +16,7 @@ import {
   JOB_TYPE_LABELS,
 } from "@/lib/jobsConstants";
 import { queryKeys } from "@/lib/queryKeys";
-import { formatAddress, formatDate, formatDateTime, formatPhone } from "@/lib/format";
+import { formatAddress, formatDate, formatDateTime, formatMoney, formatPhone } from "@/lib/format";
 import { listJobAttachments, uploadJobAttachment, downloadAttachment } from "@/lib/attachmentsApi";
 import {
   listJobCommunicationLogs,
@@ -27,7 +28,10 @@ import { ActivitySection } from "@/components/ActivitySection";
 import { TasksSection } from "@/components/TasksSection";
 import { InvoicesSection } from "@/components/InvoicesSection";
 import { StatusBadge } from "@/components/StatusBadge";
-import type { JobStatus, CreateCommunicationLogRequest, AttachmentTag } from "@/lib/types";
+import { NextBestActions } from "@/components/NextBestActions";
+import { NextStepPromptDialog } from "@/components/NextStepPromptDialog";
+import { ESTIMATE_STATUS_COLORS, ESTIMATE_STATUS_LABELS } from "@/lib/estimatesConstants";
+import type { EstimateStatus, JobStatus, CreateCommunicationLogRequest, AttachmentTag } from "@/lib/types";
 import { PREFERRED_CONTACT_LABELS } from "@/lib/preferredContactConstants";
 
 export default function JobDetailPage() {
@@ -40,6 +44,10 @@ export default function JobDetailPage() {
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [commLogError, setCommLogError] = useState<string | null>(null);
+  const [latestEstimateError, setLatestEstimateError] = useState<string | null>(null);
+  const [shareLink, setShareLink] = useState<string | null>(null);
+  const [showSharePrompt, setShowSharePrompt] = useState(false);
+  const [createFromEstimateId, setCreateFromEstimateId] = useState<string | null>(null);
 
   const { data: job, isLoading, isError, error } = useQuery({
     queryKey: queryKeys.job(auth.selectedTenantId, jobId),
@@ -51,6 +59,12 @@ export default function JobDetailPage() {
     queryKey: queryKeys.customer(auth.selectedTenantId, job?.customerId ?? ""),
     queryFn: () => getCustomer(api, job!.customerId!),
     enabled: ready && !!job?.customerId,
+  });
+
+  const estimatesQuery = useQuery({
+    queryKey: queryKeys.estimatesForJob(auth.selectedTenantId, jobId),
+    queryFn: () => listEstimatesForJob(api, jobId),
+    enabled: ready && !!jobId,
   });
 
   useEffect(() => {
@@ -143,6 +157,27 @@ export default function JobDetailPage() {
     },
   });
 
+  const shareLatestEstimateMutation = useMutation({
+    mutationFn: async (estimateToShareId: string) => {
+      const response = await shareEstimate(api, estimateToShareId, { expiresInDays: 14 });
+      return response;
+    },
+    onSuccess: async (data) => {
+      const url = `${window.location.origin}/estimate/${data.token}`;
+      setShareLink(url);
+      try {
+        await navigator.clipboard.writeText(url);
+      } catch {
+        // no-op
+      }
+      setLatestEstimateError(null);
+      setShowSharePrompt(true);
+    },
+    onError: (err: unknown) => {
+      setLatestEstimateError(getApiErrorMessage(err, "Failed to share estimate link."));
+    },
+  });
+
   if (isLoading) {
     return (
       <div className="max-w-4xl mx-auto">
@@ -175,7 +210,14 @@ export default function JobDetailPage() {
 
   if (!job) return null;
 
+  const latestEstimate = [...(estimatesQuery.data ?? [])].sort((a, b) => {
+    const aTs = new Date(a.updatedAt ?? a.createdAt ?? 0).getTime();
+    const bTs = new Date(b.updatedAt ?? b.createdAt ?? 0).getTime();
+    return bTs - aTs;
+  })[0];
+
   return (
+    <>
     <div className="max-w-4xl mx-auto">
       <div className="mb-6">
         <Link href="/app/jobs" className="text-sm text-slate-500 hover:text-slate-700 flex items-center gap-1 mb-2">
@@ -328,7 +370,11 @@ export default function JobDetailPage() {
           <TasksSection entityType="job" entityId={jobId} />
 
           {/* Invoices */}
-          <InvoicesSection jobId={jobId} />
+          <InvoicesSection
+            jobId={jobId}
+            createFromEstimateId={createFromEstimateId}
+            onCreateFromEstimateHandled={() => setCreateFromEstimateId(null)}
+          />
 
           {/* Attachments */}
           <AttachmentSection
@@ -355,6 +401,83 @@ export default function JobDetailPage() {
         </div>
 
         <div className="space-y-6">
+          <NextBestActions entityType="job" status={job.status} jobId={jobId} />
+
+          <div className="bg-white rounded-xl border border-slate-200 p-6">
+            <h2 className="text-lg font-semibold text-slate-800 mb-4">Latest Estimate</h2>
+            {estimatesQuery.isLoading && (
+              <p className="text-sm text-slate-500">Loading estimate summary…</p>
+            )}
+            {!estimatesQuery.isLoading && !latestEstimate && (
+              <div className="space-y-3">
+                <p className="text-sm text-slate-500">No estimates yet for this job.</p>
+                <Link
+                  href={`/app/jobs/${jobId}/estimates/new`}
+                  className="inline-flex w-full justify-center rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-sky-700"
+                >
+                  Create estimate
+                </Link>
+              </div>
+            )}
+            {latestEstimate && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <StatusBadge
+                    label={ESTIMATE_STATUS_LABELS[latestEstimate.status as EstimateStatus]}
+                    className={ESTIMATE_STATUS_COLORS[latestEstimate.status as EstimateStatus]}
+                  />
+                  <span className="text-sm font-medium text-slate-800">
+                    {formatMoney(latestEstimate.total ?? latestEstimate.subtotal)}
+                  </span>
+                </div>
+                <p className="text-sm text-slate-600">
+                  Updated {formatDate(latestEstimate.updatedAt ?? latestEstimate.createdAt)}
+                </p>
+                {latestEstimateError && (
+                  <p className="text-sm text-red-600">{latestEstimateError}</p>
+                )}
+                {latestEstimate.status === "DRAFT" && (
+                  <Link
+                    href={`/app/estimates/${latestEstimate.id}`}
+                    className="inline-flex w-full justify-center rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-sky-700"
+                  >
+                    Finish & Share
+                  </Link>
+                )}
+                {latestEstimate.status === "SENT" && (
+                  <button
+                    type="button"
+                    onClick={() => shareLatestEstimateMutation.mutate(latestEstimate.id)}
+                    disabled={shareLatestEstimateMutation.isPending}
+                    className="inline-flex w-full justify-center rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-60"
+                  >
+                    {shareLatestEstimateMutation.isPending ? "Sharing..." : "Share link"}
+                  </button>
+                )}
+                {latestEstimate.status === "ACCEPTED" && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLatestEstimateError(null);
+                      setCreateFromEstimateId(latestEstimate.id);
+                    }}
+                    className="inline-flex w-full justify-center rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-60"
+                  >
+                    Create invoice
+                  </button>
+                )}
+                {latestEstimate.status === "REJECTED" && (
+                  <Link
+                    href={`/app/estimates/${latestEstimate.id}`}
+                    className="inline-flex w-full justify-center rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-sky-700"
+                  >
+                    View estimate
+                  </Link>
+                )}
+              </div>
+            )}
+          </div>
+
           <div className="bg-white rounded-xl border border-slate-200 p-6">
             <h2 className="text-lg font-semibold text-slate-800 mb-4">Update status</h2>
             {updateError && (
@@ -431,5 +554,30 @@ export default function JobDetailPage() {
         </div>
       </div>
     </div>
+    {showSharePrompt && shareLink && (
+      <NextStepPromptDialog
+        title="Link copied"
+        description="Your estimate link is ready."
+        actions={[
+          {
+            label: "Preview customer view",
+            onClick: () => {
+              window.open(shareLink, "_blank", "noopener,noreferrer");
+              setShowSharePrompt(false);
+            },
+            testId: "job-share-next-step-preview",
+          },
+          {
+            label: "Done",
+            onClick: () => setShowSharePrompt(false),
+            variant: "secondary",
+            testId: "job-share-next-step-done",
+          },
+        ]}
+        onClose={() => setShowSharePrompt(false)}
+        dismissLabel="Done"
+      />
+    )}
+    </>
   );
 }

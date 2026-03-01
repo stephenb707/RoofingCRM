@@ -18,6 +18,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -48,6 +49,8 @@ public class CustomerServiceImpl implements CustomerService {
                 request.getPreferredContactMethod(),
                 request.getBillingAddress(), request.getNotes());
 
+        validateCustomerData(customer);
+
         Customer saved = customerRepository.save(customer);
         return toDto(saved);
     }
@@ -65,6 +68,8 @@ public class CustomerServiceImpl implements CustomerService {
                 request.getPrimaryPhone(), request.getEmail(),
                 request.getPreferredContactMethod(),
                 request.getBillingAddress(), request.getNotes());
+
+        validateCustomerData(customer);
 
         Customer saved = customerRepository.save(customer);
         return toDto(saved);
@@ -86,8 +91,8 @@ public class CustomerServiceImpl implements CustomerService {
     public Page<CustomerDto> listCustomers(@NonNull UUID tenantId, @NonNull UUID userId, String q, @NonNull Pageable pageable) {
         Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
         
-        String qNormalized = (q == null) ? null : q.trim().replaceAll("\\s+", " ");
-        if (qNormalized == null || qNormalized.isBlank()) {
+        String qNormalized = (q == null) ? "" : q.trim().replaceAll("\\s+", " ");
+        if (qNormalized.isBlank()) {
             return customerRepository.findByTenantAndArchivedFalse(tenant, pageable)
                     .map(this::toDto);
         }
@@ -109,7 +114,7 @@ public class CustomerServiceImpl implements CustomerService {
         customer.setFirstName(firstName);
         customer.setLastName(lastName);
         customer.setPrimaryPhone(primaryPhone);
-        customer.setEmail(email);
+        customer.setEmail(email != null ? email : "");
         customer.setPreferredContactMethod(preferredContactMethod);
         customer.setNotes(notes);
 
@@ -127,6 +132,12 @@ public class CustomerServiceImpl implements CustomerService {
             customer.setBillingAddress(address);
         } else {
             customer.setBillingAddress(null);
+        }
+    }
+
+    private void validateCustomerData(Customer customer) {
+        if (Objects.isNull(customer.getFirstName()) || Objects.isNull(customer.getLastName()) || Objects.isNull(customer.getPrimaryPhone())) {
+            throw new IllegalArgumentException("Necessary fields are missing");
         }
     }
 

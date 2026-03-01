@@ -4,6 +4,7 @@ import com.roofingcrm.AbstractIntegrationTest;
 import com.roofingcrm.TestDatabaseCleaner;
 import com.roofingcrm.api.v1.estimate.CreateEstimateRequest;
 import com.roofingcrm.api.v1.estimate.EstimateDto;
+import com.roofingcrm.api.v1.estimate.EstimateSummaryDto;
 import com.roofingcrm.api.v1.estimate.EstimateItemRequest;
 import com.roofingcrm.domain.entity.Customer;
 import com.roofingcrm.domain.entity.Job;
@@ -203,7 +204,7 @@ class EstimateServiceImplTest extends AbstractIntegrationTest {
         estimateService.createEstimateForJob(tenantId, userId, otherJob.getId(), request2);
 
         // List estimates for main job
-        List<EstimateDto> estimates = estimateService.listEstimatesForJob(tenantId, userId, jobId);
+        List<EstimateSummaryDto> estimates = estimateService.listEstimatesForJob(tenantId, userId, jobId);
 
         assertEquals(1, estimates.size());
         assertEquals(estimate1.getId(), estimates.get(0).getId());

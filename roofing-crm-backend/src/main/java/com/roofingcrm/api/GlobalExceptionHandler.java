@@ -3,8 +3,10 @@ package com.roofingcrm.api;
 import com.roofingcrm.service.exception.EstimateConflictException;
 import com.roofingcrm.service.exception.InvoiceConflictException;
 import com.roofingcrm.service.exception.EstimateLinkExpiredException;
+import com.roofingcrm.service.exception.InvoiceLinkExpiredException;
 import com.roofingcrm.service.exception.InviteConflictException;
 import com.roofingcrm.service.exception.LeadConversionNotAllowedException;
+import com.roofingcrm.service.exception.NoPaidInvoicesForYearException;
 import com.roofingcrm.service.exception.ResourceNotFoundException;
 import com.roofingcrm.service.tenant.TenantAccessDeniedException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -140,6 +142,32 @@ public class GlobalExceptionHandler {
                 request.getRequestURI()
         );
         return ResponseEntity.status(HttpStatus.GONE).body(body);
+    }
+
+    @ExceptionHandler(InvoiceLinkExpiredException.class)
+    public ResponseEntity<ApiErrorResponse> handleInvoiceLinkExpired(InvoiceLinkExpiredException ex,
+                                                                     HttpServletRequest request) {
+        ApiErrorResponse body = new ApiErrorResponse(
+                Instant.now(),
+                HttpStatus.GONE.value(),
+                HttpStatus.GONE.getReasonPhrase(),
+                ex.getMessage(),
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.GONE).body(body);
+    }
+
+    @ExceptionHandler(NoPaidInvoicesForYearException.class)
+    public ResponseEntity<ApiErrorResponse> handleNoPaidInvoicesForYear(NoPaidInvoicesForYearException ex,
+                                                                        HttpServletRequest request) {
+        ApiErrorResponse body = new ApiErrorResponse(
+                Instant.now(),
+                HttpStatus.NOT_FOUND.value(),
+                HttpStatus.NOT_FOUND.getReasonPhrase(),
+                ex.getMessage(),
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
     }
 
     private String formatFieldError(FieldError error) {

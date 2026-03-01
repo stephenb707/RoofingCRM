@@ -40,6 +40,7 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   ESTIMATE_ACCEPTED: "Estimate accepted",
   ESTIMATE_REJECTED: "Estimate rejected",
   INVOICE_CREATED: "Invoice created",
+  INVOICE_SHARED: "Invoice shared",
   INVOICE_STATUS_CHANGED: "Invoice status changed",
 };
 

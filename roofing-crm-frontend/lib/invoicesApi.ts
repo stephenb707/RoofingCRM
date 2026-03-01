@@ -1,8 +1,12 @@
 import type { AxiosInstance } from "axios";
+import axios from "axios";
 import type {
   InvoiceDto,
+  InvoiceSummaryDto,
   InvoiceStatus,
   PageResponse,
+  PublicInvoiceDto,
+  ShareInvoiceResponse,
 } from "./types";
 
 export interface CreateInvoiceFromEstimateParams {
@@ -17,6 +21,14 @@ export interface ListInvoicesParams {
   page?: number;
   size?: number;
 }
+
+const publicApiBaseUrl =
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
+
+const publicApi = axios.create({
+  baseURL: publicApiBaseUrl,
+  headers: { "Content-Type": "application/json" },
+});
 
 /**
  * Create an invoice from an ACCEPTED estimate.
@@ -38,13 +50,13 @@ export async function createInvoiceFromEstimate(
 export async function listInvoices(
   api: AxiosInstance,
   params: ListInvoicesParams = {}
-): Promise<PageResponse<InvoiceDto>> {
+): Promise<PageResponse<InvoiceSummaryDto>> {
   const queryParams: Record<string, string | number> = {};
   if (params.jobId != null && params.jobId !== "") queryParams.jobId = params.jobId;
   if (params.status != null) queryParams.status = params.status;
   if (params.page !== undefined) queryParams.page = params.page;
   if (params.size !== undefined) queryParams.size = params.size;
-  const res = await api.get<PageResponse<InvoiceDto>>("/api/v1/invoices", {
+  const res = await api.get<PageResponse<InvoiceSummaryDto>>("/api/v1/invoices", {
     params: queryParams,
   });
   return res.data;
@@ -56,8 +68,8 @@ export async function listInvoices(
 export async function listInvoicesForJob(
   api: AxiosInstance,
   jobId: string
-): Promise<InvoiceDto[]> {
-  const res = await api.get<InvoiceDto[]>(`/api/v1/invoices/job/${jobId}`);
+): Promise<InvoiceSummaryDto[]> {
+  const res = await api.get<InvoiceSummaryDto[]>(`/api/v1/invoices/job/${jobId}`);
   return res.data;
 }
 
@@ -83,5 +95,33 @@ export async function updateInvoiceStatus(
   const res = await api.put<InvoiceDto>(`/api/v1/invoices/${invoiceId}/status`, {
     status,
   });
+  return res.data;
+}
+
+export async function shareInvoice(
+  api: AxiosInstance,
+  invoiceId: string,
+  options?: { expiresInDays?: number }
+): Promise<ShareInvoiceResponse> {
+  const payload =
+    options?.expiresInDays != null
+      ? { expiresInDays: options.expiresInDays }
+      : {};
+  const res = await api.post<ShareInvoiceResponse>(
+    `/api/v1/invoices/${invoiceId}/share`,
+    Object.keys(payload).length > 0 ? payload : {}
+  );
+  return res.data;
+}
+
+export function buildPublicInvoiceUrl(token: string): string {
+  if (typeof window === "undefined") return `/invoice/${token}`;
+  return `${window.location.origin}/invoice/${token}`;
+}
+
+export async function getPublicInvoice(token: string): Promise<PublicInvoiceDto> {
+  const res = await publicApi.get<PublicInvoiceDto>(
+    `/api/public/invoices/${encodeURIComponent(token)}`
+  );
   return res.data;
 }

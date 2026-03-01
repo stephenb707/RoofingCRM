@@ -2,16 +2,20 @@ import React from "react";
 import { render, screen, waitFor, fireEvent } from "./test-utils";
 import EstimateDetailPage from "@/app/app/estimates/[estimateId]/page";
 import * as estimatesApi from "@/lib/estimatesApi";
+import * as tasksApi from "@/lib/tasksApi";
 import type { EstimateDto } from "@/lib/types";
 
 jest.mock("@/lib/estimatesApi");
+jest.mock("@/lib/tasksApi");
+const mockPush = jest.fn();
 jest.mock("next/navigation", () => ({
-  useRouter: () => ({ push: jest.fn(), replace: jest.fn(), back: jest.fn() }),
+  useRouter: () => ({ push: mockPush, replace: jest.fn(), back: jest.fn() }),
   usePathname: () => "/app/estimates/est-1",
   useParams: () => ({ estimateId: "est-1" }),
 }));
 
 const mockedEstimatesApi = estimatesApi as jest.Mocked<typeof estimatesApi>;
+const mockedTasksApi = tasksApi as jest.Mocked<typeof tasksApi>;
 
 const mockEstimate: EstimateDto = {
   id: "est-1",
@@ -34,6 +38,7 @@ const mockEstimate: EstimateDto = {
 describe("EstimateDetailPage", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockPush.mockClear();
     mockedEstimatesApi.getEstimate.mockResolvedValue(mockEstimate);
   });
 
@@ -136,8 +141,9 @@ describe("EstimateDetailPage", () => {
     const shareResponse = { token: "abc123", expiresAt: "2026-02-16T00:00:00Z" };
     mockedEstimatesApi.shareEstimate.mockResolvedValue(shareResponse);
 
+    const writeTextMock = jest.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", {
-      value: { writeText: jest.fn().mockResolvedValue(undefined) },
+      value: { writeText: writeTextMock },
       configurable: true,
     });
 
@@ -162,14 +168,17 @@ describe("EstimateDetailPage", () => {
       const linkInput = screen.getByTestId("share-link-input") as HTMLInputElement;
       expect(linkInput.value).toContain("/estimate/abc123");
     });
-    expect(screen.getByRole("button", { name: /^Copy$/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Copy link/i })).toBeInTheDocument();
+    expect(writeTextMock).toHaveBeenCalledWith(expect.stringContaining("/estimate/abc123"));
+    expect(screen.getByText("Link copied")).toBeInTheDocument();
   });
 
-  it("shows Copied! when Copy button clicked successfully", async () => {
+  it("modal preview button opens customer view and Done closes modal", async () => {
     const shareResponse = { token: "abc123", expiresAt: "2026-02-16T00:00:00Z" };
     mockedEstimatesApi.shareEstimate.mockResolvedValue(shareResponse);
-
     const writeTextMock = jest.fn().mockResolvedValue(undefined);
+    const openMock = jest.fn();
+    Object.defineProperty(window, "open", { value: openMock, configurable: true });
     Object.defineProperty(navigator, "clipboard", {
       value: { writeText: writeTextMock },
       configurable: true,
@@ -188,15 +197,58 @@ describe("EstimateDetailPage", () => {
       expect(screen.getByTestId("share-link-input")).toBeInTheDocument();
     });
 
-    const copyBtn = screen.getByTestId("share-copy-button");
-    fireEvent.click(copyBtn);
+    expect(screen.getByRole("button", { name: /set follow-up in 2 days/i })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /^done$/i })).toHaveLength(1);
+    fireEvent.click(screen.getByTestId("share-next-step-preview"));
 
     await waitFor(() => {
-      expect(screen.getByText("Copied!")).toBeInTheDocument();
+      expect(openMock).toHaveBeenCalledWith(
+        expect.stringContaining("/estimate/abc123"),
+        "_blank",
+        "noopener,noreferrer"
+      );
     });
-    expect(writeTextMock).toHaveBeenCalledWith(
-      expect.stringContaining("/estimate/abc123")
-    );
+
+    // Re-open prompt by copying existing link and close with Done.
+    fireEvent.click(screen.getByRole("button", { name: /Copy link/i }));
+    await waitFor(() => {
+      expect(screen.getByText("Link copied")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId("share-next-step-done"));
+    await waitFor(() => {
+      expect(screen.queryByText("Link copied")).not.toBeInTheDocument();
+    });
+  });
+
+  it("follow-up action creates task and navigates", async () => {
+    const shareResponse = { token: "abc123", expiresAt: "2026-02-16T00:00:00Z" };
+    mockedEstimatesApi.shareEstimate.mockResolvedValue(shareResponse);
+    mockedTasksApi.createTask.mockResolvedValue({
+      taskId: "task-1",
+      title: "Follow up",
+      status: "TODO",
+      priority: "MEDIUM",
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-01T00:00:00Z",
+    });
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: jest.fn().mockResolvedValue(undefined) },
+      configurable: true,
+    });
+
+    render(<EstimateDetailPage />);
+    await waitFor(() => {
+      expect(screen.getByText("Estimate 1")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole("button", { name: /generate link/i }));
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /set follow-up in 2 days/i })).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole("button", { name: /set follow-up in 2 days/i }));
+    await waitFor(() => {
+      expect(mockedTasksApi.createTask).toHaveBeenCalled();
+    });
+    expect(mockPush).toHaveBeenCalledWith("/app/tasks/task-1");
   });
 
   it("renders Edit Estimate link in Actions section", async () => {
@@ -206,7 +258,31 @@ describe("EstimateDetailPage", () => {
       expect(screen.getByText("Estimate 1")).toBeInTheDocument();
     });
 
-    const editLink = screen.getByRole("link", { name: /Edit Estimate/i });
-    expect(editLink).toHaveAttribute("href", "/app/estimates/est-1/edit");
+    const editLinks = screen.getAllByRole("link", { name: /Edit Estimate/i });
+    expect(editLinks[0]).toHaveAttribute("href", "/app/estimates/est-1/edit");
+  });
+
+  it("quantity and unit price draft allow empty while editing, then normalize on blur", async () => {
+    render(<EstimateDetailPage />);
+    await waitFor(() => {
+      expect(screen.getByText("Estimate 1")).toBeInTheDocument();
+    });
+
+    const addQty = screen.getByTestId("add-quantity-input") as HTMLInputElement;
+    const addUnitPrice = screen.getByTestId("add-unitprice-input") as HTMLInputElement;
+    expect(addQty.value).toBe("0");
+    expect(addUnitPrice.value).toBe("0");
+
+    addQty.focus();
+    addUnitPrice.focus();
+    fireEvent.change(addQty, { target: { value: "" } });
+    fireEvent.change(addUnitPrice, { target: { value: "" } });
+    expect(addQty.value).toBe("");
+    expect(addUnitPrice.value).toBe("");
+
+    fireEvent.blur(addQty);
+    fireEvent.blur(addUnitPrice);
+    expect(addQty.value).toBe("0");
+    expect(addUnitPrice.value).toBe("0");
   });
 });

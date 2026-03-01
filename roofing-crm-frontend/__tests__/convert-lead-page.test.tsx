@@ -94,7 +94,7 @@ describe("ConvertLeadPage", () => {
     mockedLeadsApi.convertLeadToJob.mockResolvedValue(mockJob);
   });
 
-  it("renders form and submits -> calls convertLeadToJob and navigates to job", async () => {
+  it("renders form and submits -> shows next step prompt", async () => {
     const user = userEvent.setup();
     render(<ConvertLeadPage />);
 
@@ -125,9 +125,28 @@ describe("ConvertLeadPage", () => {
       );
     });
 
+    expect(await screen.findByText("Lead converted")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /schedule it now/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /create estimate/i })).toBeInTheDocument();
+  });
+
+  it("next step prompt routes correctly", async () => {
+    const user = userEvent.setup();
+    render(<ConvertLeadPage />);
+
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith("/app/jobs/job-1");
+      expect(screen.getByText("Convert Lead to Job")).toBeInTheDocument();
     });
+
+    await user.selectOptions(screen.getByLabelText(/job type/i), "REPLACEMENT");
+    await user.click(screen.getByRole("button", { name: /convert to job/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Lead converted")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: /create estimate/i }));
+    expect(mockPush).toHaveBeenCalledWith("/app/jobs/job-1/estimates/new");
   });
 
   it("cancel navigates back to lead detail", async () => {

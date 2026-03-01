@@ -19,6 +19,7 @@ import com.roofingcrm.domain.repository.JobRepository;
 import com.roofingcrm.domain.repository.LeadRepository;
 import com.roofingcrm.domain.value.Address;
 import com.roofingcrm.service.exception.ResourceNotFoundException;
+import com.roofingcrm.service.audit.AuditSupport;
 import com.roofingcrm.service.tenant.TenantAccessService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -86,8 +87,7 @@ public class JobServiceImpl implements JobService {
         job.setTenant(tenant);
         job.setCustomer(customer);
         job.setLead(lead);
-        job.setCreatedByUserId(userId);
-        job.setUpdatedByUserId(userId);
+        AuditSupport.touchForCreate(job, userId);
 
         job.setJobType(request.getType());
         job.setStatus(request.getScheduledStartDate() != null ? JobStatus.SCHEDULED : JobStatus.UNSCHEDULED);
@@ -141,7 +141,7 @@ public class JobServiceImpl implements JobService {
         LocalDate prevEnd = job.getScheduledEndDate();
         String prevCrew = job.getAssignedCrew();
 
-        job.setUpdatedByUserId(userId);
+        AuditSupport.touchForUpdate(job, userId);
 
         if (request.getType() != null) {
             job.setJobType(request.getType());
@@ -342,7 +342,7 @@ public class JobServiceImpl implements JobService {
 
         JobStatus prevStatus = job.getStatus();
         job.setStatus(newStatus);
-        job.setUpdatedByUserId(userId);
+        AuditSupport.touchForUpdate(job, userId);
 
         Job updated = jobRepository.save(job);
 

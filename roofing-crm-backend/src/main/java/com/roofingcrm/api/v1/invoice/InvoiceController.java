@@ -41,24 +41,24 @@ public class InvoiceController {
     }
 
     @GetMapping
-    public ResponseEntity<Page<InvoiceDto>> listInvoices(
+    public ResponseEntity<Page<InvoiceSummaryDto>> listInvoices(
             @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
             @RequestParam(value = "jobId", required = false) UUID jobId,
             @RequestParam(value = "status", required = false) InvoiceStatus status,
             @PageableDefault(size = 20) Pageable pageable) {
 
         UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
-        Page<InvoiceDto> page = invoiceService.listInvoices(tenantId, userId, jobId, status, Objects.requireNonNull(pageable));
+        Page<InvoiceSummaryDto> page = invoiceService.listInvoices(tenantId, userId, jobId, status, Objects.requireNonNull(pageable));
         return ResponseEntity.ok(page);
     }
 
     @GetMapping("/job/{jobId}")
-    public ResponseEntity<List<InvoiceDto>> listInvoicesForJob(
+    public ResponseEntity<List<InvoiceSummaryDto>> listInvoicesForJob(
             @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
             @PathVariable("jobId") UUID jobId) {
 
         UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
-        List<InvoiceDto> invoices = invoiceService.listInvoicesForJob(tenantId, userId, jobId);
+        List<InvoiceSummaryDto> invoices = invoiceService.listInvoicesForJob(tenantId, userId, jobId);
         return ResponseEntity.ok(invoices);
     }
 
@@ -81,5 +81,17 @@ public class InvoiceController {
         UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
         InvoiceDto updated = invoiceService.updateStatus(tenantId, userId, invoiceId, request.getStatus());
         return ResponseEntity.ok(updated);
+    }
+
+    @PostMapping("/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}/share")
+    public ResponseEntity<ShareInvoiceResponse> shareInvoice(
+            @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
+            @PathVariable("id") UUID invoiceId,
+            @RequestBody(required = false) ShareInvoiceRequest request) {
+
+        UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
+        ShareInvoiceResponse response = invoiceService.shareInvoice(tenantId, userId, invoiceId,
+                request != null ? request : new ShareInvoiceRequest());
+        return ResponseEntity.ok(response);
     }
 }

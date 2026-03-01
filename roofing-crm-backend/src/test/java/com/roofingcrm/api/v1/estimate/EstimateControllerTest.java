@@ -126,17 +126,15 @@ class EstimateControllerTest {
         UUID tenantId = UUID.randomUUID();
         UUID jobId = UUID.randomUUID();
 
-        EstimateDto dto1 = new EstimateDto();
+        EstimateSummaryDto dto1 = new EstimateSummaryDto();
         dto1.setId(UUID.randomUUID());
         dto1.setJobId(jobId);
         dto1.setStatus(EstimateStatus.DRAFT);
-        dto1.setItems(List.of());
 
-        EstimateDto dto2 = new EstimateDto();
+        EstimateSummaryDto dto2 = new EstimateSummaryDto();
         dto2.setId(UUID.randomUUID());
         dto2.setJobId(jobId);
         dto2.setStatus(EstimateStatus.SENT);
-        dto2.setItems(List.of());
 
         when(estimateService.listEstimatesForJob(eq(tenantId), eq(userId), eq(jobId))).thenReturn(List.of(dto1, dto2));
 

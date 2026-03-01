@@ -49,6 +49,21 @@ describe("computeScheduleUpdate", () => {
     expect(result.scheduledStartDate).toBe("2026-02-10");
     expect(result.scheduledEndDate).toBe("2026-02-12");
   });
+
+  it("drop job with no end date keeps single-day behavior", () => {
+    const noEndJob: JobDto = {
+      ...baseJob,
+      scheduledStartDate: "2026-02-01",
+      scheduledEndDate: null,
+    };
+    const result = computeScheduleUpdate(noEndJob, {
+      type: "date",
+      dateKey: "2026-02-10",
+    });
+    expect(result.clearSchedule).toBe(false);
+    expect(result.scheduledStartDate).toBe("2026-02-10");
+    expect(result.scheduledEndDate).toBe("2026-02-10");
+  });
 });
 
 describe("applyOptimisticSchedulingTagChange", () => {
@@ -76,5 +91,21 @@ describe("applyOptimisticSchedulingTagChange", () => {
     expect(result.status).toBe("UNSCHEDULED");
     expect(result.scheduledStartDate).toBeNull();
     expect(result.scheduledEndDate).toBeNull();
+  });
+
+  it("keeps non-scheduling statuses while updating dates", () => {
+    const inProgressJob: JobDto = {
+      ...baseJob,
+      status: "IN_PROGRESS",
+    };
+    const update = {
+      clearSchedule: false,
+      scheduledStartDate: "2026-02-20",
+      scheduledEndDate: "2026-02-21",
+    };
+    const result = applyOptimisticSchedulingTagChange(inProgressJob, update);
+    expect(result.status).toBe("IN_PROGRESS");
+    expect(result.scheduledStartDate).toBe("2026-02-20");
+    expect(result.scheduledEndDate).toBe("2026-02-21");
   });
 });

@@ -20,5 +20,8 @@ public interface EstimateRepository extends JpaRepository<Estimate, UUID> {
     Optional<Estimate> findByIdAndTenantAndArchivedFalse(UUID id, Tenant tenant);
 
     @EntityGraph(attributePaths = {"job", "job.customer", "items"})
+    Optional<Estimate> findDetailedByIdAndTenantAndArchivedFalse(UUID id, Tenant tenant);
+
+    @EntityGraph(attributePaths = {"job", "job.customer", "items"})
     Optional<Estimate> findByPublicTokenAndPublicEnabledTrueAndArchivedFalse(String publicToken);
 }

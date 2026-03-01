@@ -23,7 +23,8 @@ import java.util.List;
         },
         indexes = {
                 @Index(name = "idx_invoices_tenant_job", columnList = "tenant_id, job_id"),
-                @Index(name = "idx_invoices_tenant_status", columnList = "tenant_id, status")
+                @Index(name = "idx_invoices_tenant_status", columnList = "tenant_id, status"),
+                @Index(name = "idx_invoices_tenant_public_enabled", columnList = "tenant_id, public_enabled")
         })
 @Getter
 @Setter
@@ -66,6 +67,18 @@ public class Invoice extends TenantAuditedEntity {
 
     @Column(columnDefinition = "text")
     private String notes;
+
+    @Column(name = "public_token", length = 64)
+    private String publicToken;
+
+    @Column(name = "public_enabled", nullable = false)
+    private boolean publicEnabled = false;
+
+    @Column(name = "public_expires_at")
+    private Instant publicExpiresAt;
+
+    @Column(name = "public_last_shared_at")
+    private Instant publicLastSharedAt;
 
     @OneToMany(mappedBy = "invoice", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<InvoiceItem> items = new ArrayList<>();

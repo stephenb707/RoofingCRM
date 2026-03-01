@@ -28,6 +28,11 @@ import { DateRangePicker } from "@/components/DateRangePicker";
 import { computeScheduleUpdate, applyOptimisticSchedulingTagChange } from "@/lib/scheduleDnd";
 import type { JobDto, JobStatus } from "@/lib/types";
 
+type ScheduleRenderItem = {
+  job: JobDto;
+  isDraggable: boolean;
+};
+
 function getMondayOfWeek(d: Date): string {
   const day = d.getDay();
   const diff = d.getDate() - day + (day === 0 ? -6 : 1);
@@ -170,7 +175,10 @@ export default function SchedulePage() {
     if (!activeId.startsWith("job:") || (!overId.startsWith("date:") && overId !== "unscheduled")) {
       return;
     }
-    const jobId = activeId.slice(4);
+    const activeJobId =
+      (active.data.current?.jobId as string | undefined) ??
+      activeId.slice(4).split("@")[0];
+    const jobId = activeJobId;
     const job = jobs.find((j) => j.id === jobId);
     if (!job) return;
 
@@ -237,20 +245,35 @@ export default function SchedulePage() {
   };
 
   const jobsByDate = useMemo(() => {
-    const map = new Map<string, JobDto[]>();
+    const map = new Map<string, ScheduleRenderItem[]>();
     for (const d of datesInRange) {
       map.set(d, []);
     }
-    const unscheduled: JobDto[] = [];
+    const unscheduled: ScheduleRenderItem[] = [];
     for (const job of jobs) {
       const sd = job.scheduledStartDate;
       if (!sd) {
-        unscheduled.push(job);
+        unscheduled.push({ job, isDraggable: true });
       } else {
-        const list = map.get(sd) ?? [];
-        list.push(job);
-        map.set(sd, list);
+        const end = job.scheduledEndDate && job.scheduledEndDate >= sd ? job.scheduledEndDate : sd;
+        for (const d of datesInRange) {
+          if (d >= sd && d <= end) {
+            const list = map.get(d) ?? [];
+            list.push({ job, isDraggable: d === sd });
+            map.set(d, list);
+          }
+        }
       }
+    }
+    // Ensure unique job IDs per day to avoid double rendering/counting.
+    for (const [d, list] of map.entries()) {
+      const unique = new Map<string, ScheduleRenderItem>();
+      for (const item of list) {
+        if (!unique.has(item.job.id)) {
+          unique.set(item.job.id, item);
+        }
+      }
+      map.set(d, Array.from(unique.values()));
     }
     return { byDate: map, unscheduled };
   }, [jobs, datesInRange]);
@@ -466,6 +489,7 @@ export default function SchedulePage() {
 function ScheduleColumn({
   columnId,
   title,
+  dateStr,
   jobs,
   editingJobId,
   editStart,
@@ -483,7 +507,7 @@ function ScheduleColumn({
   columnId: string;
   title: string;
   dateStr: string | null;
-  jobs: JobDto[];
+  jobs: ScheduleRenderItem[];
   editingJobId: string | null;
   editStart: string;
   editEnd: string;
@@ -503,6 +527,8 @@ function ScheduleColumn({
       ? "schedule-col-unscheduled"
       : `schedule-col-${columnId.slice(5)}`;
 
+  const uniqueCount = new Set(jobs.map((item) => item.job.id)).size;
+
   return (
     <section
       ref={setNodeRef}
@@ -512,20 +538,23 @@ function ScheduleColumn({
       }`}
     >
       <h2 className="text-lg font-semibold text-slate-800 mb-3">{title}</h2>
+      <p className="mb-3 text-xs text-slate-500" data-testid={`${dataTestId}-capacity`}>Jobs: {uniqueCount}</p>
       <ul className="space-y-2">
-        {jobs.map((job) => (
-          <DraggableJobCard
-            key={job.id}
-            job={job}
-            isEditing={editingJobId === job.id}
+        {jobs.map((item) => (
+          <ScheduleJobCard
+            key={`${item.job.id}-${columnId}`}
+            job={item.job}
+            columnId={columnId}
+            isDraggable={item.isDraggable}
+            isEditing={editingJobId === item.job.id && (dateStr == null || dateStr === item.job.scheduledStartDate)}
             editStart={editStart}
             editEnd={editEnd}
             editCrew={editCrew}
             onEditStartChange={onEditStartChange}
             onEditEndChange={onEditEndChange}
             onEditCrewChange={onEditCrewChange}
-            onEdit={() => openEdit(job)}
-            onSave={(e) => handleSaveEdit(e, job.id)}
+            onEdit={() => openEdit(item.job)}
+            onSave={(e) => handleSaveEdit(e, item.job.id)}
             onCancel={() => setEditingJobId(null)}
             isSaving={isSaving}
             saveError={saveError}
@@ -536,8 +565,36 @@ function ScheduleColumn({
   );
 }
 
+function ScheduleJobCard({
+  isDraggable,
+  ...props
+}: {
+  isDraggable: boolean;
+  job: JobDto;
+  columnId: string;
+  isEditing: boolean;
+  editStart: string;
+  editEnd: string;
+  editCrew: string;
+  onEditStartChange: (v: string) => void;
+  onEditEndChange: (v: string) => void;
+  onEditCrewChange: (v: string) => void;
+  onEdit: () => void;
+  onSave: (e: React.FormEvent) => void;
+  onCancel: () => void;
+  isSaving: boolean;
+  saveError: string | null;
+}) {
+  return isDraggable ? (
+    <DraggableJobCard {...props} />
+  ) : (
+    <StaticJobCard {...props} />
+  );
+}
+
 function DraggableJobCard({
   job,
+  columnId,
   isEditing,
   editStart,
   editEnd,
@@ -552,6 +609,7 @@ function DraggableJobCard({
   saveError,
 }: {
   job: JobDto;
+  columnId: string;
   isEditing: boolean;
   editStart: string;
   editEnd: string;
@@ -571,7 +629,7 @@ function DraggableJobCard({
     setNodeRef,
     transform,
     isDragging,
-  } = useDraggable({ id: `job:${job.id}` });
+  } = useDraggable({ id: `job:${job.id}`, data: { jobId: job.id } });
 
   const style = transform
     ? { transform: CSS.Translate.toString(transform) }
@@ -581,7 +639,7 @@ function DraggableJobCard({
     <li
       ref={setNodeRef}
       style={style}
-      data-testid={`schedule-card-${job.id}`}
+      data-testid={`schedule-card-${job.id}-${columnId.replace(":", "-")}`}
       className={`flex flex-col rounded-lg border transition-shadow ${
         isDragging ? "opacity-80 shadow-lg z-10" : "bg-slate-50 border-slate-100"
       }`}
@@ -605,6 +663,61 @@ function DraggableJobCard({
             ? { attributes: attributes as object, listeners: listeners as object }
             : undefined
         }
+      />
+    </li>
+  );
+}
+
+function StaticJobCard({
+  job,
+  columnId,
+  isEditing,
+  editStart,
+  editEnd,
+  editCrew,
+  onEditStartChange,
+  onEditEndChange,
+  onEditCrewChange,
+  onEdit,
+  onSave,
+  onCancel,
+  isSaving,
+  saveError,
+}: {
+  job: JobDto;
+  columnId: string;
+  isEditing: boolean;
+  editStart: string;
+  editEnd: string;
+  editCrew: string;
+  onEditStartChange: (v: string) => void;
+  onEditEndChange: (v: string) => void;
+  onEditCrewChange: (v: string) => void;
+  onEdit: () => void;
+  onSave: (e: React.FormEvent) => void;
+  onCancel: () => void;
+  isSaving: boolean;
+  saveError: string | null;
+}) {
+  return (
+    <li
+      data-testid={`schedule-card-${job.id}-${columnId.replace(":", "-")}`}
+      className="flex flex-col rounded-lg border bg-slate-50 border-slate-100"
+    >
+      <JobScheduleCard
+        job={job}
+        isEditing={isEditing}
+        editStart={editStart}
+        editEnd={editEnd}
+        editCrew={editCrew}
+        onEditStartChange={onEditStartChange}
+        onEditEndChange={onEditEndChange}
+        onEditCrewChange={onEditCrewChange}
+        onEdit={onEdit}
+        onSave={onSave}
+        onCancel={onCancel}
+        isSaving={isSaving}
+        saveError={saveError}
       />
     </li>
   );

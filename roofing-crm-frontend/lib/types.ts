@@ -247,6 +247,21 @@ export interface EstimateDto {
   updatedAt?: string | null;
 }
 
+export interface EstimateSummaryDto {
+  id: string;
+  jobId: string;
+  customerId?: string | null;
+  status: EstimateStatus;
+  title?: string | null;
+  notes?: string | null;
+  issueDate?: string | null; // YYYY-MM-DD
+  validUntil?: string | null; // YYYY-MM-DD
+  subtotal?: number | null;
+  total?: number | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
 export interface EstimateItemRequest {
   name: string;
   description?: string | null;
@@ -278,6 +293,11 @@ export interface UpdateEstimateStatusRequest {
 }
 
 export interface ShareEstimateResponse {
+  token: string;
+  expiresAt: string;
+}
+
+export interface ShareInvoiceResponse {
   token: string;
   expiresAt: string;
 }
@@ -340,6 +360,45 @@ export interface InvoiceDto {
   items?: InvoiceItemDto[];
   createdAt?: string | null;
   updatedAt?: string | null;
+}
+
+export interface InvoiceSummaryDto {
+  id: string;
+  invoiceNumber: string;
+  status: InvoiceStatus;
+  issuedAt?: string | null;
+  sentAt?: string | null;
+  dueAt?: string | null;
+  paidAt?: string | null;
+  total: number;
+  notes?: string | null;
+  jobId: string;
+  estimateId?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface PublicInvoiceItemDto {
+  name: string;
+  description?: string | null;
+  quantity: number;
+  unitPrice: number;
+  unit?: string | null;
+  lineTotal: number;
+}
+
+export interface PublicInvoiceDto {
+  invoiceNumber: string;
+  status: InvoiceStatus;
+  issuedAt?: string | null;
+  dueAt?: string | null;
+  sentAt?: string | null;
+  total: number;
+  notes?: string | null;
+  publicExpiresAt?: string | null;
+  customerName?: string | null;
+  customerAddress?: string | null;
+  items: PublicInvoiceItemDto[];
 }
 
 // Attachment types
@@ -451,6 +510,7 @@ export type ActivityEventType =
   | "ESTIMATE_ACCEPTED"
   | "ESTIMATE_REJECTED"
   | "INVOICE_CREATED"
+  | "INVOICE_SHARED"
   | "INVOICE_STATUS_CHANGED";
 
 export interface ActivityEventDto {

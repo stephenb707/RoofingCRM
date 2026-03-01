@@ -2,6 +2,7 @@ import type { AxiosInstance } from "axios";
 import axios from "axios";
 import type {
   EstimateDto,
+  EstimateSummaryDto,
   EstimateStatus,
   CreateEstimateRequest,
   UpdateEstimateRequest,
@@ -19,13 +20,13 @@ const publicApi = axios.create({
 });
 
 /**
- * List all estimates for a job. Backend returns List<EstimateDto>.
+ * List all estimates for a job (summary DTOs; no items).
  */
 export async function listEstimatesForJob(
   api: AxiosInstance,
   jobId: string
-): Promise<EstimateDto[]> {
-  const res = await api.get<EstimateDto[]>(
+): Promise<EstimateSummaryDto[]> {
+  const res = await api.get<EstimateSummaryDto[]>(
     `/api/v1/jobs/${jobId}/estimates`
   );
   return res.data;

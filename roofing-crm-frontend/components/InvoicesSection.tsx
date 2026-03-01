@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuthReady } from "@/lib/AuthContext";
 import {
@@ -19,19 +20,29 @@ import { ESTIMATE_STATUS_LABELS } from "@/lib/estimatesConstants";
 import { queryKeys } from "@/lib/queryKeys";
 import { formatDateTime, formatMoney } from "@/lib/format";
 import { StatusBadge } from "@/components/StatusBadge";
-import type { InvoiceDto, InvoiceStatus, EstimateDto } from "@/lib/types";
+import type {
+  EstimateSummaryDto,
+  InvoiceStatus,
+  InvoiceSummaryDto,
+} from "@/lib/types";
 
 export interface InvoicesSectionProps {
   jobId: string;
+  createFromEstimateId?: string | null;
+  onCreateFromEstimateHandled?: () => void;
 }
 
 function getNextStatus(current: InvoiceStatus): InvoiceStatus | null {
-  if (current === "DRAFT") return "SENT";
   if (current === "SENT") return "PAID";
   return null;
 }
 
-export function InvoicesSection({ jobId }: InvoicesSectionProps) {
+export function InvoicesSection({
+  jobId,
+  createFromEstimateId,
+  onCreateFromEstimateHandled,
+}: InvoicesSectionProps) {
+  const router = useRouter();
   const { api, auth, ready } = useAuthReady();
   const queryClient = useQueryClient();
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -57,7 +68,7 @@ export function InvoicesSection({ jobId }: InvoicesSectionProps) {
   });
 
   const acceptedEstimates = (estimatesQuery.data ?? []).filter(
-    (e: EstimateDto) => e.status === "ACCEPTED"
+    (e: EstimateSummaryDto) => e.status === "ACCEPTED"
   );
 
   const createMutation = useMutation({
@@ -67,13 +78,14 @@ export function InvoicesSection({ jobId }: InvoicesSectionProps) {
         dueAt: createDueAt ? `${createDueAt}T12:00:00Z` : undefined,
         notes: createNotes || undefined,
       }),
-    onSuccess: () => {
+    onSuccess: (created) => {
       setShowCreateModal(false);
       setCreateEstimateId("");
       setCreateDueAt("");
       setCreateNotes("");
       queryClient.invalidateQueries({ queryKey: queryKeys.invoicesForJob(auth.selectedTenantId, jobId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.activityForEntity(auth.selectedTenantId, "JOB", jobId) });
+      router.push(`/app/invoices/${created.id}`);
     },
   });
 
@@ -91,6 +103,13 @@ export function InvoicesSection({ jobId }: InvoicesSectionProps) {
     if (!createEstimateId) return;
     createMutation.mutate();
   };
+
+  useEffect(() => {
+    if (!createFromEstimateId) return;
+    setCreateEstimateId(createFromEstimateId);
+    setShowCreateModal(true);
+    onCreateFromEstimateHandled?.();
+  }, [createFromEstimateId, onCreateFromEstimateHandled]);
 
   if (invoicesQuery.isLoading) {
     return (
@@ -147,7 +166,7 @@ export function InvoicesSection({ jobId }: InvoicesSectionProps) {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
-              {invoices.map((inv: InvoiceDto) => (
+              {invoices.map((inv: InvoiceSummaryDto) => (
                 <tr key={inv.id} className="hover:bg-slate-50">
                   <td className="px-4 py-3 text-sm">
                     <Link
@@ -226,7 +245,7 @@ export function InvoicesSection({ jobId }: InvoicesSectionProps) {
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
                 >
                   <option value="">Select estimate…</option>
-                  {acceptedEstimates.map((est: EstimateDto) => (
+                  {acceptedEstimates.map((est: EstimateSummaryDto) => (
                     <option key={est.id} value={est.id}>
                       {est.title || `Estimate ${est.id.slice(0, 8)}`} — {ESTIMATE_STATUS_LABELS[est.status]}
                     </option>

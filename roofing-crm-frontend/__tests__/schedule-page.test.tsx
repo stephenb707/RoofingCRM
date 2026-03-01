@@ -126,6 +126,7 @@ describe("SchedulePage", () => {
 
     expect(await screen.findByRole("heading", { name: "Unscheduled" })).toBeInTheDocument();
     expect(screen.getAllByText(/123 Main St/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByTestId("schedule-col-unscheduled-capacity")).toHaveTextContent("Jobs: 1");
   });
 
   it("Editing a job and clicking Save calls jobsApi.updateJob with correct payload", async () => {
@@ -156,7 +157,7 @@ describe("SchedulePage", () => {
     fireEvent.click(editBtn);
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: /^Save$/ })).toBeInTheDocument();
+      expect(screen.getAllByRole("button", { name: /^Save$/i }).length).toBeGreaterThan(0);
     });
 
     const startDateInput = document.getElementById("edit-start-date");
@@ -166,7 +167,7 @@ describe("SchedulePage", () => {
     if (endDateInput) fireEvent.change(endDateInput, { target: { value: "2026-01-22" } });
     if (crewInput) fireEvent.change(crewInput, { target: { value: "Bravo" } });
 
-    const saveBtn = screen.getByRole("button", { name: /^Save$/ });
+    const saveBtn = screen.getAllByRole("button", { name: /^Save$/i })[0];
     fireEvent.click(saveBtn);
 
     await waitFor(() => {
@@ -181,5 +182,40 @@ describe("SchedulePage", () => {
         })
       );
     });
+  });
+
+  it("renders multi-day jobs in each day they span", async () => {
+    mockedJobsApi.listJobSchedule.mockResolvedValue([job1]);
+
+    render(<SchedulePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Schedule")).toBeInTheDocument();
+    });
+
+    const startInput = document.getElementById("schedule-date-start");
+    const endInput = document.getElementById("schedule-date-end");
+    if (!startInput || !endInput) throw new Error("Date inputs not found");
+    fireEvent.change(startInput, { target: { value: "2026-01-15" } });
+    fireEvent.change(endInput, { target: { value: "2026-01-17" } });
+
+    await waitFor(() => {
+      expect(mockedJobsApi.listJobSchedule).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ from: "2026-01-15", to: "2026-01-17" })
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/123 Main St/).length).toBe(3);
+    });
+
+    // Only start-day copy is draggable.
+    expect(screen.getAllByTestId("schedule-drag-handle-job-1")).toHaveLength(1);
+
+    // Capacity counts unique jobs per day.
+    expect(screen.getByTestId("schedule-col-2026-01-15-capacity")).toHaveTextContent("Jobs: 1");
+    expect(screen.getByTestId("schedule-col-2026-01-16-capacity")).toHaveTextContent("Jobs: 1");
+    expect(screen.getByTestId("schedule-col-2026-01-17-capacity")).toHaveTextContent("Jobs: 1");
   });
 });

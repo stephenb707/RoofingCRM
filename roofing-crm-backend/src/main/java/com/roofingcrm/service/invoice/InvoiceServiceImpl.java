@@ -2,7 +2,9 @@ package com.roofingcrm.service.invoice;
 
 import com.roofingcrm.api.v1.invoice.CreateInvoiceFromEstimateRequest;
 import com.roofingcrm.api.v1.invoice.InvoiceDto;
-import com.roofingcrm.api.v1.invoice.InvoiceItemDto;
+import com.roofingcrm.api.v1.invoice.InvoiceSummaryDto;
+import com.roofingcrm.api.v1.invoice.ShareInvoiceRequest;
+import com.roofingcrm.api.v1.invoice.ShareInvoiceResponse;
 import com.roofingcrm.domain.entity.Estimate;
 import com.roofingcrm.domain.entity.EstimateItem;
 import com.roofingcrm.domain.entity.Invoice;
@@ -12,9 +14,11 @@ import com.roofingcrm.domain.enums.ActivityEntityType;
 import com.roofingcrm.domain.enums.ActivityEventType;
 import com.roofingcrm.domain.enums.EstimateStatus;
 import com.roofingcrm.domain.enums.InvoiceStatus;
+import com.roofingcrm.domain.enums.UserRole;
 import com.roofingcrm.domain.repository.EstimateRepository;
 import com.roofingcrm.domain.repository.InvoiceRepository;
 import com.roofingcrm.service.activity.ActivityEventService;
+import com.roofingcrm.service.audit.AuditSupport;
 import com.roofingcrm.service.exception.InvoiceConflictException;
 import com.roofingcrm.service.exception.ResourceNotFoundException;
 import com.roofingcrm.service.tenant.TenantAccessService;
@@ -26,8 +30,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -43,16 +49,20 @@ public class InvoiceServiceImpl implements InvoiceService {
     private final InvoiceRepository invoiceRepository;
     private final EstimateRepository estimateRepository;
     private final ActivityEventService activityEventService;
+    private final InvoiceMapper invoiceMapper;
+    private static final SecureRandom secureRandom = new SecureRandom();
 
     @Autowired
     public InvoiceServiceImpl(TenantAccessService tenantAccessService,
                               InvoiceRepository invoiceRepository,
                               EstimateRepository estimateRepository,
-                              ActivityEventService activityEventService) {
+                              ActivityEventService activityEventService,
+                              InvoiceMapper invoiceMapper) {
         this.tenantAccessService = tenantAccessService;
         this.invoiceRepository = invoiceRepository;
         this.estimateRepository = estimateRepository;
         this.activityEventService = activityEventService;
+        this.invoiceMapper = invoiceMapper;
     }
 
     @Override
@@ -80,7 +90,7 @@ public class InvoiceServiceImpl implements InvoiceService {
         invoice.setIssuedAt(Instant.now());
         invoice.setDueAt(request.getDueAt());
         invoice.setNotes(request.getNotes());
-        invoice.setCreatedByUserId(userId);
+        AuditSupport.touchForCreate(invoice, userId);
 
         BigDecimal total = estimate.getTotal() != null ? estimate.getTotal() : BigDecimal.ZERO;
         invoice.setTotal(total);
@@ -110,32 +120,32 @@ public class InvoiceServiceImpl implements InvoiceService {
                 Objects.requireNonNull(saved.getJob().getId()),
                 ActivityEventType.INVOICE_CREATED, "Invoice " + saved.getInvoiceNumber() + " created", metadata);
 
-        return toDto(saved);
+        return invoiceMapper.toDto(saved);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Page<InvoiceDto> listInvoices(@NonNull UUID tenantId, @NonNull UUID userId, UUID jobId, InvoiceStatus status, @NonNull Pageable pageable) {
+    public Page<InvoiceSummaryDto> listInvoices(@NonNull UUID tenantId, @NonNull UUID userId, UUID jobId, InvoiceStatus status, @NonNull Pageable pageable) {
         Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
         return invoiceRepository.findByTenantAndArchivedFalseWithFilters(tenant, jobId, status, pageable)
-                .map(this::toDto);
+                .map(invoiceMapper::toSummaryDto);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<InvoiceDto> listInvoicesForJob(@NonNull UUID tenantId, @NonNull UUID userId, UUID jobId) {
+    public List<InvoiceSummaryDto> listInvoicesForJob(@NonNull UUID tenantId, @NonNull UUID userId, UUID jobId) {
         Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
         List<Invoice> invoices = invoiceRepository.findByTenantAndJobIdAndArchivedFalseOrderByCreatedAtDesc(tenant, jobId);
-        return invoices.stream().map(this::toDto).toList();
+        return invoices.stream().map(invoiceMapper::toSummaryDto).toList();
     }
 
     @Override
     @Transactional(readOnly = true)
     public InvoiceDto getInvoice(@NonNull UUID tenantId, @NonNull UUID userId, UUID invoiceId) {
         Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
-        Invoice invoice = invoiceRepository.findByIdAndTenantAndArchivedFalse(invoiceId, tenant)
+        Invoice invoice = invoiceRepository.findDetailedByIdAndTenantAndArchivedFalse(invoiceId, tenant)
                 .orElseThrow(() -> new ResourceNotFoundException("Invoice not found"));
-        return toDto(invoice);
+        return invoiceMapper.toDto(invoice);
     }
 
     @Override
@@ -162,6 +172,7 @@ public class InvoiceServiceImpl implements InvoiceService {
             invoice.setPaidAt(now);
         }
         invoice.setStatus(newStatus);
+        AuditSupport.touchForUpdate(invoice, userId);
 
         Invoice saved = invoiceRepository.save(invoice);
 
@@ -174,7 +185,63 @@ public class InvoiceServiceImpl implements InvoiceService {
                 Objects.requireNonNull(saved.getJob().getId()),
                 ActivityEventType.INVOICE_STATUS_CHANGED, "Invoice " + saved.getInvoiceNumber() + " status: " + fromStatus + " → " + newStatus, metadata);
 
-        return toDto(saved);
+        Invoice detailed = invoiceRepository.findDetailedByIdAndTenantAndArchivedFalse(saved.getId(), tenant)
+                .orElseThrow(() -> new ResourceNotFoundException("Invoice not found after status update"));
+        return invoiceMapper.toDto(detailed);
+    }
+
+    @Override
+    public ShareInvoiceResponse shareInvoice(@NonNull UUID tenantId, @NonNull UUID userId, UUID invoiceId, ShareInvoiceRequest request) {
+        tenantAccessService.requireAnyRole(tenantId, userId, Objects.requireNonNull(Set.of(UserRole.OWNER, UserRole.ADMIN, UserRole.SALES)),
+                "You do not have permission to share invoices.");
+        Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
+
+        Invoice invoice = invoiceRepository.findByIdAndTenantAndArchivedFalse(invoiceId, tenant)
+                .orElseThrow(() -> new ResourceNotFoundException("Invoice not found"));
+
+        if (invoice.getStatus() == InvoiceStatus.VOID) {
+            throw new InvoiceConflictException("Cannot share a VOID invoice");
+        }
+
+        Instant now = Instant.now();
+        if (invoice.getStatus() == InvoiceStatus.DRAFT) {
+            invoice.setStatus(InvoiceStatus.SENT);
+            if (invoice.getSentAt() == null) {
+                invoice.setSentAt(now);
+            }
+        }
+
+        int days = (request != null && request.getExpiresInDays() != null) ? request.getExpiresInDays() : 14;
+        days = Math.min(365, Math.max(1, days));
+        Instant expiresAt = now.plusSeconds(days * 86400L);
+
+        boolean needNewToken = invoice.getPublicToken() == null || invoice.getPublicToken().isBlank()
+                || (invoice.getPublicExpiresAt() != null && invoice.getPublicExpiresAt().isBefore(now));
+        if (needNewToken) {
+            byte[] bytes = new byte[32];
+            secureRandom.nextBytes(bytes);
+            String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+            invoice.setPublicToken(token);
+        }
+
+        invoice.setPublicEnabled(true);
+        invoice.setPublicExpiresAt(expiresAt);
+        invoice.setPublicLastSharedAt(now);
+        AuditSupport.touchForUpdate(invoice, userId);
+        Invoice saved = invoiceRepository.save(invoice);
+
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("invoiceId", saved.getId().toString());
+        metadata.put("invoiceNumber", saved.getInvoiceNumber());
+        metadata.put("expiresAt", expiresAt.toString());
+        activityEventService.recordEvent(tenant, userId, ActivityEntityType.JOB,
+                Objects.requireNonNull(saved.getJob().getId()),
+                ActivityEventType.INVOICE_SHARED, "Invoice shared via public link", metadata);
+
+        ShareInvoiceResponse response = new ShareInvoiceResponse();
+        response.setToken(saved.getPublicToken());
+        response.setExpiresAt(expiresAt);
+        return response;
     }
 
     private void validateTransition(InvoiceStatus from, InvoiceStatus to) {
@@ -191,37 +258,4 @@ public class InvoiceServiceImpl implements InvoiceService {
         }
     }
 
-    private InvoiceDto toDto(Invoice i) {
-        InvoiceDto dto = new InvoiceDto();
-        dto.setId(i.getId());
-        dto.setInvoiceNumber(i.getInvoiceNumber());
-        dto.setStatus(i.getStatus());
-        dto.setIssuedAt(i.getIssuedAt());
-        dto.setSentAt(i.getSentAt());
-        dto.setDueAt(i.getDueAt());
-        dto.setPaidAt(i.getPaidAt());
-        dto.setTotal(i.getTotal());
-        dto.setNotes(i.getNotes());
-        dto.setJobId(i.getJob() != null ? i.getJob().getId() : null);
-        dto.setEstimateId(i.getEstimate() != null ? i.getEstimate().getId() : null);
-        dto.setCreatedAt(i.getCreatedAt());
-        dto.setUpdatedAt(i.getUpdatedAt());
-
-        if (i.getItems() != null) {
-            List<InvoiceItemDto> itemDtos = new ArrayList<>();
-            for (InvoiceItem it : i.getItems()) {
-                InvoiceItemDto idto = new InvoiceItemDto();
-                idto.setId(it.getId());
-                idto.setName(it.getName());
-                idto.setDescription(it.getDescription());
-                idto.setQuantity(it.getQuantity());
-                idto.setUnitPrice(it.getUnitPrice());
-                idto.setLineTotal(it.getLineTotal());
-                idto.setSortOrder(it.getSortOrder());
-                itemDtos.add(idto);
-            }
-            dto.setItems(itemDtos);
-        }
-        return dto;
-    }
 }

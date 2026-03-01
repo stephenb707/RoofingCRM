@@ -10,13 +10,26 @@ import { getApiErrorMessage } from "@/lib/apiError";
 import { queryKeys } from "@/lib/queryKeys";
 import type { EstimateItemRequest } from "@/lib/types";
 
-const emptyItem = (): EstimateItemRequest => ({
+type EstimateItemDraft = Omit<EstimateItemRequest, "quantity" | "unitPrice"> & {
+  quantity: string;
+  unitPrice: string;
+};
+
+const emptyItem = (): EstimateItemDraft => ({
   name: "",
   description: "",
-  quantity: 1,
-  unitPrice: 0,
+  quantity: "1",
+  unitPrice: "0",
   unit: "ea",
 });
+
+function parseNonNegativeNumber(s: string): number {
+  const t = (s ?? "").trim();
+  if (t === "" || t === "." || t === "-") return 0;
+  const n = Number(t);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, n);
+}
 
 export default function NewEstimatePage() {
   const params = useParams();
@@ -29,7 +42,7 @@ export default function NewEstimatePage() {
   const [notes, setNotes] = useState("");
   const [issueDate, setIssueDate] = useState("");
   const [validUntil, setValidUntil] = useState("");
-  const [items, setItems] = useState<EstimateItemRequest[]>([emptyItem()]);
+  const [items, setItems] = useState<EstimateItemDraft[]>([emptyItem()]);
   const [formError, setFormError] = useState<string | null>(null);
 
   const create = useMutation({
@@ -51,7 +64,7 @@ export default function NewEstimatePage() {
     },
   });
 
-  const updateItem = (index: number, patch: Partial<EstimateItemRequest>) => {
+  const updateItem = (index: number, patch: Partial<EstimateItemDraft>) => {
     setItems((prev) =>
       prev.map((it, i) => (i === index ? { ...it, ...patch } : it))
     );
@@ -68,22 +81,14 @@ export default function NewEstimatePage() {
     e.preventDefault();
     setFormError(null);
 
-    const validItems = items.map((it) => ({
+    const validItems: EstimateItemRequest[] = items.map((it) => ({
       ...it,
       name: it.name.trim() || "Item",
       description: it.description || null,
       unit: it.unit || null,
-      quantity: Number(it.quantity) || 0,
-      unitPrice: Number(it.unitPrice) || 0,
+      quantity: parseNonNegativeNumber(it.quantity),
+      unitPrice: parseNonNegativeNumber(it.unitPrice),
     }));
-
-    const hasValidQtyPrice = validItems.every(
-      (it) => typeof it.quantity === "number" && typeof it.unitPrice === "number"
-    );
-    if (!hasValidQtyPrice) {
-      setFormError("Quantity and unit price must be numbers.");
-      return;
-    }
 
     create.mutate({
       title: title.trim() || undefined,
@@ -206,24 +211,32 @@ export default function NewEstimatePage() {
                   <div>
                     <label className="block text-xs text-slate-500 mb-1">Quantity</label>
                     <input
-                      required
-                      type="number"
-                      min={0}
-                      step="any"
+                      type="text"
+                      inputMode="decimal"
                       value={it.quantity}
-                      onChange={(e) => updateItem(i, { quantity: Number(e.target.value) || 0 })}
+                      onChange={(e) => updateItem(i, { quantity: e.target.value })}
+                      onBlur={() =>
+                        updateItem(i, {
+                          quantity: it.quantity.trim() === "" ? "0" : it.quantity,
+                        })
+                      }
+                      data-testid={`new-estimate-quantity-${i}`}
                       className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
                     />
                   </div>
                   <div>
                     <label className="block text-xs text-slate-500 mb-1">Unit price</label>
                     <input
-                      required
-                      type="number"
-                      min={0}
-                      step="0.01"
+                      type="text"
+                      inputMode="decimal"
                       value={it.unitPrice}
-                      onChange={(e) => updateItem(i, { unitPrice: Number(e.target.value) || 0 })}
+                      onChange={(e) => updateItem(i, { unitPrice: e.target.value })}
+                      onBlur={() =>
+                        updateItem(i, {
+                          unitPrice: it.unitPrice.trim() === "" ? "0" : it.unitPrice,
+                        })
+                      }
+                      data-testid={`new-estimate-unitprice-${i}`}
                       className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
                     />
                   </div>

@@ -1,10 +1,12 @@
 "use client";
 
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
+import { useState } from "react";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuthReady } from "@/lib/AuthContext";
-import { getInvoice, updateInvoiceStatus } from "@/lib/invoicesApi";
+import { getInvoice, updateInvoiceStatus, shareInvoice, buildPublicInvoiceUrl } from "@/lib/invoicesApi";
+import { createTask } from "@/lib/tasksApi";
 import { getApiErrorMessage } from "@/lib/apiError";
 import {
   INVOICE_STATUS_LABELS,
@@ -14,18 +16,22 @@ import { queryKeys } from "@/lib/queryKeys";
 import { formatDateTime, formatMoney } from "@/lib/format";
 import { StatusBadge } from "@/components/StatusBadge";
 import type { InvoiceStatus } from "@/lib/types";
+import { NextStepPromptDialog } from "@/components/NextStepPromptDialog";
 
 function getNextStatus(current: InvoiceStatus): InvoiceStatus | null {
-  if (current === "DRAFT") return "SENT";
   if (current === "SENT") return "PAID";
   return null;
 }
 
 export default function InvoiceDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const invoiceId = params.invoiceId as string;
   const { api, auth, ready } = useAuthReady();
   const queryClient = useQueryClient();
+  const [shareLink, setShareLink] = useState<string | null>(null);
+  const [shareExpiresAt, setShareExpiresAt] = useState<string | null>(null);
+  const [showSharePrompt, setShowSharePrompt] = useState(false);
 
   const canEdit =
     auth.tenants.find((t) => t.tenantId === auth.selectedTenantId)?.role === "OWNER" ||
@@ -46,6 +52,50 @@ export default function InvoiceDetailPage() {
         queryClient.invalidateQueries({ queryKey: queryKeys.invoicesForJob(auth.selectedTenantId, invoice.jobId) });
         queryClient.invalidateQueries({ queryKey: queryKeys.activityForEntity(auth.selectedTenantId, "JOB", invoice.jobId) });
       }
+    },
+  });
+
+  const shareMutation = useMutation({
+    mutationFn: () => shareInvoice(api, invoiceId, { expiresInDays: 14 }),
+    onSuccess: async (data) => {
+      const url = buildPublicInvoiceUrl(data.token);
+      setShareLink(url);
+      setShareExpiresAt(data.expiresAt ?? null);
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.invoice(auth.selectedTenantId, invoiceId),
+      });
+      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText && url) {
+        try {
+          await navigator.clipboard.writeText(url);
+        } catch {
+          // no-op
+        }
+      }
+      setShowSharePrompt(true);
+    },
+  });
+
+  const followUpMutation = useMutation({
+    mutationFn: async () => {
+      if (!invoice) {
+        throw new Error("Invoice unavailable");
+      }
+      const dueAt = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString();
+      return createTask(api, {
+        title: `Follow up on invoice ${invoice.invoiceNumber}`,
+        description: shareLink ? `Shared invoice link: ${shareLink}` : "Follow up on shared invoice.",
+        priority: "MEDIUM",
+        status: "TODO",
+        dueAt,
+        jobId: invoice.jobId,
+      });
+    },
+    onSuccess: (task) => {
+      router.push(`/app/tasks/${task.taskId}`);
+    },
+    onError: () => {
+      if (!invoice) return;
+      router.push(`/app/tasks/new?jobId=${invoice.jobId}`);
     },
   });
 
@@ -73,6 +123,18 @@ export default function InvoiceDetailPage() {
 
   const status = invoice.status as InvoiceStatus;
   const isTerminal = status === "PAID" || status === "VOID";
+
+  const handleCopyLink = async () => {
+    if (!shareLink) return;
+    try {
+      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(shareLink);
+      }
+    } catch {
+      // no-op
+    }
+    setShowSharePrompt(true);
+  };
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -183,6 +245,52 @@ export default function InvoiceDetailPage() {
         </div>
 
         <div className="space-y-6">
+          {canEdit && status !== "VOID" && (
+            <div className="bg-white rounded-xl border border-slate-200 p-6">
+              <h2 className="text-lg font-semibold text-slate-800 mb-4">Share</h2>
+              <button
+                type="button"
+                onClick={() => {
+                  if (shareLink) {
+                    handleCopyLink();
+                  } else {
+                    shareMutation.mutate();
+                  }
+                }}
+                disabled={shareMutation.isPending}
+                className="w-full px-4 py-2.5 text-sm font-medium text-sky-600 border border-sky-300 rounded-lg hover:bg-sky-50 disabled:opacity-60"
+              >
+                {shareMutation.isPending ? "Generating…" : shareLink ? "Copy link" : "Generate link"}
+              </button>
+              {shareLink && (
+                <button
+                  type="button"
+                  onClick={() => shareMutation.mutate()}
+                  disabled={shareMutation.isPending}
+                  className="mt-2 w-full px-4 py-2.5 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-60"
+                >
+                  Refresh link
+                </button>
+              )}
+              {shareLink && (
+                <div className="mt-4 space-y-2">
+                  <div className="grid gap-2 sm:grid-cols-1 sm:items-center">
+                    <input
+                      type="text"
+                      readOnly
+                      value={shareLink}
+                      data-testid="invoice-share-link-input"
+                      className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 bg-slate-50 text-slate-700"
+                    />
+                  </div>
+                  {shareExpiresAt && (
+                    <p className="text-xs text-slate-500">Expires: {formatDateTime(shareExpiresAt)}</p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {canEdit && !isTerminal && (
             <div className="bg-white rounded-xl border border-slate-200 p-6">
               <h2 className="text-lg font-semibold text-slate-800 mb-4">Update status</h2>
@@ -210,6 +318,41 @@ export default function InvoiceDetailPage() {
           )}
         </div>
       </div>
+      {showSharePrompt && shareLink && (
+        <NextStepPromptDialog
+          title="Link copied"
+          description="Share this secure invoice link with the customer."
+          actions={[
+            {
+              label: "Preview customer view",
+              variant: "primary",
+              testId: "invoice-share-next-step-preview",
+              onClick: () => {
+                if (typeof window !== "undefined") {
+                  window.open(shareLink, "_blank", "noopener,noreferrer");
+                }
+              },
+            },
+            {
+              label: followUpMutation.isPending ? "Creating follow-up..." : "Set follow-up in 2 days",
+              variant: "secondary",
+              disabled: followUpMutation.isPending,
+              testId: "invoice-share-next-step-followup",
+              onClick: async () => {
+                await followUpMutation.mutateAsync();
+              },
+            },
+            {
+              label: "Done",
+              variant: "secondary",
+              testId: "invoice-share-next-step-done",
+              onClick: () => setShowSharePrompt(false),
+            },
+          ]}
+          onClose={() => setShowSharePrompt(false)}
+          showDismissButton={false}
+        />
+      )}
     </div>
   );
 }
