@@ -33,6 +33,24 @@ Create a `.env.local` file in this directory:
 NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
 ```
 
+Backend mail settings for estimate/invoice email sending:
+
+```env
+APP_MAIL_ENABLED=true
+APP_MAIL_PROVIDER=resend
+APP_MAIL_RESEND_API_KEY=re_xxxxx
+APP_MAIL_FROM_EMAIL=notifications@mail.vivacrm.net
+APP_MAIL_FROM_NAME=VivaCRM
+APP_PUBLIC_BASE_URL=https://your-frontend-domain.com
+```
+
+Notes:
+
+1. `APP_MAIL_ENABLED` defaults to `false`.
+2. When mail is disabled or misconfigured, the backend falls back to `NoopEmailService`.
+3. Do not commit real API keys.
+4. Verify the sending domain or subdomain in Resend before enabling mail.
+
 ### Development
 
 ```bash

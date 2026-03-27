@@ -18,6 +18,8 @@ Thumbs.db
 .idea/
 .vscode/
 *.iml
+.env
+.env.*
 
 # ===== Archives / build artifacts =====
 *.zip

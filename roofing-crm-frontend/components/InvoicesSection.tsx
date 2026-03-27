@@ -20,6 +20,7 @@ import { ESTIMATE_STATUS_LABELS } from "@/lib/estimatesConstants";
 import { queryKeys } from "@/lib/queryKeys";
 import { formatDateTime, formatMoney } from "@/lib/format";
 import { StatusBadge } from "@/components/StatusBadge";
+import { DatePickerField } from "@/components/DatePickerField";
 import type {
   EstimateSummaryDto,
   InvoiceStatus,
@@ -67,9 +68,7 @@ export function InvoicesSection({
     enabled: ready && !!jobId && showCreateModal,
   });
 
-  const acceptedEstimates = (estimatesQuery.data ?? []).filter(
-    (e: EstimateSummaryDto) => e.status === "ACCEPTED"
-  );
+  const availableEstimates = estimatesQuery.data ?? [];
 
   const createMutation = useMutation({
     mutationFn: () =>
@@ -150,7 +149,7 @@ export function InvoicesSection({
 
       {invoices.length === 0 ? (
         <p className="text-sm text-slate-500">
-          No invoices yet. Create an invoice from an accepted estimate.
+          No invoices yet. Create an invoice from any estimate.
         </p>
       ) : (
         <div className="overflow-x-auto">
@@ -235,7 +234,7 @@ export function InvoicesSection({
             <form onSubmit={handleCreateSubmit} className="space-y-4">
               <div>
                 <label htmlFor="create-estimate" className="block text-sm font-medium text-slate-700 mb-1">
-                  Estimate (must be ACCEPTED)
+                  Estimate
                 </label>
                 <select
                   id="create-estimate"
@@ -245,28 +244,24 @@ export function InvoicesSection({
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
                 >
                   <option value="">Select estimate…</option>
-                  {acceptedEstimates.map((est: EstimateSummaryDto) => (
+                  {availableEstimates.map((est: EstimateSummaryDto) => (
                     <option key={est.id} value={est.id}>
                       {est.title || `Estimate ${est.id.slice(0, 8)}`} — {ESTIMATE_STATUS_LABELS[est.status]}
                     </option>
                   ))}
-                  {acceptedEstimates.length === 0 && estimatesQuery.data && (
+                  {availableEstimates.length === 0 && estimatesQuery.data && (
                     <option value="" disabled>
-                      No ACCEPTED estimates
+                      No estimates available
                     </option>
                   )}
                 </select>
               </div>
               <div>
-                <label htmlFor="create-due" className="block text-sm font-medium text-slate-700 mb-1">
-                  Due date (optional)
-                </label>
-                <input
+                <DatePickerField
                   id="create-due"
-                  type="date"
+                  label="Due date (optional)"
                   value={createDueAt}
-                  onChange={(e) => setCreateDueAt(e.target.value)}
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+                  onChange={setCreateDueAt}
                 />
               </div>
               <div>

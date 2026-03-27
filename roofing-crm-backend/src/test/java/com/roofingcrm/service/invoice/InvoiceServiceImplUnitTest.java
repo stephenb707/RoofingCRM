@@ -1,6 +1,7 @@
 package com.roofingcrm.service.invoice;
 
 import com.roofingcrm.api.v1.invoice.CreateInvoiceFromEstimateRequest;
+import com.roofingcrm.api.v1.invoice.SendInvoiceEmailRequest;
 import com.roofingcrm.api.v1.invoice.ShareInvoiceRequest;
 import com.roofingcrm.domain.entity.Estimate;
 import com.roofingcrm.domain.entity.EstimateItem;
@@ -14,6 +15,8 @@ import com.roofingcrm.domain.repository.EstimateRepository;
 import com.roofingcrm.domain.repository.InvoiceRepository;
 import com.roofingcrm.service.activity.ActivityEventService;
 import com.roofingcrm.service.exception.InvoiceConflictException;
+import com.roofingcrm.service.mail.EmailService;
+import com.roofingcrm.service.mail.PublicUrlProperties;
 import com.roofingcrm.service.tenant.TenantAccessService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -45,8 +48,11 @@ class InvoiceServiceImplUnitTest {
     private EstimateRepository estimateRepository;
     @Mock
     private ActivityEventService activityEventService;
+    @Mock
+    private EmailService emailService;
 
     private InvoiceServiceImpl service;
+    private PublicUrlProperties publicUrlProperties;
     private Tenant tenant;
     private Job job;
     private Estimate estimate;
@@ -61,10 +67,13 @@ class InvoiceServiceImplUnitTest {
                 invoiceRepository,
                 estimateRepository,
                 activityEventService,
-                new InvoiceMapper());
+                new InvoiceMapper(),
+                emailService,
+                publicUrlProperties = new PublicUrlProperties());
         tenantId = UUID.randomUUID();
         userId = UUID.randomUUID();
         estimateId = UUID.randomUUID();
+        publicUrlProperties.setPublicBaseUrl("https://crm.example.com");
 
         tenant = new Tenant();
         tenant.setId(tenantId);
@@ -90,19 +99,28 @@ class InvoiceServiceImplUnitTest {
     }
 
     @Test
-    void createFromEstimate_requiresAccepted_throws409WhenDraft() {
+    void createFromEstimate_allowsDraftEstimate() {
         estimate.setStatus(EstimateStatus.DRAFT);
 
         when(tenantAccessService.requireAnyRole(eq(tenantId), eq(userId), any(), anyString()))
                 .thenReturn(mock(com.roofingcrm.domain.entity.TenantUserMembership.class));
         when(tenantAccessService.loadTenantForUserOrThrow(tenantId, userId)).thenReturn(tenant);
         when(estimateRepository.findByIdAndTenantAndArchivedFalse(estimateId, tenant)).thenReturn(Optional.of(estimate));
+        when(invoiceRepository.findMaxInvoiceNumberSuffix(tenantId)).thenReturn(0L);
+        when(invoiceRepository.save(any())).thenAnswer(inv -> {
+            com.roofingcrm.domain.entity.Invoice invEntity = inv.getArgument(0);
+            invEntity.setId(UUID.randomUUID());
+            return invEntity;
+        });
 
         CreateInvoiceFromEstimateRequest req = new CreateInvoiceFromEstimateRequest();
         req.setEstimateId(estimateId);
 
-        assertThrows(InvoiceConflictException.class, () -> service.createFromEstimate(tenantId, userId, req));
-        verify(invoiceRepository, never()).save(any());
+        var result = service.createFromEstimate(tenantId, userId, req);
+
+        assertNotNull(result);
+        assertEquals("INV-1", result.getInvoiceNumber());
+        verify(invoiceRepository).save(any());
     }
 
     @Test
@@ -330,5 +348,71 @@ class InvoiceServiceImplUnitTest {
         assertNotEquals("expired-token", response.getToken());
         assertEquals(response.getToken(), invoice.getPublicToken());
         verify(invoiceRepository).save(eq(invoice));
+    }
+
+    @Test
+    void sendInvoiceEmail_whenDraft_transitionsToSent_setsSentAt_andSendsEmail() {
+        Invoice invoice = new Invoice();
+        invoice.setId(UUID.randomUUID());
+        invoice.setTenant(tenant);
+        invoice.setJob(job);
+        invoice.setInvoiceNumber("INV-300");
+        invoice.setStatus(InvoiceStatus.DRAFT);
+        invoice.setIssuedAt(Instant.now());
+        invoice.setTotal(BigDecimal.valueOf(1200));
+
+        when(tenantAccessService.requireAnyRole(eq(tenantId), eq(userId), any(), anyString()))
+                .thenReturn(mock(com.roofingcrm.domain.entity.TenantUserMembership.class));
+        when(tenantAccessService.loadTenantForUserOrThrow(tenantId, userId)).thenReturn(tenant);
+        when(invoiceRepository.findByIdAndTenantAndArchivedFalse(invoice.getId(), tenant)).thenReturn(Optional.of(invoice));
+        when(invoiceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        SendInvoiceEmailRequest request = new SendInvoiceEmailRequest();
+        request.setRecipientEmail("customer@example.com");
+        request.setRecipientName("Jane");
+
+        var response = service.sendInvoiceEmail(tenantId, userId, invoice.getId(), request);
+
+        assertTrue(response.isSuccess());
+        assertEquals(InvoiceStatus.SENT, invoice.getStatus());
+        assertNotNull(invoice.getSentAt());
+        assertTrue(response.getPublicUrl().contains("/invoice/"));
+        verify(emailService).send(argThat(message ->
+                "customer@example.com".equals(message.toEmail())
+                        && message.subject().contains("INV-300")
+                        && message.text().contains("View Invoice")
+        ));
+        verify(activityEventService).recordEvent(eq(tenant), eq(userId), eq(com.roofingcrm.domain.enums.ActivityEntityType.JOB), any(),
+                eq(com.roofingcrm.domain.enums.ActivityEventType.INVOICE_EMAIL_SENT), any(), any());
+    }
+
+    @Test
+    void sendInvoiceEmail_whenTokenValid_reusesExistingToken() {
+        Invoice invoice = new Invoice();
+        invoice.setId(UUID.randomUUID());
+        invoice.setTenant(tenant);
+        invoice.setJob(job);
+        invoice.setInvoiceNumber("INV-301");
+        invoice.setStatus(InvoiceStatus.SENT);
+        invoice.setIssuedAt(Instant.now());
+        invoice.setTotal(BigDecimal.valueOf(1200));
+        invoice.setPublicToken("existing-token");
+        invoice.setPublicEnabled(true);
+        invoice.setPublicExpiresAt(Instant.now().plusSeconds(3600));
+
+        when(tenantAccessService.requireAnyRole(eq(tenantId), eq(userId), any(), anyString()))
+                .thenReturn(mock(com.roofingcrm.domain.entity.TenantUserMembership.class));
+        when(tenantAccessService.loadTenantForUserOrThrow(tenantId, userId)).thenReturn(tenant);
+        when(invoiceRepository.findByIdAndTenantAndArchivedFalse(invoice.getId(), tenant)).thenReturn(Optional.of(invoice));
+        when(invoiceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        SendInvoiceEmailRequest request = new SendInvoiceEmailRequest();
+        request.setRecipientEmail("customer@example.com");
+
+        var response = service.sendInvoiceEmail(tenantId, userId, invoice.getId(), request);
+
+        assertTrue(response.isReusedExistingToken());
+        assertTrue(response.getPublicUrl().endsWith("/invoice/existing-token"));
+        verify(emailService).send(any());
     }
 }

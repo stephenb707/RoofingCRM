@@ -3,6 +3,8 @@ package com.roofingcrm.service.invoice;
 import com.roofingcrm.api.v1.invoice.CreateInvoiceFromEstimateRequest;
 import com.roofingcrm.api.v1.invoice.InvoiceDto;
 import com.roofingcrm.api.v1.invoice.InvoiceSummaryDto;
+import com.roofingcrm.api.v1.invoice.SendInvoiceEmailRequest;
+import com.roofingcrm.api.v1.invoice.SendInvoiceEmailResponse;
 import com.roofingcrm.api.v1.invoice.ShareInvoiceRequest;
 import com.roofingcrm.api.v1.invoice.ShareInvoiceResponse;
 import com.roofingcrm.domain.entity.Estimate;
@@ -12,7 +14,6 @@ import com.roofingcrm.domain.entity.InvoiceItem;
 import com.roofingcrm.domain.entity.Tenant;
 import com.roofingcrm.domain.enums.ActivityEntityType;
 import com.roofingcrm.domain.enums.ActivityEventType;
-import com.roofingcrm.domain.enums.EstimateStatus;
 import com.roofingcrm.domain.enums.InvoiceStatus;
 import com.roofingcrm.domain.enums.UserRole;
 import com.roofingcrm.domain.repository.EstimateRepository;
@@ -20,7 +21,11 @@ import com.roofingcrm.domain.repository.InvoiceRepository;
 import com.roofingcrm.service.activity.ActivityEventService;
 import com.roofingcrm.service.audit.AuditSupport;
 import com.roofingcrm.service.exception.InvoiceConflictException;
+import com.roofingcrm.service.exception.MailConfigurationException;
 import com.roofingcrm.service.exception.ResourceNotFoundException;
+import com.roofingcrm.service.mail.EmailService;
+import com.roofingcrm.service.mail.InvoiceEmailTemplateBuilder;
+import com.roofingcrm.service.mail.PublicUrlProperties;
 import com.roofingcrm.service.tenant.TenantAccessService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -50,6 +55,9 @@ public class InvoiceServiceImpl implements InvoiceService {
     private final EstimateRepository estimateRepository;
     private final ActivityEventService activityEventService;
     private final InvoiceMapper invoiceMapper;
+    private final EmailService emailService;
+    private final PublicUrlProperties publicUrlProperties;
+    private final InvoiceEmailTemplateBuilder invoiceEmailTemplateBuilder;
     private static final SecureRandom secureRandom = new SecureRandom();
 
     @Autowired
@@ -57,12 +65,17 @@ public class InvoiceServiceImpl implements InvoiceService {
                               InvoiceRepository invoiceRepository,
                               EstimateRepository estimateRepository,
                               ActivityEventService activityEventService,
-                              InvoiceMapper invoiceMapper) {
+                              InvoiceMapper invoiceMapper,
+                              EmailService emailService,
+                              PublicUrlProperties publicUrlProperties) {
         this.tenantAccessService = tenantAccessService;
         this.invoiceRepository = invoiceRepository;
         this.estimateRepository = estimateRepository;
         this.activityEventService = activityEventService;
         this.invoiceMapper = invoiceMapper;
+        this.emailService = emailService;
+        this.publicUrlProperties = publicUrlProperties;
+        this.invoiceEmailTemplateBuilder = new InvoiceEmailTemplateBuilder();
     }
 
     @Override
@@ -73,10 +86,6 @@ public class InvoiceServiceImpl implements InvoiceService {
 
         Estimate estimate = estimateRepository.findByIdAndTenantAndArchivedFalse(request.getEstimateId(), tenant)
                 .orElseThrow(() -> new ResourceNotFoundException("Estimate not found"));
-
-        if (estimate.getStatus() != EstimateStatus.ACCEPTED) {
-            throw new InvoiceConflictException("Estimate must be ACCEPTED to create an invoice");
-        }
 
         long suffix = invoiceRepository.findMaxInvoiceNumberSuffix(tenant.getId());
         String invoiceNumber = "INV-" + (suffix + 1);
@@ -203,44 +212,68 @@ public class InvoiceServiceImpl implements InvoiceService {
             throw new InvoiceConflictException("Cannot share a VOID invoice");
         }
 
-        Instant now = Instant.now();
-        if (invoice.getStatus() == InvoiceStatus.DRAFT) {
-            invoice.setStatus(InvoiceStatus.SENT);
-            if (invoice.getSentAt() == null) {
-                invoice.setSentAt(now);
-            }
-        }
-
         int days = (request != null && request.getExpiresInDays() != null) ? request.getExpiresInDays() : 14;
-        days = Math.min(365, Math.max(1, days));
-        Instant expiresAt = now.plusSeconds(days * 86400L);
-
-        boolean needNewToken = invoice.getPublicToken() == null || invoice.getPublicToken().isBlank()
-                || (invoice.getPublicExpiresAt() != null && invoice.getPublicExpiresAt().isBefore(now));
-        if (needNewToken) {
-            byte[] bytes = new byte[32];
-            secureRandom.nextBytes(bytes);
-            String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-            invoice.setPublicToken(token);
-        }
-
-        invoice.setPublicEnabled(true);
-        invoice.setPublicExpiresAt(expiresAt);
-        invoice.setPublicLastSharedAt(now);
-        AuditSupport.touchForUpdate(invoice, userId);
+        Instant now = Instant.now();
+        TokenState tokenState = ensurePublicShare(invoice, userId, now, days);
         Invoice saved = invoiceRepository.save(invoice);
 
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("invoiceId", saved.getId().toString());
         metadata.put("invoiceNumber", saved.getInvoiceNumber());
-        metadata.put("expiresAt", expiresAt.toString());
+        metadata.put("expiresAt", tokenState.expiresAt().toString());
         activityEventService.recordEvent(tenant, userId, ActivityEntityType.JOB,
                 Objects.requireNonNull(saved.getJob().getId()),
                 ActivityEventType.INVOICE_SHARED, "Invoice shared via public link", metadata);
 
         ShareInvoiceResponse response = new ShareInvoiceResponse();
         response.setToken(saved.getPublicToken());
-        response.setExpiresAt(expiresAt);
+        response.setExpiresAt(tokenState.expiresAt());
+        return response;
+    }
+
+    @Override
+    public SendInvoiceEmailResponse sendInvoiceEmail(@NonNull UUID tenantId, @NonNull UUID userId, UUID invoiceId, SendInvoiceEmailRequest request) {
+        tenantAccessService.requireAnyRole(tenantId, userId, Objects.requireNonNull(Set.of(UserRole.OWNER, UserRole.ADMIN, UserRole.SALES)),
+                "You do not have permission to email invoices.");
+        Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
+
+        Invoice invoice = invoiceRepository.findByIdAndTenantAndArchivedFalse(invoiceId, tenant)
+                .orElseThrow(() -> new ResourceNotFoundException("Invoice not found"));
+
+        if (invoice.getStatus() == InvoiceStatus.VOID) {
+            throw new InvoiceConflictException("Cannot email a VOID invoice");
+        }
+
+        int days = request.getExpiresInDays() != null ? request.getExpiresInDays() : 14;
+        Instant now = Instant.now();
+        TokenState tokenState = ensurePublicShare(invoice, userId, now, days);
+        Invoice saved = invoiceRepository.save(invoice);
+        String publicUrl = buildPublicInvoiceUrl(saved.getPublicToken());
+
+        emailService.send(invoiceEmailTemplateBuilder.build(
+                tenant,
+                saved,
+                request.getRecipientEmail(),
+                request.getRecipientName(),
+                request.getSubject(),
+                request.getMessage(),
+                publicUrl
+        ));
+
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("invoiceId", saved.getId().toString());
+        metadata.put("invoiceNumber", saved.getInvoiceNumber());
+        metadata.put("recipientEmail", request.getRecipientEmail());
+        metadata.put("publicUrl", publicUrl);
+        activityEventService.recordEvent(tenant, userId, ActivityEntityType.JOB,
+                Objects.requireNonNull(saved.getJob().getId()),
+                ActivityEventType.INVOICE_EMAIL_SENT, "Invoice emailed to " + request.getRecipientEmail(), metadata);
+
+        SendInvoiceEmailResponse response = new SendInvoiceEmailResponse();
+        response.setSuccess(true);
+        response.setSentAt(now);
+        response.setPublicUrl(publicUrl);
+        response.setReusedExistingToken(tokenState.reusedExistingToken());
         return response;
     }
 
@@ -256,6 +289,44 @@ public class InvoiceServiceImpl implements InvoiceService {
         } else {
             throw new InvoiceConflictException("Invalid status transition from " + from);
         }
+    }
+
+    private TokenState ensurePublicShare(Invoice invoice, UUID userId, Instant now, int days) {
+        if (invoice.getStatus() == InvoiceStatus.DRAFT) {
+            invoice.setStatus(InvoiceStatus.SENT);
+            if (invoice.getSentAt() == null) {
+                invoice.setSentAt(now);
+            }
+        }
+
+        int normalizedDays = Math.min(365, Math.max(1, days));
+        Instant expiresAt = now.plusSeconds(normalizedDays * 86400L);
+
+        boolean needNewToken = invoice.getPublicToken() == null || invoice.getPublicToken().isBlank()
+                || (invoice.getPublicExpiresAt() != null && invoice.getPublicExpiresAt().isBefore(now));
+        if (needNewToken) {
+            byte[] bytes = new byte[32];
+            secureRandom.nextBytes(bytes);
+            String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+            invoice.setPublicToken(token);
+        }
+
+        invoice.setPublicEnabled(true);
+        invoice.setPublicExpiresAt(expiresAt);
+        invoice.setPublicLastSharedAt(now);
+        AuditSupport.touchForUpdate(invoice, userId);
+        return new TokenState(expiresAt, !needNewToken);
+    }
+
+    private String buildPublicInvoiceUrl(String token) {
+        String baseUrl = publicUrlProperties.getPublicBaseUrl();
+        if (baseUrl == null || baseUrl.trim().isEmpty()) {
+            throw new MailConfigurationException("Public base URL is missing. Set APP_PUBLIC_BASE_URL before sending invoice emails.");
+        }
+        return baseUrl.replaceAll("/+$", "") + "/invoice/" + token;
+    }
+
+    private record TokenState(Instant expiresAt, boolean reusedExistingToken) {
     }
 
 }

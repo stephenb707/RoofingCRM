@@ -9,6 +9,7 @@ import { createEstimateForJob } from "@/lib/estimatesApi";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { queryKeys } from "@/lib/queryKeys";
 import type { EstimateItemRequest } from "@/lib/types";
+import { DatePickerField } from "@/components/DatePickerField";
 
 type EstimateItemDraft = Omit<EstimateItemRequest, "quantity" | "unitPrice"> & {
   quantity: string;
@@ -144,24 +145,20 @@ export default function NewEstimatePage() {
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Issue date (optional)</label>
-            <input
-              type="date"
-              value={issueDate}
-              onChange={(e) => setIssueDate(e.target.value)}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Valid until (optional)</label>
-            <input
-              type="date"
-              value={validUntil}
-              onChange={(e) => setValidUntil(e.target.value)}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-            />
-          </div>
+          <DatePickerField
+            id="new-estimate-issue-date"
+            label="Issue date (optional)"
+            value={issueDate}
+            onChange={setIssueDate}
+            placeholder="Select issue date…"
+          />
+          <DatePickerField
+            id="new-estimate-valid-until"
+            label="Valid until (optional)"
+            value={validUntil}
+            onChange={setValidUntil}
+            placeholder="Select expiry date…"
+          />
         </div>
 
         <div>

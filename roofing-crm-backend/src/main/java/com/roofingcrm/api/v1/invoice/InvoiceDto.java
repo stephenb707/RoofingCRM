@@ -24,6 +24,8 @@ public class InvoiceDto {
     private String notes;
     private UUID jobId;
     private UUID estimateId;
+    private String customerName;
+    private String customerEmail;
     private List<InvoiceItemDto> items;
     private Instant createdAt;
     private Instant updatedAt;

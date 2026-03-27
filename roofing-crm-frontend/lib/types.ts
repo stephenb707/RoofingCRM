@@ -235,6 +235,8 @@ export interface EstimateDto {
   id: string;
   jobId: string;
   customerId?: string | null;
+  customerName?: string | null;
+  customerEmail?: string | null;
   status: EstimateStatus;
   title?: string | null;
   notes?: string | null;
@@ -297,9 +299,39 @@ export interface ShareEstimateResponse {
   expiresAt: string;
 }
 
+export interface SendEstimateEmailRequest {
+  recipientEmail: string;
+  recipientName?: string;
+  subject?: string;
+  message?: string;
+  expiresInDays?: number;
+}
+
+export interface SendEstimateEmailResponse {
+  success: boolean;
+  sentAt: string;
+  publicUrl: string;
+  reusedExistingToken: boolean;
+}
+
 export interface ShareInvoiceResponse {
   token: string;
   expiresAt: string;
+}
+
+export interface SendInvoiceEmailRequest {
+  recipientEmail: string;
+  recipientName?: string;
+  subject?: string;
+  message?: string;
+  expiresInDays?: number;
+}
+
+export interface SendInvoiceEmailResponse {
+  success: boolean;
+  sentAt: string;
+  publicUrl: string;
+  reusedExistingToken: boolean;
 }
 
 export interface PublicEstimateItemDto {
@@ -357,6 +389,8 @@ export interface InvoiceDto {
   notes?: string | null;
   jobId: string;
   estimateId?: string | null;
+  customerName?: string | null;
+  customerEmail?: string | null;
   items?: InvoiceItemDto[];
   createdAt?: string | null;
   updatedAt?: string | null;
@@ -507,10 +541,12 @@ export type ActivityEventType =
   | "LEAD_CONVERTED_TO_JOB"
   | "ATTACHMENT_ADDED"
   | "ESTIMATE_SHARED"
+  | "ESTIMATE_EMAIL_SENT"
   | "ESTIMATE_ACCEPTED"
   | "ESTIMATE_REJECTED"
   | "INVOICE_CREATED"
   | "INVOICE_SHARED"
+  | "INVOICE_EMAIL_SENT"
   | "INVOICE_STATUS_CHANGED";
 
 export interface ActivityEventDto {

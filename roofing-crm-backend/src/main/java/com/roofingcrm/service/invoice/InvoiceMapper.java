@@ -27,6 +27,13 @@ public class InvoiceMapper {
         dto.setNotes(invoice.getNotes());
         dto.setJobId(invoice.getJob() != null ? invoice.getJob().getId() : null);
         dto.setEstimateId(invoice.getEstimate() != null ? invoice.getEstimate().getId() : null);
+        if (invoice.getJob() != null && invoice.getJob().getCustomer() != null) {
+            dto.setCustomerName(customerName(
+                    invoice.getJob().getCustomer().getFirstName(),
+                    invoice.getJob().getCustomer().getLastName()
+            ));
+            dto.setCustomerEmail(invoice.getJob().getCustomer().getEmail());
+        }
         dto.setCreatedAt(invoice.getCreatedAt());
         dto.setUpdatedAt(invoice.getUpdatedAt());
 
@@ -65,5 +72,12 @@ public class InvoiceMapper {
         dto.setCreatedAt(invoice.getCreatedAt());
         dto.setUpdatedAt(invoice.getUpdatedAt());
         return dto;
+    }
+
+    private String customerName(String firstName, String lastName) {
+        String first = firstName == null ? "" : firstName.trim();
+        String last = lastName == null ? "" : lastName.trim();
+        String fullName = (first + " " + last).trim();
+        return fullName.isEmpty() ? null : fullName;
     }
 }

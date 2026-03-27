@@ -6,6 +6,8 @@ import type {
   EstimateStatus,
   CreateEstimateRequest,
   UpdateEstimateRequest,
+  SendEstimateEmailRequest,
+  SendEstimateEmailResponse,
   ShareEstimateResponse,
   PublicEstimateDto,
   PublicEstimateDecisionRequest,
@@ -86,6 +88,18 @@ export async function shareEstimate(
   const res = await api.post<ShareEstimateResponse>(
     `/api/v1/estimates/${estimateId}/share`,
     Object.keys(payload).length > 0 ? payload : {}
+  );
+  return res.data;
+}
+
+export async function sendEstimateEmail(
+  api: AxiosInstance,
+  estimateId: string,
+  payload: SendEstimateEmailRequest
+): Promise<SendEstimateEmailResponse> {
+  const res = await api.post<SendEstimateEmailResponse>(
+    `/api/v1/estimates/${estimateId}/send-email`,
+    payload
   );
   return res.data;
 }

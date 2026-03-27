@@ -1,6 +1,7 @@
 package com.roofingcrm.service.estimate;
 
 import com.roofingcrm.api.v1.estimate.ShareEstimateRequest;
+import com.roofingcrm.api.v1.estimate.SendEstimateEmailRequest;
 import com.roofingcrm.domain.entity.Estimate;
 import com.roofingcrm.domain.entity.EstimateItem;
 import com.roofingcrm.domain.entity.Job;
@@ -9,6 +10,9 @@ import com.roofingcrm.domain.enums.EstimateStatus;
 import com.roofingcrm.domain.repository.EstimateRepository;
 import com.roofingcrm.domain.repository.JobRepository;
 import com.roofingcrm.service.activity.ActivityEventService;
+import com.roofingcrm.service.mail.EmailService;
+import com.roofingcrm.service.mail.PublicUrlProperties;
+import com.roofingcrm.service.exception.MailConfigurationException;
 import com.roofingcrm.service.exception.ResourceNotFoundException;
 import com.roofingcrm.service.tenant.TenantAccessService;
 import com.roofingcrm.service.tenant.TenantAccessDeniedException;
@@ -41,8 +45,11 @@ class EstimateServiceImplUnitTest {
     private EstimateRepository estimateRepository;
     @Mock
     private ActivityEventService activityEventService;
+    @Mock
+    private EmailService emailService;
 
     private EstimateServiceImpl service;
+    private PublicUrlProperties publicUrlProperties;
     private Tenant tenant;
     private Estimate estimate;
     private Job job;
@@ -57,10 +64,13 @@ class EstimateServiceImplUnitTest {
                 jobRepository,
                 estimateRepository,
                 activityEventService,
-                new EstimateMapper());
+                new EstimateMapper(),
+                emailService,
+                publicUrlProperties = new PublicUrlProperties());
         tenantId = UUID.randomUUID();
         userId = UUID.randomUUID();
         estimateId = UUID.randomUUID();
+        publicUrlProperties.setPublicBaseUrl("https://crm.example.com");
 
         tenant = new Tenant();
         tenant.setId(tenantId);
@@ -162,6 +172,74 @@ class EstimateServiceImplUnitTest {
         assertEquals(EstimateStatus.SENT, estimate.getStatus());
         assertEquals("existing-token", response.getToken());
         verify(estimateRepository).save(eq(estimate));
+    }
+
+    @Test
+    void sendEstimateEmail_whenDraft_transitionsToSent_sendsEmail_andReturnsPublicUrl() {
+        estimate.setStatus(EstimateStatus.DRAFT);
+        when(tenantAccessService.requireAnyRole(eq(tenantId), eq(userId), any(), anyString()))
+                .thenReturn(mock(com.roofingcrm.domain.entity.TenantUserMembership.class));
+        when(tenantAccessService.loadTenantForUserOrThrow(tenantId, userId)).thenReturn(tenant);
+        when(estimateRepository.findByIdAndTenantAndArchivedFalse(estimateId, tenant)).thenReturn(Optional.of(estimate));
+        when(estimateRepository.save(any(Estimate.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        SendEstimateEmailRequest request = new SendEstimateEmailRequest();
+        request.setRecipientEmail("customer@example.com");
+        request.setRecipientName("Jane");
+        request.setMessage("Please take a look.");
+
+        var response = service.sendEstimateEmail(tenantId, userId, estimateId, request);
+
+        assertTrue(response.isSuccess());
+        assertEquals(EstimateStatus.SENT, estimate.getStatus());
+        assertTrue(response.getPublicUrl().contains("/estimate/"));
+        assertFalse(response.isReusedExistingToken());
+        verify(emailService).send(argThat(message ->
+                "customer@example.com".equals(message.toEmail())
+                        && message.subject().contains("EST-1001")
+                        && message.text().contains("View Estimate")
+        ));
+        verify(activityEventService).recordEvent(eq(tenant), eq(userId), eq(com.roofingcrm.domain.enums.ActivityEntityType.JOB), any(),
+                eq(com.roofingcrm.domain.enums.ActivityEventType.ESTIMATE_EMAIL_SENT), any(), any());
+    }
+
+    @Test
+    void sendEstimateEmail_whenTokenValid_reusesExistingToken() {
+        estimate.setPublicToken("existing-token");
+        estimate.setPublicEnabled(true);
+        estimate.setPublicExpiresAt(java.time.Instant.now().plusSeconds(3600));
+        when(tenantAccessService.requireAnyRole(eq(tenantId), eq(userId), any(), anyString()))
+                .thenReturn(mock(com.roofingcrm.domain.entity.TenantUserMembership.class));
+        when(tenantAccessService.loadTenantForUserOrThrow(tenantId, userId)).thenReturn(tenant);
+        when(estimateRepository.findByIdAndTenantAndArchivedFalse(estimateId, tenant)).thenReturn(Optional.of(estimate));
+        when(estimateRepository.save(any(Estimate.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        SendEstimateEmailRequest request = new SendEstimateEmailRequest();
+        request.setRecipientEmail("customer@example.com");
+
+        var response = service.sendEstimateEmail(tenantId, userId, estimateId, request);
+
+        assertTrue(response.isReusedExistingToken());
+        assertTrue(response.getPublicUrl().endsWith("/estimate/existing-token"));
+        verify(emailService).send(any());
+    }
+
+    @Test
+    void sendEstimateEmail_whenPublicBaseUrlMissing_throwsClearError() {
+        publicUrlProperties.setPublicBaseUrl("");
+        when(tenantAccessService.requireAnyRole(eq(tenantId), eq(userId), any(), anyString()))
+                .thenReturn(mock(com.roofingcrm.domain.entity.TenantUserMembership.class));
+        when(tenantAccessService.loadTenantForUserOrThrow(tenantId, userId)).thenReturn(tenant);
+        when(estimateRepository.findByIdAndTenantAndArchivedFalse(estimateId, tenant)).thenReturn(Optional.of(estimate));
+        when(estimateRepository.save(any(Estimate.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        SendEstimateEmailRequest request = new SendEstimateEmailRequest();
+        request.setRecipientEmail("customer@example.com");
+
+        MailConfigurationException ex = assertThrows(MailConfigurationException.class,
+                () -> service.sendEstimateEmail(tenantId, userId, estimateId, request));
+        assertTrue(ex.getMessage().contains("APP_PUBLIC_BASE_URL"));
+        verify(emailService, never()).send(any());
     }
 
     private Estimate withSingleEstimateItem(Estimate base) {

@@ -168,6 +168,34 @@ class EstimateControllerTest {
     }
 
     @Test
+    void sendEstimateEmail_returnsSuccessPayload() throws Exception {
+        UUID tenantId = UUID.randomUUID();
+        UUID estimateId = UUID.randomUUID();
+
+        SendEstimateEmailResponse response = new SendEstimateEmailResponse();
+        response.setSuccess(true);
+        response.setPublicUrl("https://crm.example.com/estimate/abc123");
+        response.setSentAt(Instant.now());
+        response.setReusedExistingToken(false);
+
+        when(estimateService.sendEstimateEmail(eq(tenantId), eq(userId), eq(estimateId), any(SendEstimateEmailRequest.class)))
+                .thenReturn(response);
+
+        mockMvc.perform(post("/api/v1/estimates/{id}/send-email", estimateId)
+                        .header("X-Tenant-Id", tenantId.toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"recipientEmail":"customer@example.com","recipientName":"Jane","message":"Please review this estimate.","expiresInDays":14}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success", is(true)))
+                .andExpect(jsonPath("$.publicUrl", is("https://crm.example.com/estimate/abc123")))
+                .andExpect(jsonPath("$.sentAt").exists());
+
+        verify(estimateService).sendEstimateEmail(eq(tenantId), eq(userId), eq(estimateId), any(SendEstimateEmailRequest.class));
+    }
+
+    @Test
     void updateEstimateStatus_returnsOk() throws Exception {
         UUID tenantId = UUID.randomUUID();
         UUID estimateId = UUID.randomUUID();

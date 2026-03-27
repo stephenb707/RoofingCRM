@@ -3,6 +3,8 @@ package com.roofingcrm.service.invoice;
 import com.roofingcrm.api.v1.invoice.CreateInvoiceFromEstimateRequest;
 import com.roofingcrm.api.v1.invoice.InvoiceDto;
 import com.roofingcrm.api.v1.invoice.InvoiceSummaryDto;
+import com.roofingcrm.api.v1.invoice.SendInvoiceEmailRequest;
+import com.roofingcrm.api.v1.invoice.SendInvoiceEmailResponse;
 import com.roofingcrm.api.v1.invoice.ShareInvoiceRequest;
 import com.roofingcrm.api.v1.invoice.ShareInvoiceResponse;
 import com.roofingcrm.domain.enums.InvoiceStatus;
@@ -26,4 +28,6 @@ public interface InvoiceService {
     InvoiceDto updateStatus(@NonNull UUID tenantId, @NonNull UUID userId, UUID invoiceId, InvoiceStatus newStatus);
 
     ShareInvoiceResponse shareInvoice(@NonNull UUID tenantId, @NonNull UUID userId, UUID invoiceId, ShareInvoiceRequest request);
+
+    SendInvoiceEmailResponse sendInvoiceEmail(@NonNull UUID tenantId, @NonNull UUID userId, UUID invoiceId, SendInvoiceEmailRequest request);
 }

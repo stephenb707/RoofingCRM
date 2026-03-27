@@ -27,10 +27,10 @@ const mockInvoice: InvoiceDto = {
   items: [],
 };
 
-const mockAcceptedEstimate: EstimateDto = {
+const mockEstimate: EstimateDto = {
   id: "est-1",
   jobId: "job-1",
-  status: "ACCEPTED",
+  status: "DRAFT",
   title: "Roof Estimate",
   notes: null,
   items: [{ id: "i1", name: "Shingles", quantity: 100, unitPrice: 50 }],
@@ -62,7 +62,7 @@ describe("InvoicesSection", () => {
 
   it("create invoice opens modal and calls API on submit", async () => {
     const user = userEvent.setup();
-    mockedEstimatesApi.listEstimatesForJob.mockResolvedValue([mockAcceptedEstimate]);
+    mockedEstimatesApi.listEstimatesForJob.mockResolvedValue([mockEstimate]);
     mockedInvoicesApi.createInvoiceFromEstimate.mockResolvedValue({
       ...mockInvoice,
       id: "inv-new",
@@ -77,7 +77,7 @@ describe("InvoicesSection", () => {
 
     await user.click(screen.getByRole("button", { name: /Create Invoice/i }));
 
-    const select = await screen.findByLabelText(/Estimate.*ACCEPTED/i);
+    const select = await screen.findByLabelText(/^Estimate$/i);
     await user.selectOptions(select, "est-1");
 
     const createBtn = screen.getByRole("button", { name: /^Create$/ });

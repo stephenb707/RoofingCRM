@@ -6,6 +6,8 @@ import type {
   InvoiceStatus,
   PageResponse,
   PublicInvoiceDto,
+  SendInvoiceEmailRequest,
+  SendInvoiceEmailResponse,
   ShareInvoiceResponse,
 } from "./types";
 
@@ -31,7 +33,7 @@ const publicApi = axios.create({
 });
 
 /**
- * Create an invoice from an ACCEPTED estimate.
+ * Create an invoice from an estimate.
  */
 export async function createInvoiceFromEstimate(
   api: AxiosInstance,
@@ -110,6 +112,18 @@ export async function shareInvoice(
   const res = await api.post<ShareInvoiceResponse>(
     `/api/v1/invoices/${invoiceId}/share`,
     Object.keys(payload).length > 0 ? payload : {}
+  );
+  return res.data;
+}
+
+export async function sendInvoiceEmail(
+  api: AxiosInstance,
+  invoiceId: string,
+  payload: SendInvoiceEmailRequest
+): Promise<SendInvoiceEmailResponse> {
+  const res = await api.post<SendInvoiceEmailResponse>(
+    `/api/v1/invoices/${invoiceId}/send-email`,
+    payload
   );
   return res.data;
 }

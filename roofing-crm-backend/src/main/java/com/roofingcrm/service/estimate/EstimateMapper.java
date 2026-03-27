@@ -30,6 +30,9 @@ public class EstimateMapper {
             dto.setJobId(entity.getJob().getId());
             if (entity.getJob().getCustomer() != null) {
                 dto.setCustomerId(entity.getJob().getCustomer().getId());
+                dto.setCustomerName(customerName(entity.getJob().getCustomer().getFirstName(),
+                        entity.getJob().getCustomer().getLastName()));
+                dto.setCustomerEmail(entity.getJob().getCustomer().getEmail());
             }
         }
 
@@ -90,5 +93,12 @@ public class EstimateMapper {
         return items.stream()
                 .map(EstimateItem::getLineTotal)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private String customerName(String firstName, String lastName) {
+        String first = firstName == null ? "" : firstName.trim();
+        String last = lastName == null ? "" : lastName.trim();
+        String fullName = (first + " " + last).trim();
+        return fullName.isEmpty() ? null : fullName;
     }
 }

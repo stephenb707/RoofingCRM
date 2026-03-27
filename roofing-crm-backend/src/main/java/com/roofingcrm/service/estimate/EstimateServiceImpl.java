@@ -4,6 +4,8 @@ import com.roofingcrm.api.v1.estimate.CreateEstimateRequest;
 import com.roofingcrm.api.v1.estimate.EstimateDto;
 import com.roofingcrm.api.v1.estimate.EstimateItemRequest;
 import com.roofingcrm.api.v1.estimate.EstimateSummaryDto;
+import com.roofingcrm.api.v1.estimate.SendEstimateEmailRequest;
+import com.roofingcrm.api.v1.estimate.SendEstimateEmailResponse;
 import com.roofingcrm.api.v1.estimate.ShareEstimateRequest;
 import com.roofingcrm.api.v1.estimate.ShareEstimateResponse;
 import com.roofingcrm.api.v1.estimate.UpdateEstimateRequest;
@@ -19,7 +21,11 @@ import com.roofingcrm.domain.repository.EstimateRepository;
 import com.roofingcrm.domain.repository.JobRepository;
 import com.roofingcrm.service.activity.ActivityEventService;
 import com.roofingcrm.service.audit.AuditSupport;
+import com.roofingcrm.service.exception.MailConfigurationException;
 import com.roofingcrm.service.exception.ResourceNotFoundException;
+import com.roofingcrm.service.mail.EmailService;
+import com.roofingcrm.service.mail.EstimateEmailTemplateBuilder;
+import com.roofingcrm.service.mail.PublicUrlProperties;
 import com.roofingcrm.service.tenant.TenantAccessService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.lang.NonNull;
@@ -48,6 +54,9 @@ public class EstimateServiceImpl implements EstimateService {
     private final EstimateRepository estimateRepository;
     private final ActivityEventService activityEventService;
     private final EstimateMapper estimateMapper;
+    private final EmailService emailService;
+    private final PublicUrlProperties publicUrlProperties;
+    private final EstimateEmailTemplateBuilder estimateEmailTemplateBuilder;
 
     private static final SecureRandom secureRandom = new SecureRandom();
 
@@ -59,12 +68,17 @@ public class EstimateServiceImpl implements EstimateService {
                                JobRepository jobRepository,
                                EstimateRepository estimateRepository,
                                ActivityEventService activityEventService,
-                               EstimateMapper estimateMapper) {
+                               EstimateMapper estimateMapper,
+                               EmailService emailService,
+                               PublicUrlProperties publicUrlProperties) {
         this.tenantAccessService = tenantAccessService;
         this.jobRepository = jobRepository;
         this.estimateRepository = estimateRepository;
         this.activityEventService = activityEventService;
         this.estimateMapper = estimateMapper;
+        this.emailService = emailService;
+        this.publicUrlProperties = publicUrlProperties;
+        this.estimateEmailTemplateBuilder = new EstimateEmailTemplateBuilder();
     }
 
     @Override
@@ -200,43 +214,64 @@ public class EstimateServiceImpl implements EstimateService {
         Estimate estimate = estimateRepository.findByIdAndTenantAndArchivedFalse(estimateId, tenant)
                 .orElseThrow(() -> new ResourceNotFoundException("Estimate not found"));
 
-        if (estimate.getStatus() == EstimateStatus.DRAFT) {
-            estimate.setStatus(EstimateStatus.SENT);
-        }
-
         int days = (request != null && request.getExpiresInDays() != null) ? request.getExpiresInDays() : 14;
-        days = Math.min(365, Math.max(1, days));
-
         Instant now = Instant.now();
-        Instant expiresAt = now.plusSeconds(days * 86400L);
-
-        boolean needNewToken = estimate.getPublicToken() == null || estimate.getPublicToken().isBlank()
-                || (estimate.getPublicExpiresAt() != null && estimate.getPublicExpiresAt().isBefore(now));
-
-        if (needNewToken) {
-            byte[] bytes = new byte[32];
-            secureRandom.nextBytes(bytes);
-            String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-            estimate.setPublicToken(token);
-        }
-
-        estimate.setPublicEnabled(true);
-        estimate.setPublicExpiresAt(expiresAt);
-        estimate.setPublicLastSharedAt(now);
-        AuditSupport.touchForUpdate(estimate, userId);
-        Estimate saved = estimateRepository.save(estimate);
+        TokenState tokenState = ensurePublicShare(estimate, userId, now, days);
+        Estimate saved = estimateRepository.save(Objects.requireNonNull(estimate));
 
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("estimateId", saved.getId().toString());
         metadata.put("estimateNumber", saved.getEstimateNumber());
-        metadata.put("expiresAt", expiresAt.toString());
+        metadata.put("expiresAt", tokenState.expiresAt().toString());
         activityEventService.recordEvent(tenant, userId, ActivityEntityType.JOB,
                 Objects.requireNonNull(saved.getJob().getId()),
                 ActivityEventType.ESTIMATE_SHARED, "Estimate shared via public link", metadata);
 
         ShareEstimateResponse response = new ShareEstimateResponse();
         response.setToken(saved.getPublicToken());
-        response.setExpiresAt(expiresAt);
+        response.setExpiresAt(tokenState.expiresAt());
+        return response;
+    }
+
+    @Override
+    public SendEstimateEmailResponse sendEstimateEmail(@NonNull UUID tenantId, @NonNull UUID userId, UUID estimateId, SendEstimateEmailRequest request) {
+        tenantAccessService.requireAnyRole(tenantId, userId, Objects.requireNonNull(Set.of(UserRole.OWNER, UserRole.ADMIN, UserRole.SALES)),
+                "You do not have permission to email estimates.");
+        Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
+
+        Estimate estimate = estimateRepository.findByIdAndTenantAndArchivedFalse(estimateId, tenant)
+                .orElseThrow(() -> new ResourceNotFoundException("Estimate not found"));
+
+        int days = request.getExpiresInDays() != null ? request.getExpiresInDays() : 14;
+        Instant now = Instant.now();
+        TokenState tokenState = ensurePublicShare(estimate, userId, now, days);
+        Estimate saved = estimateRepository.save(Objects.requireNonNull(estimate));
+        String publicUrl = buildPublicEstimateUrl(saved.getPublicToken());
+
+        emailService.send(estimateEmailTemplateBuilder.build(
+                tenant,
+                saved,
+                request.getRecipientEmail(),
+                request.getRecipientName(),
+                request.getSubject(),
+                request.getMessage(),
+                publicUrl
+        ));
+
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("estimateId", saved.getId().toString());
+        metadata.put("estimateNumber", saved.getEstimateNumber());
+        metadata.put("recipientEmail", request.getRecipientEmail());
+        metadata.put("publicUrl", publicUrl);
+        activityEventService.recordEvent(tenant, userId, ActivityEntityType.JOB,
+                Objects.requireNonNull(saved.getJob().getId()),
+                ActivityEventType.ESTIMATE_EMAIL_SENT, "Estimate emailed to " + request.getRecipientEmail(), metadata);
+
+        SendEstimateEmailResponse response = new SendEstimateEmailResponse();
+        response.setSuccess(true);
+        response.setSentAt(now);
+        response.setPublicUrl(publicUrl);
+        response.setReusedExistingToken(tokenState.reusedExistingToken());
         return response;
     }
 
@@ -259,6 +294,42 @@ public class EstimateServiceImpl implements EstimateService {
         return items.stream()
                 .map(EstimateItem::getLineTotal)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private TokenState ensurePublicShare(Estimate estimate, UUID userId, Instant now, int days) {
+        if (estimate.getStatus() == EstimateStatus.DRAFT) {
+            estimate.setStatus(EstimateStatus.SENT);
+        }
+
+        int normalizedDays = Math.min(365, Math.max(1, days));
+        Instant expiresAt = now.plusSeconds(normalizedDays * 86400L);
+
+        boolean needNewToken = estimate.getPublicToken() == null || estimate.getPublicToken().isBlank()
+                || (estimate.getPublicExpiresAt() != null && estimate.getPublicExpiresAt().isBefore(now));
+
+        if (needNewToken) {
+            byte[] bytes = new byte[32];
+            secureRandom.nextBytes(bytes);
+            String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+            estimate.setPublicToken(token);
+        }
+
+        estimate.setPublicEnabled(true);
+        estimate.setPublicExpiresAt(expiresAt);
+        estimate.setPublicLastSharedAt(now);
+        AuditSupport.touchForUpdate(estimate, userId);
+        return new TokenState(expiresAt, !needNewToken);
+    }
+
+    private String buildPublicEstimateUrl(String token) {
+        String baseUrl = publicUrlProperties.getPublicBaseUrl();
+        if (baseUrl == null || baseUrl.trim().isEmpty()) {
+            throw new MailConfigurationException("Public base URL is missing. Set APP_PUBLIC_BASE_URL before sending estimate emails.");
+        }
+        return baseUrl.replaceAll("/+$", "") + "/estimate/" + token;
+    }
+
+    private record TokenState(Instant expiresAt, boolean reusedExistingToken) {
     }
 
 }
