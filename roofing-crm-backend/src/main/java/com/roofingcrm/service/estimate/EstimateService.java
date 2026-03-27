@@ -3,6 +3,8 @@ package com.roofingcrm.service.estimate;
 import com.roofingcrm.api.v1.estimate.CreateEstimateRequest;
 import com.roofingcrm.api.v1.estimate.EstimateDto;
 import com.roofingcrm.api.v1.estimate.EstimateSummaryDto;
+import com.roofingcrm.api.v1.estimate.SendEstimateEmailRequest;
+import com.roofingcrm.api.v1.estimate.SendEstimateEmailResponse;
 import com.roofingcrm.api.v1.estimate.ShareEstimateRequest;
 import com.roofingcrm.api.v1.estimate.ShareEstimateResponse;
 import com.roofingcrm.api.v1.estimate.UpdateEstimateRequest;
@@ -25,4 +27,6 @@ public interface EstimateService {
     EstimateDto updateEstimateStatus(@NonNull UUID tenantId, @NonNull UUID userId, UUID estimateId, EstimateStatus newStatus);
 
     ShareEstimateResponse shareEstimate(@NonNull UUID tenantId, @NonNull UUID userId, UUID estimateId, ShareEstimateRequest request);
+
+    SendEstimateEmailResponse sendEstimateEmail(@NonNull UUID tenantId, @NonNull UUID userId, UUID estimateId, SendEstimateEmailRequest request);
 }

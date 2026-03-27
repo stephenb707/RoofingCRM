@@ -37,10 +37,12 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   LEAD_CONVERTED_TO_JOB: "Converted to job",
   ATTACHMENT_ADDED: "Attachment added",
   ESTIMATE_SHARED: "Estimate shared",
+  ESTIMATE_EMAIL_SENT: "Estimate emailed",
   ESTIMATE_ACCEPTED: "Estimate accepted",
   ESTIMATE_REJECTED: "Estimate rejected",
   INVOICE_CREATED: "Invoice created",
   INVOICE_SHARED: "Invoice shared",
+  INVOICE_EMAIL_SENT: "Invoice emailed",
   INVOICE_STATUS_CHANGED: "Invoice status changed",
 };
 
@@ -221,29 +223,34 @@ export function ActivitySection({ entityType, entityId }: ActivitySectionProps) 
         </div>
       </form>
 
-      <ul className="divide-y divide-slate-100 space-y-0">
-        {events.length === 0 ? (
-          <li className="py-2 text-sm text-slate-500">No activity yet</li>
-        ) : (
-          events.map((evt) => (
-            <li key={evt.activityId} className="py-3 first:pt-0">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <span className="text-xs font-medium text-slate-500 uppercase">
-                    {EVENT_TYPE_LABELS[evt.eventType] ?? evt.eventType}
-                  </span>
-                  <span className="text-xs text-slate-400 ml-2">
-                    {formatDateTime(evt.createdAt)} · {getActorLabel(evt, auth.userId ?? null)}
-                  </span>
+      <div
+        className="max-h-80 overflow-y-auto pr-2 overscroll-contain"
+        aria-label="Activity feed"
+      >
+        <ul className="divide-y divide-slate-100 space-y-0">
+          {events.length === 0 ? (
+            <li className="py-2 text-sm text-slate-500">No activity yet</li>
+          ) : (
+            events.map((evt) => (
+              <li key={evt.activityId} className="py-3 first:pt-0">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <span className="text-xs font-medium text-slate-500 uppercase">
+                      {EVENT_TYPE_LABELS[evt.eventType] ?? evt.eventType}
+                    </span>
+                    <span className="text-xs text-slate-400 ml-2">
+                      {formatDateTime(evt.createdAt)} · {getActorLabel(evt, auth.userId ?? null)}
+                    </span>
+                  </div>
                 </div>
-              </div>
-              <p className="mt-1 text-sm text-slate-700 whitespace-pre-wrap">
-                {evt.message}
-              </p>
-            </li>
-          ))
-        )}
-      </ul>
+                <p className="mt-1 text-sm text-slate-700 whitespace-pre-wrap">
+                  {evt.message}
+                </p>
+              </li>
+            ))
+          )}
+        </ul>
+      </div>
     </div>
   );
 }

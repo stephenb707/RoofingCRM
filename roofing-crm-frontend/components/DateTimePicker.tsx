@@ -53,6 +53,7 @@ export function DateTimePicker({
   const { buttonRef, popoverRef, style } = usePopoverPlacement(open, {
     maxWidthPx: 320,
     fallbackHeightPx: 420,
+    collisionPaddingPx: 24,
   });
 
   useEffect(() => {
@@ -106,7 +107,6 @@ export function DateTimePicker({
     setDraftDate(undefined);
     setDraftTime("09:00");
     onChange("");
-    setOpen(false);
   };
 
   const handleCancel = () => {
@@ -128,7 +128,7 @@ export function DateTimePicker({
         type="button"
         id={id}
         onClick={() => setOpen((o) => !o)}
-        className={`w-full border border-slate-300 rounded-lg px-4 py-2.5 text-left text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent bg-white ${className}`}
+        className={`w-full border border-slate-300 rounded-lg px-3 py-2 text-left text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent bg-white ${className}`}
       >
         {displayText}
       </button>
@@ -136,14 +136,13 @@ export function DateTimePicker({
       {open && (
         <div
           ref={popoverRef}
-          className="max-w-[min(95vw,320px)] bg-white rounded-xl border border-slate-200 shadow-lg p-4 overflow-auto"
+          className="w-auto max-w-[min(95vw,300px)] bg-white rounded-xl border border-slate-200 shadow-lg p-2 overflow-visible"
           style={
             style
               ? {
                   position: style.position,
                   top: style.top,
                   left: style.left,
-                  maxHeight: style.maxHeight,
                   zIndex: style.zIndex,
                 }
               : { visibility: "hidden" as const }
@@ -153,23 +152,44 @@ export function DateTimePicker({
             mode="single"
             selected={draftDate}
             onSelect={setDraftDate}
+            showOutsideDays
+            className="text-sm"
+            classNames={{
+              month: "space-y-2",
+              caption: "flex items-center justify-between px-1",
+              caption_label: "text-sm font-medium",
+              nav: "flex items-center gap-1",
+              nav_button: "h-7 w-7 rounded-md border border-slate-200 hover:bg-slate-50",
+              table: "w-full border-collapse",
+              head_row: "flex",
+              head_cell: "w-8 text-[11px] font-medium text-slate-500",
+              row: "flex w-full mt-1",
+              cell: "relative w-8 h-8 p-0 text-center",
+              day: "h-8 w-8 rounded-md p-0 text-sm hover:bg-slate-100",
+              selected: "!bg-sky-700 !text-white hover:!bg-sky-700 focus:!bg-sky-700",
+              day_selected: "!bg-sky-700 !text-white hover:!bg-sky-700 focus:!bg-sky-700",
+              today: "font-semibold text-sky-700",
+              day_today: "font-semibold text-sky-700",
+              outside: "text-slate-300",
+              day_outside: "text-slate-300",
+            }}
           />
-          <div className="mt-4 pt-4 border-t border-slate-100">
-            <label className="block text-xs font-medium text-slate-500 mb-1.5">
+          <div className="mt-2 pt-2 border-t border-slate-100">
+            <label className="block text-xs font-medium text-slate-500 mb-1">
               Time
             </label>
             <input
               type="time"
               value={draftTime}
               onChange={(e) => setDraftTime(e.target.value)}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+              className="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
             />
           </div>
-          <div className="flex items-center justify-between gap-2 mt-4 pt-4 border-t border-slate-100">
+          <div className="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-slate-100">
             <button
               type="button"
               onClick={handleClear}
-              className="text-sm text-slate-600 hover:text-slate-800"
+              className="text-xs text-slate-600 hover:text-slate-800"
             >
               Clear
             </button>
@@ -177,14 +197,14 @@ export function DateTimePicker({
               <button
                 type="button"
                 onClick={handleCancel}
-                className="px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 rounded-lg"
+                className="px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100 rounded-lg"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleConfirm}
-                className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-sm font-medium rounded-lg"
+                className="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white text-xs font-medium rounded-lg"
               >
                 Confirm
               </button>

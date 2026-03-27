@@ -6,6 +6,8 @@ import com.roofingcrm.service.exception.EstimateLinkExpiredException;
 import com.roofingcrm.service.exception.InvoiceLinkExpiredException;
 import com.roofingcrm.service.exception.InviteConflictException;
 import com.roofingcrm.service.exception.LeadConversionNotAllowedException;
+import com.roofingcrm.service.exception.MailConfigurationException;
+import com.roofingcrm.service.exception.MailDeliveryException;
 import com.roofingcrm.service.exception.NoPaidInvoicesForYearException;
 import com.roofingcrm.service.exception.ResourceNotFoundException;
 import com.roofingcrm.service.tenant.TenantAccessDeniedException;
@@ -129,6 +131,32 @@ public class GlobalExceptionHandler {
                 request.getRequestURI()
         );
         return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+    }
+
+    @ExceptionHandler(MailConfigurationException.class)
+    public ResponseEntity<ApiErrorResponse> handleMailConfiguration(MailConfigurationException ex,
+                                                                    HttpServletRequest request) {
+        ApiErrorResponse body = new ApiErrorResponse(
+                Instant.now(),
+                HttpStatus.CONFLICT.value(),
+                HttpStatus.CONFLICT.getReasonPhrase(),
+                ex.getMessage(),
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+    }
+
+    @ExceptionHandler(MailDeliveryException.class)
+    public ResponseEntity<ApiErrorResponse> handleMailDelivery(MailDeliveryException ex,
+                                                               HttpServletRequest request) {
+        ApiErrorResponse body = new ApiErrorResponse(
+                Instant.now(),
+                HttpStatus.BAD_GATEWAY.value(),
+                HttpStatus.BAD_GATEWAY.getReasonPhrase(),
+                ex.getMessage(),
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(body);
     }
 
     @ExceptionHandler(EstimateLinkExpiredException.class)

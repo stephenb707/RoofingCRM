@@ -35,6 +35,7 @@ management:
       show-details: when_authorized
 
 app:
+  public-base-url: ${APP_PUBLIC_BASE_URL:http://localhost:3000}
   cors:
     allowed-origins:
       - "http://localhost:3000"
@@ -54,3 +55,10 @@ app:
   storage:
     local:
       base-dir: "./uploads"
+  mail:
+    enabled: ${APP_MAIL_ENABLED:false}
+    provider: ${APP_MAIL_PROVIDER:resend}
+    from-email: ${APP_MAIL_FROM_EMAIL:}
+    from-name: ${APP_MAIL_FROM_NAME:VivaCRM}
+    resend:
+      api-key: ${APP_MAIL_RESEND_API_KEY:}

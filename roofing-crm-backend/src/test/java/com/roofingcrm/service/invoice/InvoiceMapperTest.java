@@ -1,7 +1,9 @@
 package com.roofingcrm.service.invoice;
 
+import com.roofingcrm.domain.entity.Customer;
 import com.roofingcrm.domain.entity.Invoice;
 import com.roofingcrm.domain.entity.InvoiceItem;
+import com.roofingcrm.domain.entity.Job;
 import com.roofingcrm.domain.enums.InvoiceStatus;
 import org.junit.jupiter.api.Test;
 
@@ -57,5 +59,28 @@ class InvoiceMapperTest {
         assertEquals(1, dto.getItems().size());
         assertEquals("Labor", dto.getItems().get(0).getName());
         assertEquals(new BigDecimal("200.00"), dto.getItems().get(0).getLineTotal());
+    }
+
+    @Test
+    void toDto_mapsCustomerNameAndEmailFromJobCustomer() {
+        Invoice invoice = new Invoice();
+        invoice.setId(UUID.randomUUID());
+        invoice.setInvoiceNumber("INV-3");
+        invoice.setStatus(InvoiceStatus.DRAFT);
+
+        Customer customer = new Customer();
+        customer.setFirstName("Jane");
+        customer.setLastName("Doe");
+        customer.setEmail("jane@example.com");
+
+        Job job = new Job();
+        job.setId(UUID.randomUUID());
+        job.setCustomer(customer);
+        invoice.setJob(job);
+
+        var dto = mapper.toDto(invoice);
+
+        assertEquals("Jane Doe", dto.getCustomerName());
+        assertEquals("jane@example.com", dto.getCustomerEmail());
     }
 }

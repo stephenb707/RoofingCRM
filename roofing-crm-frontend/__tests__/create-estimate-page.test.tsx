@@ -103,4 +103,12 @@ describe("NewEstimatePage", () => {
       );
     });
   });
+
+  it("uses custom date picker fields instead of native date inputs", () => {
+    render(<NewEstimatePage />);
+
+    expect(document.querySelector('input[type="date"]')).toBeNull();
+    expect(screen.getByRole("button", { name: /Issue date \(optional\)/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Valid until \(optional\)/i })).toBeInTheDocument();
+  });
 });

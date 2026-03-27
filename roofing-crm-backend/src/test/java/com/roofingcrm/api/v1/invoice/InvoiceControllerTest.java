@@ -175,4 +175,32 @@ class InvoiceControllerTest {
 
         verify(invoiceService).updateStatus(eq(tenantId), eq(userId), eq(invoiceId), eq(InvoiceStatus.SENT));
     }
+
+    @Test
+    void sendInvoiceEmail_returnsSuccessPayload() throws Exception {
+        UUID tenantId = UUID.randomUUID();
+        UUID invoiceId = UUID.randomUUID();
+
+        SendInvoiceEmailResponse response = new SendInvoiceEmailResponse();
+        response.setSuccess(true);
+        response.setPublicUrl("https://crm.example.com/invoice/abc123");
+        response.setSentAt(Instant.now());
+        response.setReusedExistingToken(true);
+
+        when(invoiceService.sendInvoiceEmail(eq(tenantId), eq(userId), eq(invoiceId), any(SendInvoiceEmailRequest.class)))
+                .thenReturn(response);
+
+        mockMvc.perform(post("/api/v1/invoices/{id}/send-email", invoiceId)
+                        .header("X-Tenant-Id", tenantId.toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"recipientEmail":"customer@example.com","recipientName":"Jane","message":"Please review this invoice.","expiresInDays":14}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success", is(true)))
+                .andExpect(jsonPath("$.publicUrl", is("https://crm.example.com/invoice/abc123")))
+                .andExpect(jsonPath("$.reusedExistingToken", is(true)));
+
+        verify(invoiceService).sendInvoiceEmail(eq(tenantId), eq(userId), eq(invoiceId), any(SendInvoiceEmailRequest.class));
+    }
 }

@@ -94,4 +94,15 @@ public class InvoiceController {
                 request != null ? request : new ShareInvoiceRequest());
         return ResponseEntity.ok(response);
     }
+
+    @PostMapping("/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}/send-email")
+    public ResponseEntity<SendInvoiceEmailResponse> sendInvoiceEmail(
+            @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
+            @PathVariable("id") UUID invoiceId,
+            @Valid @RequestBody SendInvoiceEmailRequest request) {
+
+        UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
+        SendInvoiceEmailResponse response = invoiceService.sendInvoiceEmail(tenantId, userId, invoiceId, request);
+        return ResponseEntity.ok(response);
+    }
 }

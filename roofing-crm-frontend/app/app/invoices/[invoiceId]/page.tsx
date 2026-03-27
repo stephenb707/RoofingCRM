@@ -5,7 +5,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuthReady } from "@/lib/AuthContext";
-import { getInvoice, updateInvoiceStatus, shareInvoice, buildPublicInvoiceUrl } from "@/lib/invoicesApi";
+import { getInvoice, updateInvoiceStatus, shareInvoice, buildPublicInvoiceUrl, sendInvoiceEmail } from "@/lib/invoicesApi";
 import { createTask } from "@/lib/tasksApi";
 import { getApiErrorMessage } from "@/lib/apiError";
 import {
@@ -17,6 +17,7 @@ import { formatDateTime, formatMoney } from "@/lib/format";
 import { StatusBadge } from "@/components/StatusBadge";
 import type { InvoiceStatus } from "@/lib/types";
 import { NextStepPromptDialog } from "@/components/NextStepPromptDialog";
+import { SendEmailModal } from "@/components/SendEmailModal";
 
 function getNextStatus(current: InvoiceStatus): InvoiceStatus | null {
   if (current === "SENT") return "PAID";
@@ -32,6 +33,8 @@ export default function InvoiceDetailPage() {
   const [shareLink, setShareLink] = useState<string | null>(null);
   const [shareExpiresAt, setShareExpiresAt] = useState<string | null>(null);
   const [showSharePrompt, setShowSharePrompt] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailSuccess, setEmailSuccess] = useState<string | null>(null);
 
   const canEdit =
     auth.tenants.find((t) => t.tenantId === auth.selectedTenantId)?.role === "OWNER" ||
@@ -96,6 +99,26 @@ export default function InvoiceDetailPage() {
     onError: () => {
       if (!invoice) return;
       router.push(`/app/tasks/new?jobId=${invoice.jobId}`);
+    },
+  });
+
+  const sendEmailMutation = useMutation({
+    mutationFn: (payload: {
+      recipientEmail: string;
+      recipientName?: string;
+      message?: string;
+      expiresInDays?: number;
+    }) => sendInvoiceEmail(api, invoiceId, payload),
+    onSuccess: (data, variables) => {
+      setShareLink(data.publicUrl);
+      setShareExpiresAt(null);
+      setEmailSuccess(`Email sent to ${variables.recipientEmail}.`);
+      setShowEmailModal(false);
+      queryClient.invalidateQueries({ queryKey: queryKeys.invoice(auth.selectedTenantId, invoiceId) });
+      if (invoice?.jobId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.invoicesForJob(auth.selectedTenantId, invoice.jobId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.activityForEntity(auth.selectedTenantId, "JOB", invoice.jobId) });
+      }
     },
   });
 
@@ -248,6 +271,11 @@ export default function InvoiceDetailPage() {
           {canEdit && status !== "VOID" && (
             <div className="bg-white rounded-xl border border-slate-200 p-6">
               <h2 className="text-lg font-semibold text-slate-800 mb-4">Share</h2>
+              {emailSuccess && (
+                <div className="mb-3 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                  {emailSuccess}
+                </div>
+              )}
               <button
                 type="button"
                 onClick={() => {
@@ -261,6 +289,17 @@ export default function InvoiceDetailPage() {
                 className="w-full px-4 py-2.5 text-sm font-medium text-sky-600 border border-sky-300 rounded-lg hover:bg-sky-50 disabled:opacity-60"
               >
                 {shareMutation.isPending ? "Generating…" : shareLink ? "Copy link" : "Generate link"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setEmailSuccess(null);
+                  setShowEmailModal(true);
+                }}
+                disabled={sendEmailMutation.isPending}
+                className="mt-2 w-full px-4 py-2.5 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-60"
+              >
+                {sendEmailMutation.isPending ? "Sending..." : "Send email"}
               </button>
               {shareLink && (
                 <button
@@ -351,6 +390,17 @@ export default function InvoiceDetailPage() {
           ]}
           onClose={() => setShowSharePrompt(false)}
           showDismissButton={false}
+        />
+      )}
+      {showEmailModal && (
+        <SendEmailModal
+          title="Send invoice by email"
+          isSubmitting={sendEmailMutation.isPending}
+          error={sendEmailMutation.isError ? getApiErrorMessage(sendEmailMutation.error, "Failed to send invoice email.") : null}
+          initialRecipientEmail={invoice.customerEmail ?? ""}
+          initialRecipientName={invoice.customerName ?? ""}
+          onClose={() => setShowEmailModal(false)}
+          onSubmit={(values) => sendEmailMutation.mutate(values)}
         />
       )}
     </div>

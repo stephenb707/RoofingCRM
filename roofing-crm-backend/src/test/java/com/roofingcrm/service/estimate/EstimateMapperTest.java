@@ -1,7 +1,9 @@
 package com.roofingcrm.service.estimate;
 
+import com.roofingcrm.domain.entity.Customer;
 import com.roofingcrm.domain.entity.Estimate;
 import com.roofingcrm.domain.entity.EstimateItem;
+import com.roofingcrm.domain.entity.Job;
 import com.roofingcrm.domain.enums.EstimateStatus;
 import org.junit.jupiter.api.Test;
 
@@ -65,5 +67,29 @@ class EstimateMapperTest {
         assertEquals(2, dto.getItems().size());
         assertEquals(new BigDecimal("250.00"), dto.getSubtotal());
         assertEquals(new BigDecimal("250.00"), dto.getTotal());
+    }
+
+    @Test
+    void toDto_mapsCustomerNameAndEmailFromJobCustomer() {
+        Estimate estimate = new Estimate();
+        estimate.setId(UUID.randomUUID());
+        estimate.setStatus(EstimateStatus.DRAFT);
+
+        Customer customer = new Customer();
+        customer.setId(UUID.randomUUID());
+        customer.setFirstName("Jane");
+        customer.setLastName("Doe");
+        customer.setEmail("jane@example.com");
+
+        Job job = new Job();
+        job.setId(UUID.randomUUID());
+        job.setCustomer(customer);
+        estimate.setJob(job);
+
+        var dto = mapper.toDto(estimate);
+
+        assertEquals(customer.getId(), dto.getCustomerId());
+        assertEquals("Jane Doe", dto.getCustomerName());
+        assertEquals("jane@example.com", dto.getCustomerEmail());
     }
 }

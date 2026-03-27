@@ -9,6 +9,7 @@ import { getEstimate, updateEstimate } from "@/lib/estimatesApi";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { queryKeys } from "@/lib/queryKeys";
 import type { EstimateItemRequest } from "@/lib/types";
+import { DatePickerField } from "@/components/DatePickerField";
 
 function toDateInputValue(s: string | null | undefined): string {
   if (!s) return "";
@@ -168,28 +169,18 @@ export default function EditEstimatePage() {
               />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="issueDate" className="block text-sm font-medium text-slate-700 mb-1.5">Issue date</label>
-                <input
-                  id="issueDate"
-                  name="issueDate"
-                  type="date"
-                  value={issueDate}
-                  onChange={(e) => setIssueDate(e.target.value)}
-                  className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
-                />
-              </div>
-              <div>
-                <label htmlFor="validUntil" className="block text-sm font-medium text-slate-700 mb-1.5">Valid until</label>
-                <input
-                  id="validUntil"
-                  name="validUntil"
-                  type="date"
-                  value={validUntil}
-                  onChange={(e) => setValidUntil(e.target.value)}
-                  className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
-                />
-              </div>
+              <DatePickerField
+                id="issueDate"
+                label="Issue date"
+                value={issueDate}
+                onChange={setIssueDate}
+              />
+              <DatePickerField
+                id="validUntil"
+                label="Valid until"
+                value={validUntil}
+                onChange={setValidUntil}
+              />
             </div>
           </div>
         </div>

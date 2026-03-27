@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, waitFor, fireEvent } from "./test-utils";
+import { render, screen, waitFor, fireEvent, within } from "./test-utils";
 import EstimateDetailPage from "@/app/app/estimates/[estimateId]/page";
 import * as estimatesApi from "@/lib/estimatesApi";
 import * as tasksApi from "@/lib/tasksApi";
@@ -21,6 +21,8 @@ const mockEstimate: EstimateDto = {
   id: "est-1",
   jobId: "job-1",
   customerId: "cust-1",
+  customerName: "Jane Doe",
+  customerEmail: "jane@example.com",
   status: "DRAFT",
   title: "Estimate 1",
   notes: null,
@@ -260,6 +262,91 @@ describe("EstimateDetailPage", () => {
 
     const editLinks = screen.getAllByRole("link", { name: /Edit Estimate/i });
     expect(editLinks[0]).toHaveAttribute("href", "/app/estimates/est-1/edit");
+  });
+
+  it("opens send-email modal and submits estimate email request", async () => {
+    mockedEstimatesApi.sendEstimateEmail.mockResolvedValue({
+      success: true,
+      sentAt: "2026-02-16T00:00:00Z",
+      publicUrl: "http://localhost:3000/estimate/abc123",
+      reusedExistingToken: false,
+    });
+
+    render(<EstimateDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Estimate 1")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Send email/i }));
+    const dialog = screen.getByRole("dialog", { name: /send estimate by email/i });
+    fireEvent.change(within(dialog).getByLabelText(/recipient email/i), {
+      target: { value: "customer@example.com" },
+    });
+    fireEvent.change(within(dialog).getByLabelText(/recipient name/i), {
+      target: { value: "Jane" },
+    });
+    fireEvent.change(within(dialog).getByLabelText(/^message \(optional\)$/i), {
+      target: { value: "Please review this estimate." },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: /^Send email$/i }));
+
+    await waitFor(() => {
+      expect(mockedEstimatesApi.sendEstimateEmail).toHaveBeenCalledWith(
+        expect.anything(),
+        "est-1",
+        expect.objectContaining({
+          recipientEmail: "customer@example.com",
+          recipientName: "Jane",
+          message: "Please review this estimate.",
+          expiresInDays: 14,
+        })
+      );
+    });
+
+    expect(screen.getByText("Email sent to customer@example.com.")).toBeInTheDocument();
+  });
+
+  it("prefills estimate send-email modal from customer and keeps fields editable", async () => {
+    render(<EstimateDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Estimate 1")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Send email/i }));
+    const dialog = screen.getByRole("dialog", { name: /send estimate by email/i });
+    const emailInput = within(dialog).getByLabelText(/recipient email/i) as HTMLInputElement;
+    const nameInput = within(dialog).getByLabelText(/recipient name/i) as HTMLInputElement;
+
+    expect(emailInput.value).toBe("jane@example.com");
+    expect(nameInput.value).toBe("Jane Doe");
+
+    fireEvent.change(emailInput, { target: { value: "edited@example.com" } });
+    fireEvent.change(nameInput, { target: { value: "Edited Name" } });
+
+    expect(emailInput.value).toBe("edited@example.com");
+    expect(nameInput.value).toBe("Edited Name");
+  });
+
+  it("leaves estimate send-email modal fields blank when customer info is missing", async () => {
+    mockedEstimatesApi.getEstimate.mockResolvedValue({
+      ...mockEstimate,
+      customerName: null,
+      customerEmail: null,
+    });
+
+    render(<EstimateDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Estimate 1")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Send email/i }));
+    const dialog = screen.getByRole("dialog", { name: /send estimate by email/i });
+
+    expect((within(dialog).getByLabelText(/recipient email/i) as HTMLInputElement).value).toBe("");
+    expect((within(dialog).getByLabelText(/recipient name/i) as HTMLInputElement).value).toBe("");
   });
 
   it("quantity and unit price draft allow empty while editing, then normalize on blur", async () => {

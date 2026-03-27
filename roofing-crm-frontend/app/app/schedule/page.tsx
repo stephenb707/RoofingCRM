@@ -25,6 +25,7 @@ import {
   parseLocalDateOnly,
 } from "@/lib/format";
 import { DateRangePicker } from "@/components/DateRangePicker";
+import { DatePickerField } from "@/components/DatePickerField";
 import { computeScheduleUpdate, applyOptimisticSchedulingTagChange } from "@/lib/scheduleDnd";
 import type { JobDto, JobStatus } from "@/lib/types";
 
@@ -312,18 +313,12 @@ export default function SchedulePage() {
             />
           </div>
           <div>
-            <label
-              htmlFor="schedule-jump-date"
-              className="block text-sm font-medium text-slate-700 mb-1"
-            >
-              Jump to week
-            </label>
-            <input
+            <DatePickerField
               id="schedule-jump-date"
-              type="date"
+              label="Jump to week"
               value={startDate}
-              onChange={(e) => jumpToWeek(e.target.value)}
-              className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+              onChange={jumpToWeek}
+              className="min-w-[180px]"
             />
           </div>
           <div className="flex items-center gap-2">
@@ -827,23 +822,19 @@ function JobScheduleCard({
         <form onSubmit={onSave} className="mt-3 pt-3 border-t border-slate-200 space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <label htmlFor="edit-start-date" className="block text-xs font-medium text-slate-600 mb-1">Start date</label>
-              <input
+              <DatePickerField
                 id="edit-start-date"
-                type="date"
+                label="Start date"
                 value={editStart}
-                onChange={(e) => onEditStartChange(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm"
+                onChange={onEditStartChange}
               />
             </div>
             <div>
-              <label htmlFor="edit-end-date" className="block text-xs font-medium text-slate-600 mb-1">End date</label>
-              <input
+              <DatePickerField
                 id="edit-end-date"
-                type="date"
+                label="End date"
                 value={editEnd}
-                onChange={(e) => onEditEndChange(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm"
+                onChange={onEditEndChange}
               />
             </div>
             <div>

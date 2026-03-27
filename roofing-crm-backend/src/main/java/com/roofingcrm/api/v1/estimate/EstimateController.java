@@ -78,6 +78,17 @@ public class EstimateController {
         return ResponseEntity.ok(response);
     }
 
+    @PostMapping("/api/v1/estimates/{id}/send-email")
+    public ResponseEntity<SendEstimateEmailResponse> sendEstimateEmail(
+            @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
+            @PathVariable("id") UUID estimateId,
+            @Valid @RequestBody SendEstimateEmailRequest request) {
+
+        UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
+        SendEstimateEmailResponse response = estimateService.sendEstimateEmail(tenantId, userId, estimateId, request);
+        return ResponseEntity.ok(response);
+    }
+
     @PostMapping("/api/v1/estimates/{id}/status")
     public ResponseEntity<EstimateDto> updateEstimateStatus(
             @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,

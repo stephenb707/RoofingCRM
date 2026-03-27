@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuthReady } from "@/lib/AuthContext";
-import { getEstimate, updateEstimate, updateEstimateStatus, shareEstimate } from "@/lib/estimatesApi";
+import { getEstimate, updateEstimate, updateEstimateStatus, shareEstimate, sendEstimateEmail } from "@/lib/estimatesApi";
 import { createTask } from "@/lib/tasksApi";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { queryKeys } from "@/lib/queryKeys";
@@ -19,6 +19,7 @@ import { formatDate, formatMoney } from "@/lib/format";
 import { StatusBadge } from "@/components/StatusBadge";
 import { NextBestActions } from "@/components/NextBestActions";
 import { NextStepPromptDialog } from "@/components/NextStepPromptDialog";
+import { SendEmailModal } from "@/components/SendEmailModal";
 
 type ItemDraft = {
   name: string;
@@ -91,6 +92,8 @@ export default function EstimateDetailPage() {
   const [shareLink, setShareLink] = useState<string | null>(null);
   const [shareExpiresAt, setShareExpiresAt] = useState<string | null>(null);
   const [showSharePrompt, setShowSharePrompt] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailSuccess, setEmailSuccess] = useState<string | null>(null);
 
   const canShare =
     auth.tenants.find((t) => t.tenantId === auth.selectedTenantId)?.role === "OWNER" ||
@@ -140,6 +143,26 @@ export default function EstimateDetailPage() {
       if (!estimate) return;
       const customer = estimate.customerId ? `&customerId=${estimate.customerId}` : "";
       router.push(`/app/tasks/new?jobId=${estimate.jobId}${customer}`);
+    },
+  });
+
+  const sendEmailMutation = useMutation({
+    mutationFn: (payload: {
+      recipientEmail: string;
+      recipientName?: string;
+      message?: string;
+      expiresInDays?: number;
+    }) => sendEstimateEmail(api, estimateId, payload),
+    onSuccess: (data, variables) => {
+      setShareLink(data.publicUrl);
+      setShareExpiresAt(null);
+      setEmailSuccess(`Email sent to ${variables.recipientEmail}.`);
+      setShowEmailModal(false);
+      queryClient.invalidateQueries({ queryKey: queryKeys.estimate(auth.selectedTenantId, estimateId) });
+      if (estimate?.jobId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.activityForEntity(auth.selectedTenantId, "JOB", estimate.jobId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.estimatesForJob(auth.selectedTenantId, estimate.jobId) });
+      }
     },
   });
 
@@ -549,6 +572,11 @@ export default function EstimateDetailPage() {
               <h2 className="text-lg font-semibold text-slate-800 mb-4">
                 Share
               </h2>
+              {emailSuccess && (
+                <div className="mb-3 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                  {emailSuccess}
+                </div>
+              )}
               <button
                 type="button"
                 onClick={() => {
@@ -562,6 +590,17 @@ export default function EstimateDetailPage() {
                 className="w-full px-4 py-2.5 text-sm font-medium text-sky-600 border border-sky-300 rounded-lg hover:bg-sky-50 disabled:opacity-60"
               >
                 {shareMutation.isPending ? "Generating…" : shareLink ? "Copy link" : "Generate link"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setEmailSuccess(null);
+                  setShowEmailModal(true);
+                }}
+                disabled={sendEmailMutation.isPending}
+                className="mt-2 w-full px-4 py-2.5 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-60"
+              >
+                {sendEmailMutation.isPending ? "Sending..." : "Send email"}
               </button>
               {shareLink && (
                 <button
@@ -647,6 +686,17 @@ export default function EstimateDetailPage() {
         ]}
         onClose={() => setShowSharePrompt(false)}
         showDismissButton={false}
+      />
+    )}
+    {showEmailModal && (
+      <SendEmailModal
+        title="Send estimate by email"
+        isSubmitting={sendEmailMutation.isPending}
+        error={sendEmailMutation.isError ? getApiErrorMessage(sendEmailMutation.error, "Failed to send estimate email.") : null}
+        initialRecipientEmail={estimate.customerEmail ?? ""}
+        initialRecipientName={estimate.customerName ?? ""}
+        onClose={() => setShowEmailModal(false)}
+        onSubmit={(values) => sendEmailMutation.mutate(values)}
       />
     )}
     </>

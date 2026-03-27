@@ -165,7 +165,7 @@ describe("JobDetailPage", () => {
 
     fireEvent.click(screen.getByText("Create invoice"));
     await waitFor(() => {
-      expect(screen.getByLabelText(/due date \(optional\)/i)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /due date \(optional\)/i })).toBeInTheDocument();
     });
     expect(mockedInvoicesApi.createInvoiceFromEstimate).not.toHaveBeenCalled();
   });
@@ -199,9 +199,9 @@ describe("JobDetailPage", () => {
     fireEvent.click(screen.getByText("Create invoice"));
 
     await waitFor(() => {
-      expect(screen.getByLabelText(/estimate \(must be accepted\)/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/^estimate$/i)).toBeInTheDocument();
     });
-    fireEvent.change(screen.getByLabelText(/estimate \(must be accepted\)/i), {
+    fireEvent.change(screen.getByLabelText(/^estimate$/i), {
       target: { value: "est-1" },
     });
     fireEvent.click(screen.getByRole("button", { name: /^Create$/ }));

@@ -18,6 +18,8 @@ public class EstimateDto {
 
     private UUID jobId;
     private UUID customerId;
+    private String customerName;
+    private String customerEmail;
 
     private EstimateStatus status;
 

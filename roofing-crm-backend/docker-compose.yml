@@ -28,6 +28,12 @@ services:
       APP_SECURITY_JWT_EXPIRATION_SECONDS: "36000"
       APP_STORAGE_LOCAL_BASE_DIR: "/app/uploads"
       APP_CORS_ALLOWED_ORIGINS: "http://localhost:3000,http://127.0.0.1:3000"
+      APP_PUBLIC_BASE_URL: "http://localhost:3000"
+      APP_MAIL_ENABLED: "true"
+      APP_MAIL_PROVIDER: "resend"
+      APP_MAIL_FROM_EMAIL: "notifications@mail.vivacrm.net"
+      APP_MAIL_FROM_NAME: "VivaCrm"
+      APP_MAIL_RESEND_API_KEY: ""
     ports:
       - "8080:8080"
     volumes:

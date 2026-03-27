@@ -2,7 +2,6 @@
 
 import { useState, useRef, useLayoutEffect, useCallback } from "react";
 
-const PADDING = 12;
 const GAP = 8;
 const MIN_HEIGHT = 240;
 const MAX_HEIGHT = 520;
@@ -12,6 +11,8 @@ export interface PopoverPlacementOptions {
   maxWidthPx: number;
   /** Fallback height when popover not yet measured */
   fallbackHeightPx: number;
+  /** Padding from viewport edges when clamping placement */
+  collisionPaddingPx?: number;
 }
 
 export interface PopoverPlacementStyle {
@@ -26,18 +27,22 @@ function computePlacement(
   buttonRect: DOMRect,
   popoverWidth: number,
   popoverHeight: number,
-  fallbackHeight: number
+  fallbackHeight: number,
+  collisionPaddingPx = 24
 ): PopoverPlacementStyle {
   const vw = typeof window !== "undefined" ? window.innerWidth : 1024;
   const vh = typeof window !== "undefined" ? window.innerHeight : 768;
+  const pad = collisionPaddingPx;
 
-  const spaceBelow = vh - buttonRect.bottom - GAP;
-  const spaceAbove = buttonRect.top - GAP;
+  const heightRaw = popoverHeight > 0 ? popoverHeight : fallbackHeight;
+  const effectiveHeight = Math.min(heightRaw, Math.max(0, vh - pad * 2));
 
-  const height = popoverHeight > 0 ? popoverHeight : fallbackHeight;
+  const availableBelow = vh - pad - (buttonRect.bottom + GAP);
+  const availableAbove = (buttonRect.top - GAP) - pad;
 
-  const useBottom =
-    spaceBelow >= MIN_HEIGHT || (spaceBelow >= spaceAbove && spaceBelow > 0);
+  const canFitBelow = availableBelow >= effectiveHeight;
+  const canFitAbove = availableAbove >= effectiveHeight;
+  const useBottom = canFitBelow ? true : canFitAbove ? false : availableBelow >= availableAbove;
 
   let topPx: number;
   let maxHeightPx: number;
@@ -46,25 +51,22 @@ function computePlacement(
     topPx = buttonRect.bottom + GAP;
     maxHeightPx = Math.min(
       MAX_HEIGHT,
-      Math.max(MIN_HEIGHT, spaceBelow - GAP)
+      Math.max(MIN_HEIGHT, Math.max(0, availableBelow))
     );
   } else {
-    topPx = buttonRect.top - height - GAP;
+    topPx = buttonRect.top - GAP - effectiveHeight;
     maxHeightPx = Math.min(
       MAX_HEIGHT,
-      Math.max(MIN_HEIGHT, spaceAbove - GAP)
+      Math.max(MIN_HEIGHT, Math.max(0, availableAbove))
     );
   }
 
-  topPx = Math.max(PADDING, topPx);
+  const maxTop = Math.max(pad, vh - pad - effectiveHeight);
+  topPx = Math.max(pad, Math.min(topPx, maxTop));
 
   let leftPx = buttonRect.left;
-  if (leftPx + popoverWidth > vw - PADDING) {
-    leftPx = vw - popoverWidth - PADDING;
-  }
-  if (leftPx < PADDING) {
-    leftPx = PADDING;
-  }
+  const maxLeft = Math.max(pad, vw - pad - popoverWidth);
+  leftPx = Math.max(pad, Math.min(leftPx, maxLeft));
 
   return {
     position: "fixed",
@@ -96,10 +98,11 @@ export function usePopoverPlacement(
         rect,
         popoverWidth,
         popoverHeight,
-        options.fallbackHeightPx
+        options.fallbackHeightPx,
+        options.collisionPaddingPx ?? 24
       )
     );
-  }, [open, options.maxWidthPx, options.fallbackHeightPx]);
+  }, [open, options.maxWidthPx, options.fallbackHeightPx, options.collisionPaddingPx]);
 
   useLayoutEffect(() => {
     if (!open) {
@@ -115,11 +118,20 @@ export function usePopoverPlacement(
     const onScrollOrResize = () => recompute();
     window.addEventListener("resize", onScrollOrResize);
     window.addEventListener("scroll", onScrollOrResize, true);
+    const popoverEl = popoverRef.current;
+    const resizeObserver =
+      popoverEl && typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(() => recompute())
+        : null;
+    if (popoverEl && resizeObserver) {
+      resizeObserver.observe(popoverEl);
+    }
 
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", onScrollOrResize);
       window.removeEventListener("scroll", onScrollOrResize, true);
+      resizeObserver?.disconnect();
     };
   }, [open, recompute]);
 
