@@ -14,7 +14,6 @@ public class TenantInviteDto {
     private UUID inviteId;
     private String email;
     private UserRole role;
-    private UUID token;
     private Instant expiresAt;
     private Instant acceptedAt;
     private Instant createdAt;

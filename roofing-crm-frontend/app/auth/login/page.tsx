@@ -16,6 +16,10 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const registerHref =
+    nextUrl && nextUrl.startsWith("/")
+      ? `/auth/register?next=${encodeURIComponent(nextUrl)}`
+      : "/auth/register";
 
   useEffect(() => {
     if (!auth.token) return;
@@ -161,7 +165,7 @@ export default function LoginPage() {
         <p className="mt-6 text-center text-xs text-slate-500">
           Don&apos;t have an account yet?{" "}
           <Link
-            href="/auth/register"
+            href={registerHref}
             className="text-sky-600 hover:text-sky-700 font-medium"
           >
             Create one

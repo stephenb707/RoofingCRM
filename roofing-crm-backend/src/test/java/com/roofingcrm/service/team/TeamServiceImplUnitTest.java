@@ -12,6 +12,8 @@ import com.roofingcrm.domain.repository.TenantUserMembershipRepository;
 import com.roofingcrm.domain.repository.TenantRepository;
 import com.roofingcrm.domain.repository.UserRepository;
 import com.roofingcrm.service.exception.InviteConflictException;
+import com.roofingcrm.service.mail.EmailService;
+import com.roofingcrm.service.mail.PublicUrlProperties;
 import com.roofingcrm.service.tenant.TenantAccessDeniedException;
 import com.roofingcrm.service.tenant.TenantAccessService;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,6 +44,10 @@ class TeamServiceImplUnitTest {
     private TenantRepository tenantRepository;
     @Mock
     private UserRepository userRepository;
+    @Mock
+    private EmailService emailService;
+    @Mock
+    private PublicUrlProperties publicUrlProperties;
 
     private TeamServiceImpl service;
 
@@ -55,7 +61,7 @@ class TeamServiceImplUnitTest {
     void setUp() {
         service = new TeamServiceImpl(
                 tenantAccessService, inviteRepository, membershipRepository,
-                tenantRepository, userRepository);
+                tenantRepository, userRepository, emailService, publicUrlProperties);
 
         tenant = new Tenant();
         tenant.setId(UUID.randomUUID());
@@ -79,6 +85,7 @@ class TeamServiceImplUnitTest {
         when(tenantAccessService.requireAnyRole(eq(tenantId), eq(actorUserId), any())).thenReturn(actorMembership);
         when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
         when(userRepository.findById(actorUserId)).thenReturn(Optional.of(actorUser));
+        when(publicUrlProperties.getPublicBaseUrl()).thenReturn("http://localhost:3000");
         when(userRepository.findByEmailIgnoreCase("new@test.com")).thenReturn(Optional.empty());
         when(inviteRepository.findByTenantAndEmailIgnoreCaseAndAcceptedAtIsNull(eq(tenant), eq("new@test.com"))).thenReturn(Optional.empty());
 
@@ -105,11 +112,11 @@ class TeamServiceImplUnitTest {
         assertNotNull(dto.getInviteId());
         assertEquals("new@test.com", dto.getEmail());
         assertEquals(UserRole.SALES, dto.getRole());
-        assertNotNull(dto.getToken());
 
         ArgumentCaptor<TenantInvite> captor = ArgumentCaptor.forClass(TenantInvite.class);
         verify(inviteRepository).save(captor.capture());
         assertEquals("new@test.com", captor.getValue().getEmail());
+        verify(emailService).send(any());
     }
 
     @Test
@@ -133,6 +140,22 @@ class TeamServiceImplUnitTest {
                 service.createInvite(tenantId, actorUserId, req));
 
         verify(inviteRepository, never()).save(any());
+    }
+
+    @Test
+    void createInvite_adminCannotInviteOwner() {
+        actorMembership.setRole(UserRole.ADMIN);
+        when(tenantAccessService.requireAnyRole(eq(tenantId), eq(actorUserId), any())).thenReturn(actorMembership);
+
+        CreateInviteRequest req = new CreateInviteRequest();
+        req.setEmail("owner@test.com");
+        req.setRole(UserRole.OWNER);
+
+        assertThrows(TenantAccessDeniedException.class, () ->
+                service.createInvite(tenantId, actorUserId, req));
+
+        verify(inviteRepository, never()).save(any());
+        verify(emailService, never()).send(any());
     }
 
     @Test
@@ -160,6 +183,55 @@ class TeamServiceImplUnitTest {
                 service.createInvite(tenantId, actorUserId, req));
 
         verify(inviteRepository, never()).save(any());
+    }
+
+    @Test
+    void resendInvite_sendsEmailAgain() {
+        UUID inviteId = UUID.randomUUID();
+        UUID token = UUID.randomUUID();
+        TenantInvite invite = new TenantInvite();
+        invite.setInviteId(inviteId);
+        invite.setTenant(tenant);
+        invite.setEmail("invitee@test.com");
+        invite.setRole(UserRole.SALES);
+        invite.setToken(token);
+        invite.setExpiresAt(java.time.Instant.now().plusSeconds(3600));
+
+        when(tenantAccessService.requireAnyRole(eq(tenantId), eq(actorUserId), any())).thenReturn(actorMembership);
+        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(inviteRepository.findById(inviteId)).thenReturn(Optional.of(invite));
+        when(publicUrlProperties.getPublicBaseUrl()).thenReturn("http://localhost:3000");
+
+        var dto = service.resendInvite(tenantId, actorUserId, inviteId);
+
+        assertEquals(inviteId, dto.getInviteId());
+        verify(emailService).send(any());
+    }
+
+    @Test
+    void acceptInvite_createsMembership() {
+        UUID token = UUID.randomUUID();
+        TenantInvite invite = new TenantInvite();
+        invite.setInviteId(UUID.randomUUID());
+        invite.setToken(token);
+        invite.setTenant(tenant);
+        invite.setEmail("owner@test.com");
+        invite.setRole(UserRole.ADMIN);
+        invite.setExpiresAt(java.time.Instant.now().plusSeconds(3600));
+
+        when(inviteRepository.findByToken(token)).thenReturn(Optional.of(invite));
+        when(userRepository.findById(actorUserId)).thenReturn(Optional.of(actorUser));
+        when(membershipRepository.findByTenantAndUserAndArchivedFalse(tenant, actorUser)).thenReturn(Optional.empty());
+
+        var request = new com.roofingcrm.api.v1.team.AcceptInviteRequest();
+        request.setToken(token);
+
+        var response = service.acceptInvite(actorUserId, request);
+
+        assertEquals(tenant.getId(), response.getTenantId());
+        assertEquals(UserRole.ADMIN, response.getRole());
+        verify(membershipRepository).save(any(TenantUserMembership.class));
+        verify(inviteRepository).save(invite);
     }
 
     @Test

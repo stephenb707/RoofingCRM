@@ -11,6 +11,10 @@ import com.roofingcrm.domain.repository.TenantRepository;
 import com.roofingcrm.domain.repository.TenantUserMembershipRepository;
 import com.roofingcrm.domain.repository.UserRepository;
 import com.roofingcrm.service.exception.InviteConflictException;
+import com.roofingcrm.service.exception.MailConfigurationException;
+import com.roofingcrm.service.mail.EmailService;
+import com.roofingcrm.service.mail.InviteEmailTemplateBuilder;
+import com.roofingcrm.service.mail.PublicUrlProperties;
 import com.roofingcrm.service.exception.ResourceNotFoundException;
 import com.roofingcrm.service.tenant.TenantAccessDeniedException;
 import com.roofingcrm.service.tenant.TenantAccessService;
@@ -47,17 +51,25 @@ public class TeamServiceImpl implements TeamService {
     private final TenantUserMembershipRepository membershipRepository;
     private final TenantRepository tenantRepository;
     private final UserRepository userRepository;
+    private final EmailService emailService;
+    private final PublicUrlProperties publicUrlProperties;
+    private final InviteEmailTemplateBuilder inviteEmailTemplateBuilder;
 
     public TeamServiceImpl(TenantAccessService tenantAccessService,
                            TenantInviteRepository inviteRepository,
                            TenantUserMembershipRepository membershipRepository,
                            TenantRepository tenantRepository,
-                           UserRepository userRepository) {
+                           UserRepository userRepository,
+                           EmailService emailService,
+                           PublicUrlProperties publicUrlProperties) {
         this.tenantAccessService = tenantAccessService;
         this.inviteRepository = inviteRepository;
         this.membershipRepository = membershipRepository;
         this.tenantRepository = tenantRepository;
         this.userRepository = userRepository;
+        this.emailService = emailService;
+        this.publicUrlProperties = publicUrlProperties;
+        this.inviteEmailTemplateBuilder = new InviteEmailTemplateBuilder();
     }
 
     @Override
@@ -94,9 +106,14 @@ public class TeamServiceImpl implements TeamService {
     @Override
     @Transactional
     public TenantInviteDto createInvite(UUID tenantId, UUID actorUserId, CreateInviteRequest request) {
-        tenantAccessService.requireAnyRole(Objects.requireNonNull(tenantId), Objects.requireNonNull(actorUserId), Objects.requireNonNull(INVITE_ROLES));
+        TenantUserMembership actorMembership = tenantAccessService.requireAnyRole(
+                Objects.requireNonNull(tenantId),
+                Objects.requireNonNull(actorUserId),
+                Objects.requireNonNull(INVITE_ROLES)
+        );
 
         String email = normalizeEmail(request.getEmail());
+        validateInviteRole(actorMembership.getRole(), request.getRole());
 
         Tenant tenant = tenantRepository.findById(tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Tenant not found"));
@@ -128,6 +145,32 @@ public class TeamServiceImpl implements TeamService {
         invite.setCreatedAt(Instant.now());
 
         invite = inviteRepository.save(invite);
+        sendInviteEmail(tenant, invite);
+        return toTenantInviteDto(invite);
+    }
+
+    @Override
+    @Transactional
+    public TenantInviteDto resendInvite(UUID tenantId, UUID actorUserId, UUID inviteId) {
+        tenantAccessService.requireAnyRole(Objects.requireNonNull(tenantId), Objects.requireNonNull(actorUserId), Objects.requireNonNull(INVITE_ROLES));
+
+        Tenant tenant = tenantRepository.findById(tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Tenant not found"));
+
+        TenantInvite invite = inviteRepository.findById(Objects.requireNonNull(inviteId))
+                .orElseThrow(() -> new ResourceNotFoundException("Invite not found"));
+
+        if (!invite.getTenant().getId().equals(tenant.getId())) {
+            throw new ResourceNotFoundException("Invite not found");
+        }
+        if (invite.getAcceptedAt() != null) {
+            throw new InviteConflictException("Cannot resend an accepted invite.");
+        }
+        if (invite.getExpiresAt().isBefore(Instant.now())) {
+            throw new InviteConflictException("Cannot resend an expired invite.");
+        }
+
+        sendInviteEmail(tenant, invite);
         return toTenantInviteDto(invite);
     }
 
@@ -289,7 +332,6 @@ public class TeamServiceImpl implements TeamService {
         dto.setInviteId(inv.getInviteId());
         dto.setEmail(inv.getEmail());
         dto.setRole(inv.getRole());
-        dto.setToken(inv.getToken());
         dto.setExpiresAt(inv.getExpiresAt());
         dto.setAcceptedAt(inv.getAcceptedAt());
         dto.setCreatedAt(inv.getCreatedAt());
@@ -307,5 +349,31 @@ public class TeamServiceImpl implements TeamService {
 
     private static String normalizeEmail(String email) {
         return email != null ? email.trim().toLowerCase() : "";
+    }
+
+    private void validateInviteRole(UserRole actorRole, UserRole requestedRole) {
+        if (actorRole == UserRole.OWNER) {
+            return;
+        }
+        if (actorRole == UserRole.ADMIN && requestedRole == UserRole.OWNER) {
+            throw new TenantAccessDeniedException("Admins cannot invite owners.");
+        }
+    }
+
+    private void sendInviteEmail(Tenant tenant, TenantInvite invite) {
+        emailService.send(inviteEmailTemplateBuilder.build(
+                tenant,
+                invite.getEmail(),
+                invite.getRole(),
+                buildInviteUrl(invite.getToken())
+        ));
+    }
+
+    private String buildInviteUrl(UUID token) {
+        String baseUrl = publicUrlProperties.getPublicBaseUrl();
+        if (baseUrl == null || baseUrl.trim().isEmpty()) {
+            throw new MailConfigurationException("Public base URL is missing. Set APP_PUBLIC_BASE_URL before sending invite emails.");
+        }
+        return baseUrl.replaceAll("/+$", "") + "/auth/accept-invite?token=" + token;
     }
 }

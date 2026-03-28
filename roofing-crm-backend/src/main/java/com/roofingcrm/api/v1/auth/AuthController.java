@@ -24,6 +24,12 @@ public class AuthController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    @PostMapping("/register-with-invite")
+    public ResponseEntity<AuthResponse> registerWithInvite(@Valid @RequestBody RegisterWithInviteRequest request) {
+        AuthResponse response = authService.registerWithInvite(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         AuthResponse response = authService.login(request);
