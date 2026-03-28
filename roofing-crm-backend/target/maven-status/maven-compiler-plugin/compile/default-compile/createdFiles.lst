@@ -165,6 +165,7 @@ com\roofingcrm\service\attachment\AttachmentServiceImpl.class
 com\roofingcrm\service\exception\InvoiceConflictException.class
 com\roofingcrm\domain\entity\Attachment.class
 com\roofingcrm\service\estimate\EstimateMapper.class
+com\roofingcrm\service\mail\InviteEmailTemplateBuilder$1.class
 com\roofingcrm\api\v1\activity\ActivityEventDto.class
 com\roofingcrm\api\v1\estimate\EstimateSummaryDto.class
 com\roofingcrm\domain\repository\TenantUserMembershipRepository.class

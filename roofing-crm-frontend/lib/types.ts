@@ -18,7 +18,6 @@ export interface TenantInvite {
   inviteId: string;
   email: string;
   role: UserRole;
-  token: string;
   expiresAt: string;
   acceptedAt?: string | null;
   createdAt: string;

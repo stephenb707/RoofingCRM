@@ -27,9 +27,9 @@ describe("TeamPage", () => {
       inviteId: "inv-1",
       email: "invited@test.com",
       role: "ADMIN" as const,
-      token: "token-abc",
       expiresAt: "2025-02-08T00:00:00Z",
       createdAt: "2025-02-01T00:00:00Z",
+      createdByName: "Owner User",
     },
   ];
 
@@ -113,12 +113,11 @@ describe("TeamPage", () => {
     });
   });
 
-  it("invite create triggers teamApi.createInvite and renders invite link", async () => {
+  it("invite create triggers teamApi.createInvite and renders email success state", async () => {
     const createdInvite = {
       inviteId: "inv-new",
       email: "new@test.com",
       role: "SALES" as const,
-      token: "token-new-123",
       expiresAt: "2025-02-08T00:00:00Z",
       createdAt: "2025-02-01T00:00:00Z",
     };
@@ -145,8 +144,31 @@ describe("TeamPage", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText("Invite link created")).toBeInTheDocument();
+      expect(
+        screen.getByText("Invitation email sent to new@test.com.")
+      ).toBeInTheDocument();
     });
-    expect(screen.getByRole("button", { name: /Copy/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Copy/i })).not.toBeInTheDocument();
+  });
+
+  it("pending invites render resend and revoke actions", async () => {
+    mockedTeamApi.resendInvite.mockResolvedValue(mockInvites[0]);
+
+    render(<TeamPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/invited@test.com/i)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Resend/i }));
+
+    await waitFor(() => {
+      expect(mockedTeamApi.resendInvite).toHaveBeenCalledWith(
+        expect.anything(),
+        "inv-1"
+      );
+    });
+
+    expect(screen.getByRole("button", { name: /Revoke/i })).toBeInTheDocument();
   });
 });

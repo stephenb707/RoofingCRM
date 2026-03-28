@@ -50,6 +50,15 @@ public class TeamController {
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
+    @PostMapping("/invites/{inviteId}/resend")
+    public ResponseEntity<TenantInviteDto> resendInvite(
+            @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
+            @PathVariable("inviteId") UUID inviteId) {
+        UUID actorUserId = SecurityUtils.getCurrentUserIdOrThrow();
+        TenantInviteDto resent = teamService.resendInvite(tenantId, actorUserId, inviteId);
+        return ResponseEntity.ok(resent);
+    }
+
     @DeleteMapping("/invites/{inviteId}")
     public ResponseEntity<Void> revokeInvite(
             @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,

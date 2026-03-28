@@ -76,7 +76,6 @@ class TeamControllerTest {
         invite.setInviteId(UUID.randomUUID());
         invite.setEmail("invited@test.com");
         invite.setRole(com.roofingcrm.domain.enums.UserRole.SALES);
-        invite.setToken(UUID.randomUUID());
         invite.setExpiresAt(Instant.now().plusSeconds(86400));
         invite.setCreatedAt(Instant.now());
 
@@ -98,7 +97,6 @@ class TeamControllerTest {
         created.setInviteId(UUID.randomUUID());
         created.setEmail("new@test.com");
         created.setRole(com.roofingcrm.domain.enums.UserRole.ADMIN);
-        created.setToken(UUID.randomUUID());
         created.setExpiresAt(Instant.now().plusSeconds(604800));
         created.setCreatedAt(Instant.now());
 
@@ -110,6 +108,24 @@ class TeamControllerTest {
                         .content(Objects.requireNonNull(objectMapper.writeValueAsString(request))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.email", org.hamcrest.Matchers.is("new@test.com")));
+    }
+
+    @Test
+    void resendInvite_returnsOk() throws Exception {
+        UUID inviteId = UUID.randomUUID();
+        TenantInviteDto resent = new TenantInviteDto();
+        resent.setInviteId(inviteId);
+        resent.setEmail("new@test.com");
+        resent.setRole(com.roofingcrm.domain.enums.UserRole.ADMIN);
+        resent.setExpiresAt(Instant.now().plusSeconds(604800));
+        resent.setCreatedAt(Instant.now());
+
+        when(teamService.resendInvite(eq(tenantId), eq(userId), eq(inviteId))).thenReturn(resent);
+
+        mockMvc.perform(post("/api/v1/team/invites/{inviteId}/resend", inviteId)
+                        .header("X-Tenant-Id", tenantId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.inviteId", org.hamcrest.Matchers.is(inviteId.toString())));
     }
 
     @Test

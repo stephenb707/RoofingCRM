@@ -7,6 +7,7 @@ import {
   listMembers,
   listInvites,
   createInvite,
+  resendInvite,
   revokeInvite,
   updateMemberRole,
   removeMember,
@@ -37,7 +38,7 @@ export default function TeamPage() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<UserRole>("SALES");
   const [inviteError, setInviteError] = useState<string | null>(null);
-  const [createdInvite, setCreatedInvite] = useState<TenantInvite | null>(null);
+  const [inviteSuccess, setInviteSuccess] = useState<string | null>(null);
 
   const { data: members = [], isLoading: membersLoading } = useQuery({
     queryKey: queryKeys.teamMembers(tenantId),
@@ -55,13 +56,27 @@ export default function TeamPage() {
     mutationFn: (payload: { email: string; role: UserRole }) =>
       createInvite(api, payload),
     onSuccess: (data) => {
-      setCreatedInvite(data);
       setInviteEmail("");
       setInviteError(null);
+      setInviteSuccess(`Invitation email sent to ${data.email}.`);
       queryClient.invalidateQueries({ queryKey: queryKeys.teamInvites(tenantId) });
     },
     onError: (err) => {
+      setInviteSuccess(null);
       setInviteError(getApiErrorMessage(err, "Failed to create invite"));
+    },
+  });
+
+  const resendInviteMutation = useMutation({
+    mutationFn: (inviteId: string) => resendInvite(api, inviteId),
+    onSuccess: (data) => {
+      setInviteError(null);
+      setInviteSuccess(`Invitation email resent to ${data.email}.`);
+      queryClient.invalidateQueries({ queryKey: queryKeys.teamInvites(tenantId) });
+    },
+    onError: (err) => {
+      setInviteSuccess(null);
+      setInviteError(getApiErrorMessage(err, "Failed to resend invite"));
     },
   });
 
@@ -69,7 +84,7 @@ export default function TeamPage() {
     mutationFn: (inviteId: string) => revokeInvite(api, inviteId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.teamInvites(tenantId) });
-      if (createdInvite) setCreatedInvite(null);
+      setInviteSuccess(null);
     },
   });
 
@@ -93,6 +108,7 @@ export default function TeamPage() {
       e.preventDefault();
       if (!inviteEmail.trim()) return;
       setInviteError(null);
+      setInviteSuccess(null);
       createInviteMutation.mutate({
         email: inviteEmail.trim(),
         role: inviteRole,
@@ -100,11 +116,6 @@ export default function TeamPage() {
     },
     [inviteEmail, inviteRole, createInviteMutation]
   );
-
-  const handleCopyInviteLink = useCallback((token: string) => {
-    const link = `${typeof window !== "undefined" ? window.location.origin : ""}/auth/accept-invite?token=${token}`;
-    navigator.clipboard.writeText(link);
-  }, []);
 
   if (!ready) {
     return (
@@ -218,7 +229,7 @@ export default function TeamPage() {
       {canInvite && (
         <div className="bg-white rounded-xl border border-slate-200 p-6">
           <h2 className="text-lg font-semibold text-slate-800 mb-4">
-            Pending Invites
+            Invite team member
           </h2>
 
           <form onSubmit={handleInviteSubmit} className="flex flex-wrap gap-4 mb-6">
@@ -269,27 +280,13 @@ export default function TeamPage() {
             <p className="text-sm text-red-600 mb-4">{inviteError}</p>
           )}
 
-          {createdInvite && (
-            <div className="mb-6 p-4 bg-sky-50 border border-sky-200 rounded-lg">
-              <p className="text-sm font-medium text-sky-800 mb-2">
-                Invite link created
-              </p>
-              <div className="flex gap-2 items-center">
-                <input
-                  readOnly
-                  value={`${typeof window !== "undefined" ? window.location.origin : ""}/auth/accept-invite?token=${createdInvite.token}`}
-                  className="flex-1 border border-slate-200 rounded px-2 py-1.5 text-xs bg-white"
-                />
-                <button
-                  type="button"
-                  onClick={() => handleCopyInviteLink(createdInvite.token)}
-                  className="px-3 py-1.5 bg-sky-600 text-white text-sm rounded hover:bg-sky-700"
-                >
-                  Copy
-                </button>
-              </div>
+          {inviteSuccess && (
+            <div className="mb-6 p-4 bg-sky-50 border border-sky-200 rounded-lg text-sm font-medium text-sky-800">
+              {inviteSuccess}
             </div>
           )}
+
+          <h3 className="text-sm font-semibold text-slate-700 mb-3">Pending invites</h3>
 
           {invitesLoading ? (
             <p className="text-sm text-slate-500">Loading invites...</p>
@@ -300,16 +297,31 @@ export default function TeamPage() {
                   key={inv.inviteId}
                   className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0"
                 >
-                  <span className="text-sm">
-                    {inv.email} ({inv.role})
-                  </span>
-                  <button
-                    onClick={() => revokeInviteMutation.mutate(inv.inviteId)}
-                    disabled={revokeInviteMutation.isPending}
-                    className="text-red-600 hover:text-red-700 text-sm font-medium"
-                  >
-                    Revoke
-                  </button>
+                  <div className="text-sm">
+                    <div className="font-medium text-slate-800">
+                      {inv.email} ({inv.role})
+                    </div>
+                    <div className="text-slate-500 text-xs">
+                      Expires {new Date(inv.expiresAt).toLocaleDateString()}
+                      {inv.createdByName ? ` • Invited by ${inv.createdByName}` : ""}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => resendInviteMutation.mutate(inv.inviteId)}
+                      disabled={resendInviteMutation.isPending}
+                      className="text-sky-600 hover:text-sky-700 text-sm font-medium disabled:opacity-50"
+                    >
+                      Resend
+                    </button>
+                    <button
+                      onClick={() => revokeInviteMutation.mutate(inv.inviteId)}
+                      disabled={revokeInviteMutation.isPending}
+                      className="text-red-600 hover:text-red-700 text-sm font-medium disabled:opacity-50"
+                    >
+                      Revoke
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>

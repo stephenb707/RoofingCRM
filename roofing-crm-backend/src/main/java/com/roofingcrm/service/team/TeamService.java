@@ -13,6 +13,8 @@ public interface TeamService {
 
     TenantInviteDto createInvite(UUID tenantId, UUID actorUserId, CreateInviteRequest request);
 
+    TenantInviteDto resendInvite(UUID tenantId, UUID actorUserId, UUID inviteId);
+
     void revokeInvite(UUID tenantId, UUID actorUserId, UUID inviteId);
 
     TeamMemberDto updateMemberRole(UUID tenantId, UUID actorUserId, UUID targetUserId, UpdateMemberRoleRequest request);

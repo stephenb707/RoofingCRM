@@ -38,6 +38,17 @@ export async function createInvite(
 }
 
 /**
+ * Resend a pending invite email.
+ */
+export async function resendInvite(
+  api: AxiosInstance,
+  inviteId: string
+): Promise<TenantInvite> {
+  const res = await api.post<TenantInvite>(`/api/v1/team/invites/${inviteId}/resend`);
+  return res.data;
+}
+
+/**
  * Revoke a pending invite.
  */
 export async function revokeInvite(

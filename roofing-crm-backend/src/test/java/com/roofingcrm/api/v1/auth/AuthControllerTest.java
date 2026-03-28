@@ -99,6 +99,37 @@ class AuthControllerTest {
     }
 
     @Test
+    void registerWithInvite_returnsCreated() throws Exception {
+        RegisterWithInviteRequest request = new RegisterWithInviteRequest();
+        request.setEmail("invitee@example.com");
+        request.setPassword("password123");
+        request.setFullName("Invited User");
+        request.setToken(UUID.randomUUID());
+
+        TenantSummaryDto tenantDto = new TenantSummaryDto();
+        tenantDto.setTenantId(UUID.randomUUID());
+        tenantDto.setTenantName("Test Company");
+        tenantDto.setTenantSlug("test-company");
+        tenantDto.setRole(UserRole.SALES);
+
+        AuthResponse response = new AuthResponse();
+        response.setToken("jwt-token-here");
+        response.setUserId(UUID.randomUUID());
+        response.setEmail("invitee@example.com");
+        response.setFullName("Invited User");
+        response.setTenants(List.of(tenantDto));
+
+        when(authService.registerWithInvite(any(RegisterWithInviteRequest.class))).thenReturn(response);
+
+        mockMvc.perform(post("/api/v1/auth/register-with-invite")
+                        .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                        .content(Objects.requireNonNull(objectMapper.writeValueAsString(request))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.email", is("invitee@example.com")))
+                .andExpect(jsonPath("$.tenants[0].role", is("SALES")));
+    }
+
+    @Test
     void register_invalidEmail_returnsBadRequest() throws Exception {
         RegisterRequest request = new RegisterRequest();
         request.setEmail("not-an-email");

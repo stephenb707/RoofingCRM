@@ -5,17 +5,25 @@ import com.roofingcrm.TestDatabaseCleaner;
 import com.roofingcrm.api.v1.auth.AuthResponse;
 import com.roofingcrm.api.v1.auth.LoginRequest;
 import com.roofingcrm.api.v1.auth.RegisterRequest;
+import com.roofingcrm.api.v1.auth.RegisterWithInviteRequest;
+import com.roofingcrm.domain.entity.Tenant;
+import com.roofingcrm.domain.entity.TenantInvite;
 import com.roofingcrm.domain.entity.TenantUserMembership;
 import com.roofingcrm.domain.entity.User;
 import com.roofingcrm.domain.enums.UserRole;
+import com.roofingcrm.domain.repository.TenantInviteRepository;
+import com.roofingcrm.domain.repository.TenantRepository;
 import com.roofingcrm.domain.repository.TenantUserMembershipRepository;
 import com.roofingcrm.domain.repository.UserRepository;
+import com.roofingcrm.service.exception.InviteConflictException;
 import com.roofingcrm.service.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -26,6 +34,12 @@ class AuthServiceImplTest extends AbstractIntegrationTest {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private TenantRepository tenantRepository;
+
+    @Autowired
+    private TenantInviteRepository inviteRepository;
 
     @Autowired
     private TenantUserMembershipRepository membershipRepository;
@@ -84,6 +98,94 @@ class AuthServiceImplTest extends AbstractIntegrationTest {
         request2.setTenantName("Second Company");
 
         assertThrows(IllegalArgumentException.class, () -> authService.registerOwner(request2));
+    }
+
+    @Test
+    void registerWithInvite_createsUserWithoutNewTenantAndAcceptsInvite() {
+        Tenant tenant = new Tenant();
+        tenant.setName("Invite Tenant");
+        tenant.setSlug("invite-tenant");
+        tenant = tenantRepository.save(tenant);
+
+        TenantInvite invite = new TenantInvite();
+        invite.setInviteId(UUID.randomUUID());
+        invite.setTenant(tenant);
+        invite.setEmail("invitee@example.com");
+        invite.setRole(UserRole.SALES);
+        invite.setToken(UUID.randomUUID());
+        invite.setExpiresAt(Instant.now().plusSeconds(3600));
+        invite.setCreatedAt(Instant.now());
+        invite = inviteRepository.save(invite);
+
+        RegisterWithInviteRequest request = new RegisterWithInviteRequest();
+        request.setEmail("invitee@example.com");
+        request.setPassword("password123");
+        request.setFullName("Invited User");
+        request.setToken(invite.getToken());
+
+        AuthResponse response = authService.registerWithInvite(request);
+
+        assertEquals("invitee@example.com", response.getEmail());
+        assertEquals(1, response.getTenants().size());
+        assertEquals("Invite Tenant", response.getTenants().get(0).getTenantName());
+        assertEquals(UserRole.SALES, response.getTenants().get(0).getRole());
+        assertEquals(1, tenantRepository.count());
+
+        TenantInvite savedInvite = inviteRepository.findByToken(invite.getToken()).orElseThrow();
+        assertNotNull(savedInvite.getAcceptedAt());
+        assertNotNull(savedInvite.getAcceptedBy());
+    }
+
+    @Test
+    void registerWithInvite_rejectsMismatchedEmail() {
+        Tenant tenant = new Tenant();
+        tenant.setName("Invite Tenant");
+        tenant.setSlug("invite-tenant");
+        tenant = tenantRepository.save(tenant);
+
+        TenantInvite invite = new TenantInvite();
+        invite.setInviteId(UUID.randomUUID());
+        invite.setTenant(tenant);
+        invite.setEmail("invitee@example.com");
+        invite.setRole(UserRole.SALES);
+        invite.setToken(UUID.randomUUID());
+        invite.setExpiresAt(Instant.now().plusSeconds(3600));
+        invite.setCreatedAt(Instant.now());
+        inviteRepository.save(invite);
+
+        RegisterWithInviteRequest request = new RegisterWithInviteRequest();
+        request.setEmail("other@example.com");
+        request.setPassword("password123");
+        request.setFullName("Invited User");
+        request.setToken(invite.getToken());
+
+        assertThrows(InviteConflictException.class, () -> authService.registerWithInvite(request));
+    }
+
+    @Test
+    void registerWithInvite_rejectsExpiredInvite() {
+        Tenant tenant = new Tenant();
+        tenant.setName("Invite Tenant");
+        tenant.setSlug("invite-tenant");
+        tenant = tenantRepository.save(tenant);
+
+        TenantInvite invite = new TenantInvite();
+        invite.setInviteId(UUID.randomUUID());
+        invite.setTenant(tenant);
+        invite.setEmail("invitee@example.com");
+        invite.setRole(UserRole.SALES);
+        invite.setToken(UUID.randomUUID());
+        invite.setExpiresAt(Instant.now().minusSeconds(60));
+        invite.setCreatedAt(Instant.now());
+        inviteRepository.save(invite);
+
+        RegisterWithInviteRequest request = new RegisterWithInviteRequest();
+        request.setEmail("invitee@example.com");
+        request.setPassword("password123");
+        request.setFullName("Invited User");
+        request.setToken(invite.getToken());
+
+        assertThrows(InviteConflictException.class, () -> authService.registerWithInvite(request));
     }
 
     @Test

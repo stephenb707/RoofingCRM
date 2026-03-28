@@ -1,14 +1,17 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/AuthContext";
 import { getApiErrorMessage } from "@/lib/apiError";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { api, auth, setAuthFromLogin } = useAuth();
+  const nextUrl = searchParams.get("next");
+  const directToken = searchParams.get("token");
 
   const [fullName, setFullName] = useState("");
   const [tenantName, setTenantName] = useState("");
@@ -16,6 +19,13 @@ export default function RegisterPage() {
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const inviteToken = directToken ?? extractInviteToken(nextUrl);
+  const inviteMode = Boolean(inviteToken);
+  const loginHref =
+    nextUrl && nextUrl.startsWith("/")
+      ? `/auth/login?next=${encodeURIComponent(nextUrl)}`
+      : "/auth/login";
 
   useEffect(() => {
     if (!auth.token) return;
@@ -29,14 +39,20 @@ export default function RegisterPage() {
     setSubmitting(true);
 
     try {
-      const res = await api.post("/api/v1/auth/register", {
-        fullName,
-        tenantName,
-        email,
-        password,
-      });
+      const res = inviteMode
+        ? await api.post("/api/v1/auth/register-with-invite", {
+            fullName,
+            email,
+            password,
+            token: inviteToken,
+          })
+        : await api.post("/api/v1/auth/register", {
+            fullName,
+            tenantName,
+            email,
+            password,
+          });
 
-      // Reuse existing auth handler from login
       setAuthFromLogin(res.data);
 
       const tenants = res.data.tenants ?? [];
@@ -74,7 +90,9 @@ export default function RegisterPage() {
           </div>
           <h1 className="text-2xl font-bold text-slate-800">Create account</h1>
           <p className="text-sm text-slate-500 mt-1">
-            Set up Viva Roofing CRM for your roofing business
+            {inviteMode
+              ? "Create your account to join the invited team"
+              : "Set up Viva Roofing CRM for your roofing business"}
           </p>
         </div>
 
@@ -93,19 +111,21 @@ export default function RegisterPage() {
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">
-              Company name
-            </label>
-            <input
-              type="text"
-              className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-shadow"
-              value={tenantName}
-              onChange={(e) => setTenantName(e.target.value)}
-              required
-              placeholder="Your Roofing Co."
-            />
-          </div>
+          {!inviteMode && (
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                Company name
+              </label>
+              <input
+                type="text"
+                className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-shadow"
+                value={tenantName}
+                onChange={(e) => setTenantName(e.target.value)}
+                required
+                placeholder="Your Roofing Co."
+              />
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">
@@ -191,7 +211,7 @@ export default function RegisterPage() {
         <p className="mt-6 text-center text-xs text-slate-500">
           Already have an account?{" "}
           <Link
-            href="/auth/login"
+            href={loginHref}
             className="text-sky-600 hover:text-sky-700 font-medium"
           >
             Sign in
@@ -200,4 +220,14 @@ export default function RegisterPage() {
       </div>
     </div>
   );
+}
+
+function extractInviteToken(nextUrl: string | null): string | null {
+  if (!nextUrl || !nextUrl.startsWith("/auth/accept-invite")) {
+    return null;
+  }
+
+  const query = nextUrl.split("?")[1] ?? "";
+  const params = new URLSearchParams(query);
+  return params.get("token");
 }

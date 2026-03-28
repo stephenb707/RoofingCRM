@@ -3,16 +3,22 @@ package com.roofingcrm.service.auth;
 import com.roofingcrm.api.v1.auth.AuthResponse;
 import com.roofingcrm.api.v1.auth.LoginRequest;
 import com.roofingcrm.api.v1.auth.RegisterRequest;
+import com.roofingcrm.api.v1.auth.RegisterWithInviteRequest;
 import com.roofingcrm.api.v1.auth.TenantSummaryDto;
+import com.roofingcrm.api.v1.team.AcceptInviteRequest;
 import com.roofingcrm.domain.entity.Tenant;
+import com.roofingcrm.domain.entity.TenantInvite;
 import com.roofingcrm.domain.entity.TenantUserMembership;
 import com.roofingcrm.domain.entity.User;
 import com.roofingcrm.domain.enums.UserRole;
+import com.roofingcrm.domain.repository.TenantInviteRepository;
 import com.roofingcrm.domain.repository.TenantRepository;
 import com.roofingcrm.domain.repository.TenantUserMembershipRepository;
 import com.roofingcrm.domain.repository.UserRepository;
 import com.roofingcrm.security.JwtService;
+import com.roofingcrm.service.exception.InviteConflictException;
 import com.roofingcrm.service.exception.ResourceNotFoundException;
+import com.roofingcrm.service.team.TeamService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,16 +32,22 @@ public class AuthServiceImpl implements AuthService {
     private final UserRepository userRepository;
     private final TenantRepository tenantRepository;
     private final TenantUserMembershipRepository membershipRepository;
+    private final TenantInviteRepository inviteRepository;
+    private final TeamService teamService;
     private final JwtService jwtService;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     public AuthServiceImpl(UserRepository userRepository,
                            TenantRepository tenantRepository,
                            TenantUserMembershipRepository membershipRepository,
+                           TenantInviteRepository inviteRepository,
+                           TeamService teamService,
                            JwtService jwtService) {
         this.userRepository = userRepository;
         this.tenantRepository = tenantRepository;
         this.membershipRepository = membershipRepository;
+        this.inviteRepository = inviteRepository;
+        this.teamService = teamService;
         this.jwtService = jwtService;
     }
 
@@ -65,6 +77,42 @@ public class AuthServiceImpl implements AuthService {
         membership.setUser(user);
         membership.setRole(UserRole.OWNER);
         membershipRepository.save(membership);
+
+        return buildAuthResponse(user);
+    }
+
+    @Override
+    public AuthResponse registerWithInvite(RegisterWithInviteRequest request) {
+        String normalizedEmail = request.getEmail().trim().toLowerCase();
+
+        TenantInvite invite = inviteRepository.findByToken(request.getToken())
+                .orElseThrow(() -> new ResourceNotFoundException("Invite not found"));
+
+        if (invite.getExpiresAt().isBefore(java.time.Instant.now())) {
+            throw new InviteConflictException("Invite has expired.");
+        }
+        if (invite.getAcceptedAt() != null) {
+            throw new InviteConflictException("Invite has already been accepted.");
+        }
+        if (!invite.getEmail().equalsIgnoreCase(normalizedEmail)) {
+            throw new InviteConflictException("Invite email does not match registration email.");
+        }
+
+        userRepository.findByEmailIgnoreCase(normalizedEmail)
+                .ifPresent(existing -> {
+                    throw new InviteConflictException("User with that email already exists. Please sign in to accept the invite.");
+                });
+
+        User user = new User();
+        user.setEmail(normalizedEmail);
+        user.setFullName(request.getFullName());
+        user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+        user.setEnabled(true);
+        user = userRepository.save(user);
+
+        AcceptInviteRequest acceptInviteRequest = new AcceptInviteRequest();
+        acceptInviteRequest.setToken(request.getToken());
+        teamService.acceptInvite(user.getId(), acceptInviteRequest);
 
         return buildAuthResponse(user);
     }
