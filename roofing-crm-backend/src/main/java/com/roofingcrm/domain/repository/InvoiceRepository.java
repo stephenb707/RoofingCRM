@@ -13,6 +13,7 @@ import org.springframework.data.repository.query.Param;
 import java.util.List;
 import java.util.Optional;
 import java.time.Instant;
+import java.math.BigDecimal;
 import java.util.UUID;
 
 public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
@@ -43,6 +44,26 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
 
     @Query(value = "SELECT COALESCE(MAX(CAST(SUBSTRING(i.invoice_number FROM 5) AS bigint)), 0) FROM invoices i WHERE i.tenant_id = :tenantId", nativeQuery = true)
     long findMaxInvoiceNumberSuffix(@Param("tenantId") UUID tenantId);
+
+    @Query("""
+            select coalesce(sum(i.total), 0)
+            from Invoice i
+            where i.tenant = :tenant
+              and i.job.id = :jobId
+              and i.archived = false
+              and i.status <> com.roofingcrm.domain.enums.InvoiceStatus.VOID
+            """)
+    BigDecimal sumNonVoidTotalForJob(@Param("tenant") Tenant tenant, @Param("jobId") UUID jobId);
+
+    @Query("""
+            select coalesce(sum(i.total), 0)
+            from Invoice i
+            where i.tenant = :tenant
+              and i.job.id = :jobId
+              and i.archived = false
+              and i.status = com.roofingcrm.domain.enums.InvoiceStatus.PAID
+            """)
+    BigDecimal sumPaidTotalForJob(@Param("tenant") Tenant tenant, @Param("jobId") UUID jobId);
 
     @Query(value = """
             SELECT DISTINCT CAST(EXTRACT(YEAR FROM i.paid_at) AS int) AS year

@@ -9,11 +9,13 @@ import * as communicationLogsApi from "@/lib/communicationLogsApi";
 import * as tasksApi from "@/lib/tasksApi";
 import * as activityApi from "@/lib/activityApi";
 import * as invoicesApi from "@/lib/invoicesApi";
+import * as accountingApi from "@/lib/accountingApi";
 import { JobDto } from "@/lib/types";
 
 jest.mock("@/lib/jobsApi");
 jest.mock("@/lib/estimatesApi");
 jest.mock("@/lib/invoicesApi");
+jest.mock("@/lib/accountingApi");
 jest.mock("@/lib/attachmentsApi");
 jest.mock("@/lib/communicationLogsApi");
 jest.mock("@/lib/tasksApi");
@@ -33,6 +35,7 @@ const mockedCommLogsApi = communicationLogsApi as jest.Mocked<typeof communicati
 const mockedTasksApi = tasksApi as jest.Mocked<typeof tasksApi>;
 const mockedActivityApi = activityApi as jest.Mocked<typeof activityApi>;
 const mockedInvoicesApi = invoicesApi as jest.Mocked<typeof invoicesApi>;
+const mockedAccountingApi = accountingApi as jest.Mocked<typeof accountingApi>;
 
 const mockJob: JobDto = {
   id: "job-1",
@@ -70,6 +73,26 @@ describe("JobDetailPage", () => {
       last: true,
     });
     mockedInvoicesApi.listInvoicesForJob.mockResolvedValue([]);
+    mockedAccountingApi.getJobAccountingSummary.mockResolvedValue({
+      agreedAmount: null,
+      invoicedAmount: 0,
+      paidAmount: 0,
+      totalCosts: 0,
+      grossProfit: 0,
+      marginPercent: null,
+      projectedProfit: null,
+      actualProfit: 0,
+      projectedMarginPercent: null,
+      actualMarginPercent: null,
+      categoryTotals: {
+        MATERIAL: 0,
+        TRANSPORTATION: 0,
+        LABOR: 0,
+        OTHER: 0,
+      },
+      hasAcceptedEstimate: false,
+    });
+    mockedAccountingApi.listJobCostEntries.mockResolvedValue([]);
   });
 
   it("renders job overview and status", async () => {
@@ -261,6 +284,17 @@ describe("JobDetailPage", () => {
 
     expect(screen.getByRole("heading", { name: /^Attachments$/ })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /^Communication Logs$/ })).toBeInTheDocument();
+  });
+
+  it("renders the Accounting section", async () => {
+    render(<JobDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: /^Accounting$/ })).toBeInTheDocument();
+    });
+
+    expect(mockedAccountingApi.getJobAccountingSummary).toHaveBeenCalledWith(expect.anything(), "job-1");
+    expect(mockedAccountingApi.listJobCostEntries).toHaveBeenCalledWith(expect.anything(), "job-1");
   });
 
   it("uploading file calls uploadJobAttachment", async () => {

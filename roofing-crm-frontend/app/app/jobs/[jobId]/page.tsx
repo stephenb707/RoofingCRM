@@ -27,6 +27,7 @@ import { CommunicationLogSection } from "@/components/CommunicationLogSection";
 import { ActivitySection } from "@/components/ActivitySection";
 import { TasksSection } from "@/components/TasksSection";
 import { InvoicesSection } from "@/components/InvoicesSection";
+import { AccountingSection } from "@/components/AccountingSection";
 import { StatusBadge } from "@/components/StatusBadge";
 import { NextBestActions } from "@/components/NextBestActions";
 import { NextStepPromptDialog } from "@/components/NextStepPromptDialog";
@@ -375,6 +376,9 @@ export default function JobDetailPage() {
             createFromEstimateId={createFromEstimateId}
             onCreateFromEstimateHandled={() => setCreateFromEstimateId(null)}
           />
+
+          {/* Accounting */}
+          <AccountingSection jobId={jobId} />
 
           {/* Attachments */}
           <AttachmentSection

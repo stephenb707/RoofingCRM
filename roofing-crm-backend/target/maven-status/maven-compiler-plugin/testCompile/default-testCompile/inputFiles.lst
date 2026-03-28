@@ -23,6 +23,8 @@ C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\c
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\com\roofingcrm\TestDatabaseCleaner.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\com\roofingcrm\service\communication\CommunicationLogServiceImplTest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\com\roofingcrm\service\invoice\InvoiceServiceImplUnitTest.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\com\roofingcrm\service\accounting\JobAccountingServiceImplUnitTest.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\com\roofingcrm\api\v1\accounting\JobAccountingControllerTest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\com\roofingcrm\api\v1\schedule\ScheduleControllerTest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\com\roofingcrm\InvoiceMigrationFileTest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\com\roofingcrm\service\lead\LeadServiceImplTest.java

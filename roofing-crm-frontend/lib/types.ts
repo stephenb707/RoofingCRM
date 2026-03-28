@@ -333,6 +333,58 @@ export interface SendInvoiceEmailResponse {
   reusedExistingToken: boolean;
 }
 
+export type JobCostCategory =
+  | "MATERIAL"
+  | "TRANSPORTATION"
+  | "LABOR"
+  | "OTHER";
+
+export interface JobCostEntryDto {
+  id: string;
+  jobId: string;
+  category: JobCostCategory;
+  vendorName?: string | null;
+  description: string;
+  amount: number;
+  incurredAt: string;
+  notes?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface CreateJobCostEntryRequest {
+  category: JobCostCategory;
+  vendorName?: string | null;
+  description: string;
+  amount: number;
+  incurredAt: string;
+  notes?: string | null;
+}
+
+export interface UpdateJobCostEntryRequest {
+  category?: JobCostCategory | null;
+  vendorName?: string | null;
+  description?: string | null;
+  amount?: number | null;
+  incurredAt?: string | null;
+  notes?: string | null;
+}
+
+export interface JobAccountingSummaryDto {
+  agreedAmount?: number | null;
+  invoicedAmount: number;
+  paidAmount: number;
+  totalCosts: number;
+  grossProfit: number;
+  marginPercent?: number | null;
+  projectedProfit?: number | null;
+  actualProfit: number;
+  projectedMarginPercent?: number | null;
+  actualMarginPercent?: number | null;
+  categoryTotals: Record<JobCostCategory, number>;
+  hasAcceptedEstimate: boolean;
+}
+
 export interface PublicEstimateItemDto {
   name: string;
   description?: string | null;
@@ -546,7 +598,10 @@ export type ActivityEventType =
   | "INVOICE_CREATED"
   | "INVOICE_SHARED"
   | "INVOICE_EMAIL_SENT"
-  | "INVOICE_STATUS_CHANGED";
+  | "INVOICE_STATUS_CHANGED"
+  | "COST_ENTRY_CREATED"
+  | "COST_ENTRY_UPDATED"
+  | "COST_ENTRY_DELETED";
 
 export interface ActivityEventDto {
   activityId: string;
