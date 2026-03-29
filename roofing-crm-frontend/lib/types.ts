@@ -492,6 +492,7 @@ export type AttachmentTag =
   | "DAMAGE"
   | "AFTER"
   | "INVOICE"
+  | "RECEIPT"
   | "DOCUMENT"
   | "OTHER";
 
@@ -508,6 +509,27 @@ export interface AttachmentDto {
   tag?: AttachmentTag | null;
   createdAt?: string | null;
   updatedAt?: string | null;
+}
+
+export interface JobReceiptDto {
+  id: string;
+  fileName: string;
+  contentType?: string | null;
+  fileSize?: number | null;
+  description?: string | null;
+  uploadedAt?: string | null;
+  linkedCostEntryId?: string | null;
+  linkedCostEntryDescription?: string | null;
+  linkedCostEntryAmount?: number | null;
+}
+
+export interface CreateCostFromReceiptRequest {
+  category: JobCostCategory;
+  vendorName?: string | null;
+  description: string;
+  amount: number;
+  incurredAt: string;
+  notes?: string | null;
 }
 
 // Task-related types
@@ -601,7 +623,11 @@ export type ActivityEventType =
   | "INVOICE_STATUS_CHANGED"
   | "COST_ENTRY_CREATED"
   | "COST_ENTRY_UPDATED"
-  | "COST_ENTRY_DELETED";
+  | "COST_ENTRY_DELETED"
+  | "RECEIPT_UPLOADED"
+  | "RECEIPT_LINKED_TO_COST"
+  | "RECEIPT_UNLINKED_FROM_COST"
+  | "RECEIPT_DELETED";
 
 export interface ActivityEventDto {
   activityId: string;

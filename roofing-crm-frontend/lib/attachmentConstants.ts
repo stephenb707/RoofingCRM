@@ -14,6 +14,7 @@ export const TAG_LABELS: Record<AttachmentTag, string> = {
   DAMAGE: "Damage",
   AFTER: "After",
   INVOICE: "Invoice",
+  RECEIPT: "Receipt",
   DOCUMENT: "Document",
   OTHER: "Other",
 };

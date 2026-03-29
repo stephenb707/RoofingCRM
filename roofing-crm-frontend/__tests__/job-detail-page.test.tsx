@@ -93,6 +93,7 @@ describe("JobDetailPage", () => {
       hasAcceptedEstimate: false,
     });
     mockedAccountingApi.listJobCostEntries.mockResolvedValue([]);
+    mockedAccountingApi.listJobReceipts.mockResolvedValue([]);
   });
 
   it("renders job overview and status", async () => {
@@ -295,6 +296,7 @@ describe("JobDetailPage", () => {
 
     expect(mockedAccountingApi.getJobAccountingSummary).toHaveBeenCalledWith(expect.anything(), "job-1");
     expect(mockedAccountingApi.listJobCostEntries).toHaveBeenCalledWith(expect.anything(), "job-1");
+    expect(mockedAccountingApi.listJobReceipts).toHaveBeenCalledWith(expect.anything(), "job-1");
   });
 
   it("uploading file calls uploadJobAttachment", async () => {
@@ -315,7 +317,7 @@ describe("JobDetailPage", () => {
       expect(screen.getByRole("heading", { name: /^Attachments$/ })).toBeInTheDocument();
     });
 
-    const fileInput = document.querySelector('input[type="file"]');
+    const fileInput = screen.getByLabelText("Choose file to upload");
     expect(fileInput).toBeInTheDocument();
     if (fileInput) {
       const file = new File(["content"], "doc.pdf", { type: "application/pdf" });

@@ -31,6 +31,10 @@ public class Attachment extends TenantAuditedEntity {
     @JoinColumn(name = "job_id")
     private Job job;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "job_cost_entry_id")
+    private JobCostEntry jobCostEntry;
+
     @Column(nullable = false)
     private String fileName;
 

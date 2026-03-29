@@ -1,8 +1,10 @@
 import type { AxiosInstance } from "axios";
 import type {
+  CreateCostFromReceiptRequest,
   CreateJobCostEntryRequest,
   JobAccountingSummaryDto,
   JobCostEntryDto,
+  JobReceiptDto,
   UpdateJobCostEntryRequest,
 } from "./types";
 
@@ -47,4 +49,69 @@ export async function deleteJobCostEntry(
   costEntryId: string
 ): Promise<void> {
   await api.delete(`/api/v1/jobs/${jobId}/costs/${costEntryId}`);
+}
+
+export async function listJobReceipts(
+  api: AxiosInstance,
+  jobId: string
+): Promise<JobReceiptDto[]> {
+  const res = await api.get<JobReceiptDto[]>(`/api/v1/jobs/${jobId}/receipts`);
+  return res.data;
+}
+
+export async function uploadJobReceipt(
+  api: AxiosInstance,
+  jobId: string,
+  file: File,
+  description?: string | null
+): Promise<JobReceiptDto> {
+  const form = new FormData();
+  form.append("file", file);
+  if (description != null && description !== "") {
+    form.append("description", description);
+  }
+  const res = await api.post<JobReceiptDto>(`/api/v1/jobs/${jobId}/receipts`, form);
+  return res.data;
+}
+
+export async function createCostFromReceipt(
+  api: AxiosInstance,
+  jobId: string,
+  receiptId: string,
+  payload: CreateCostFromReceiptRequest
+): Promise<JobCostEntryDto> {
+  const res = await api.post<JobCostEntryDto>(
+    `/api/v1/jobs/${jobId}/receipts/${receiptId}/create-cost`,
+    payload
+  );
+  return res.data;
+}
+
+export async function linkReceiptToCost(
+  api: AxiosInstance,
+  jobId: string,
+  receiptId: string,
+  costEntryId: string
+): Promise<JobReceiptDto> {
+  const res = await api.put<JobReceiptDto>(
+    `/api/v1/jobs/${jobId}/receipts/${receiptId}/link-cost/${costEntryId}`
+  );
+  return res.data;
+}
+
+export async function unlinkReceiptFromCost(
+  api: AxiosInstance,
+  jobId: string,
+  receiptId: string
+): Promise<JobReceiptDto> {
+  const res = await api.delete<JobReceiptDto>(`/api/v1/jobs/${jobId}/receipts/${receiptId}/link-cost`);
+  return res.data;
+}
+
+export async function deleteJobReceipt(
+  api: AxiosInstance,
+  jobId: string,
+  receiptId: string
+): Promise<void> {
+  await api.delete(`/api/v1/jobs/${jobId}/receipts/${receiptId}`);
 }

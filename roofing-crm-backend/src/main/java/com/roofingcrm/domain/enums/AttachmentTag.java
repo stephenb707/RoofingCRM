@@ -5,6 +5,7 @@ public enum AttachmentTag {
     DAMAGE,
     AFTER,
     INVOICE,
+    RECEIPT,
     DOCUMENT,
     OTHER
 }

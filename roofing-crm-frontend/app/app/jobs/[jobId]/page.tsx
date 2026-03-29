@@ -99,6 +99,7 @@ export default function JobDetailPage() {
     queryFn: () => listJobAttachments(api, jobId),
     enabled: ready && !!jobId,
   });
+  const nonReceiptAttachments = (attachmentsQuery.data ?? []).filter((attachment) => attachment.tag !== "RECEIPT");
 
   const uploadAttachmentMutation = useMutation({
     mutationFn: ({
@@ -383,7 +384,7 @@ export default function JobDetailPage() {
           {/* Attachments */}
           <AttachmentSection
             title="Attachments"
-            attachments={attachmentsQuery.data ?? []}
+            attachments={nonReceiptAttachments}
             onUpload={(file, options) =>
               uploadAttachmentMutation.mutate({ file, tag: options?.tag, description: options?.description })
             }

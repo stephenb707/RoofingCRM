@@ -11,12 +11,21 @@ export function createApiClient(getAuthState: () => AuthState) {
 
   instance.interceptors.request.use((config) => {
     const auth = getAuthState();
+    const headers = axios.AxiosHeaders.from(config.headers ?? {});
+
     if (auth.token) {
-      config.headers.set("Authorization", `Bearer ${auth.token}`);
+      headers.set("Authorization", `Bearer ${auth.token}`);
     }
     if (auth.selectedTenantId) {
-      config.headers.set("X-Tenant-Id", auth.selectedTenantId);
+      headers.set("X-Tenant-Id", auth.selectedTenantId);
     }
+
+    // Let axios/browser compute the multipart boundary automatically.
+    if (typeof FormData !== "undefined" && config.data instanceof FormData) {
+      headers.delete("Content-Type");
+    }
+
+    config.headers = headers;
     return config;
   });
 

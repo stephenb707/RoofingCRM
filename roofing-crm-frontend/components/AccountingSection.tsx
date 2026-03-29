@@ -1,24 +1,34 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import type { ReactNode } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuthReady } from "@/lib/AuthContext";
 import {
+  createCostFromReceipt,
   createJobCostEntry,
   deleteJobCostEntry,
+  deleteJobReceipt,
   getJobAccountingSummary,
+  linkReceiptToCost,
   listJobCostEntries,
+  listJobReceipts,
+  unlinkReceiptFromCost,
   updateJobCostEntry,
+  uploadJobReceipt,
 } from "@/lib/accountingApi";
+import { downloadAttachment } from "@/lib/attachmentsApi";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { JOB_COST_CATEGORIES, JOB_COST_CATEGORY_LABELS } from "@/lib/accountingConstants";
 import { queryKeys } from "@/lib/queryKeys";
-import { formatDate, formatMoney, formatDateOnly } from "@/lib/format";
+import { formatDate, formatDateOnly, formatFileSize, formatMoney } from "@/lib/format";
 import { DatePickerField } from "@/components/DatePickerField";
 import type {
+  CreateCostFromReceiptRequest,
   CreateJobCostEntryRequest,
   JobCostCategory,
   JobCostEntryDto,
+  JobReceiptDto,
   UpdateJobCostEntryRequest,
 } from "@/lib/types";
 
@@ -67,11 +77,19 @@ function formatPercent(value?: number | null): string {
 export function AccountingSection({ jobId }: AccountingSectionProps) {
   const { api, auth, ready } = useAuthReady();
   const queryClient = useQueryClient();
+  const receiptFileInputRef = useRef<HTMLInputElement>(null);
+
   const [filter, setFilter] = useState<CostFilter>("ALL");
-  const [showModal, setShowModal] = useState(false);
+  const [showCostModal, setShowCostModal] = useState(false);
   const [editingEntry, setEditingEntry] = useState<JobCostEntryDto | null>(null);
+  const [receiptCreateTarget, setReceiptCreateTarget] = useState<JobReceiptDto | null>(null);
+  const [showLinkModal, setShowLinkModal] = useState(false);
+  const [linkReceiptTarget, setLinkReceiptTarget] = useState<JobReceiptDto | null>(null);
+  const [selectedLinkCostId, setSelectedLinkCostId] = useState("");
   const [formState, setFormState] = useState<CostFormState>(getDefaultFormState());
   const [formError, setFormError] = useState<string | null>(null);
+  const [receiptError, setReceiptError] = useState<string | null>(null);
+  const [receiptDescription, setReceiptDescription] = useState("");
 
   const selectedTenant = auth.tenants.find((tenant) => tenant.tenantId === auth.selectedTenantId);
   const canEdit =
@@ -91,10 +109,18 @@ export function AccountingSection({ jobId }: AccountingSectionProps) {
     enabled: ready && !!jobId,
   });
 
+  const receiptsQuery = useQuery({
+    queryKey: queryKeys.jobReceipts(auth.selectedTenantId, jobId),
+    queryFn: () => listJobReceipts(api, jobId),
+    enabled: ready && !!jobId,
+  });
+
   const invalidateAccountingQueries = async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: queryKeys.jobAccountingSummary(auth.selectedTenantId, jobId) }),
       queryClient.invalidateQueries({ queryKey: queryKeys.jobCostEntries(auth.selectedTenantId, jobId) }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.jobReceipts(auth.selectedTenantId, jobId) }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.jobAttachments(auth.selectedTenantId, jobId) }),
       queryClient.invalidateQueries({ queryKey: queryKeys.activityForEntity(auth.selectedTenantId, "JOB", jobId) }),
     ]);
   };
@@ -102,10 +128,7 @@ export function AccountingSection({ jobId }: AccountingSectionProps) {
   const createMutation = useMutation({
     mutationFn: (payload: CreateJobCostEntryRequest) => createJobCostEntry(api, jobId, payload),
     onSuccess: async () => {
-      setFormError(null);
-      setShowModal(false);
-      setEditingEntry(null);
-      setFormState(getDefaultFormState());
+      closeCostModal();
       await invalidateAccountingQueries();
     },
     onError: (error: unknown) => {
@@ -113,14 +136,23 @@ export function AccountingSection({ jobId }: AccountingSectionProps) {
     },
   });
 
+  const createFromReceiptMutation = useMutation({
+    mutationFn: ({ receiptId, payload }: { receiptId: string; payload: CreateCostFromReceiptRequest }) =>
+      createCostFromReceipt(api, jobId, receiptId, payload),
+    onSuccess: async () => {
+      closeCostModal();
+      await invalidateAccountingQueries();
+    },
+    onError: (error: unknown) => {
+      setFormError(getApiErrorMessage(error, "Failed to create cost from receipt."));
+    },
+  });
+
   const updateMutation = useMutation({
     mutationFn: ({ costEntryId, payload }: { costEntryId: string; payload: UpdateJobCostEntryRequest }) =>
       updateJobCostEntry(api, jobId, costEntryId, payload),
     onSuccess: async () => {
-      setFormError(null);
-      setShowModal(false);
-      setEditingEntry(null);
-      setFormState(getDefaultFormState());
+      closeCostModal();
       await invalidateAccountingQueries();
     },
     onError: (error: unknown) => {
@@ -135,7 +167,53 @@ export function AccountingSection({ jobId }: AccountingSectionProps) {
     },
   });
 
+  const uploadReceiptMutation = useMutation({
+    mutationFn: ({ file, description }: { file: File; description?: string | null }) =>
+      uploadJobReceipt(api, jobId, file, description),
+    onSuccess: async () => {
+      setReceiptDescription("");
+      setReceiptError(null);
+      await invalidateAccountingQueries();
+    },
+    onError: (error: unknown) => {
+      setReceiptError(getApiErrorMessage(error, "Failed to upload receipt."));
+    },
+  });
+
+  const linkReceiptMutation = useMutation({
+    mutationFn: ({ receiptId, costEntryId }: { receiptId: string; costEntryId: string }) =>
+      linkReceiptToCost(api, jobId, receiptId, costEntryId),
+    onSuccess: async () => {
+      closeLinkModal();
+      await invalidateAccountingQueries();
+    },
+    onError: (error: unknown) => {
+      setReceiptError(getApiErrorMessage(error, "Failed to link receipt to cost."));
+    },
+  });
+
+  const unlinkReceiptMutation = useMutation({
+    mutationFn: (receiptId: string) => unlinkReceiptFromCost(api, jobId, receiptId),
+    onSuccess: async () => {
+      await invalidateAccountingQueries();
+    },
+    onError: (error: unknown) => {
+      setReceiptError(getApiErrorMessage(error, "Failed to unlink receipt."));
+    },
+  });
+
+  const deleteReceiptMutation = useMutation({
+    mutationFn: (receiptId: string) => deleteJobReceipt(api, jobId, receiptId),
+    onSuccess: async () => {
+      await invalidateAccountingQueries();
+    },
+    onError: (error: unknown) => {
+      setReceiptError(getApiErrorMessage(error, "Failed to delete receipt."));
+    },
+  });
+
   const entries = costsQuery.data ?? [];
+  const receipts = receiptsQuery.data ?? [];
   const summary = summaryQuery.data;
   const categoryTotals = summary?.categoryTotals ?? EMPTY_CATEGORY_TOTALS;
 
@@ -155,19 +233,33 @@ export function AccountingSection({ jobId }: AccountingSectionProps) {
     return groups;
   }, [filteredEntries]);
 
-  const isSaving = createMutation.isPending || updateMutation.isPending;
-  const isLoading = summaryQuery.isLoading || costsQuery.isLoading;
-  const isError = summaryQuery.isError || costsQuery.isError;
+  const isSaving =
+    createMutation.isPending || updateMutation.isPending || createFromReceiptMutation.isPending;
+  const isLoading = summaryQuery.isLoading || costsQuery.isLoading || receiptsQuery.isLoading;
+  const isError = summaryQuery.isError || costsQuery.isError || receiptsQuery.isError;
 
   const openCreateModal = () => {
     setEditingEntry(null);
+    setReceiptCreateTarget(null);
     setFormError(null);
     setFormState(getDefaultFormState());
-    setShowModal(true);
+    setShowCostModal(true);
+  };
+
+  const openCreateFromReceiptModal = (receipt: JobReceiptDto) => {
+    setEditingEntry(null);
+    setReceiptCreateTarget(receipt);
+    setFormError(null);
+    setFormState((current) => ({
+      ...getDefaultFormState(),
+      description: receipt.description ?? "",
+    }));
+    setShowCostModal(true);
   };
 
   const openEditModal = (entry: JobCostEntryDto) => {
     setEditingEntry(entry);
+    setReceiptCreateTarget(null);
     setFormError(null);
     setFormState({
       category: entry.category,
@@ -177,14 +269,28 @@ export function AccountingSection({ jobId }: AccountingSectionProps) {
       incurredAt: entry.incurredAt.slice(0, 10),
       notes: entry.notes ?? "",
     });
-    setShowModal(true);
+    setShowCostModal(true);
   };
 
-  const closeModal = () => {
-    setShowModal(false);
+  const closeCostModal = () => {
+    setShowCostModal(false);
     setEditingEntry(null);
+    setReceiptCreateTarget(null);
     setFormError(null);
     setFormState(getDefaultFormState());
+  };
+
+  const openLinkModal = (receipt: JobReceiptDto) => {
+    setLinkReceiptTarget(receipt);
+    setSelectedLinkCostId("");
+    setReceiptError(null);
+    setShowLinkModal(true);
+  };
+
+  const closeLinkModal = () => {
+    setShowLinkModal(false);
+    setLinkReceiptTarget(null);
+    setSelectedLinkCostId("");
   };
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
@@ -214,9 +320,15 @@ export function AccountingSection({ jobId }: AccountingSectionProps) {
 
     if (editingEntry) {
       updateMutation.mutate({ costEntryId: editingEntry.id, payload });
-    } else {
-      createMutation.mutate(payload);
+      return;
     }
+
+    if (receiptCreateTarget) {
+      createFromReceiptMutation.mutate({ receiptId: receiptCreateTarget.id, payload });
+      return;
+    }
+
+    createMutation.mutate(payload);
   };
 
   const handleDelete = (entry: JobCostEntryDto) => {
@@ -224,6 +336,53 @@ export function AccountingSection({ jobId }: AccountingSectionProps) {
       return;
     }
     deleteMutation.mutate(entry.id);
+  };
+
+  const handleReceiptFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    uploadReceiptMutation.mutate({
+      file,
+      description: receiptDescription.trim() || null,
+    });
+    event.target.value = "";
+  };
+
+  const handleViewReceipt = async (receipt: JobReceiptDto) => {
+    try {
+      const blob = await downloadAttachment(api, receipt.id);
+      const url = URL.createObjectURL(blob);
+      const opened = window.open(url, "_blank", "noopener,noreferrer");
+      if (!opened) {
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = receipt.fileName;
+        link.click();
+      }
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (error) {
+      setReceiptError(getApiErrorMessage(error, "Failed to open receipt."));
+    }
+  };
+
+  const handleUnlinkReceipt = (receiptId: string) => {
+    unlinkReceiptMutation.mutate(receiptId);
+  };
+
+  const handleDeleteReceipt = (receiptId: string) => {
+    if (typeof window !== "undefined" && !window.confirm("Delete this receipt?")) {
+      return;
+    }
+    deleteReceiptMutation.mutate(receiptId);
+  };
+
+  const handleLinkSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!linkReceiptTarget || !selectedLinkCostId) return;
+    linkReceiptMutation.mutate({
+      receiptId: linkReceiptTarget.id,
+      costEntryId: selectedLinkCostId,
+    });
   };
 
   if (isLoading) {
@@ -240,7 +399,10 @@ export function AccountingSection({ jobId }: AccountingSectionProps) {
       <div className="bg-white rounded-xl border border-slate-200 p-6">
         <h2 className="text-lg font-semibold text-slate-800 mb-4">Accounting</h2>
         <p className="text-sm text-red-600">
-          {getApiErrorMessage(summaryQuery.error ?? costsQuery.error, "Failed to load accounting details.")}
+          {getApiErrorMessage(
+            summaryQuery.error ?? costsQuery.error ?? receiptsQuery.error,
+            "Failed to load accounting details."
+          )}
         </p>
       </div>
     );
@@ -251,7 +413,7 @@ export function AccountingSection({ jobId }: AccountingSectionProps) {
       <div className="flex items-center justify-between gap-4 mb-6">
         <div>
           <h2 className="text-lg font-semibold text-slate-800">Accounting</h2>
-          <p className="text-sm text-slate-500 mt-1">Track job revenue, costs, and profitability.</p>
+          <p className="text-sm text-slate-500 mt-1">Track job revenue, costs, receipts, and profitability.</p>
         </div>
         {canEdit && (
           <button
@@ -277,9 +439,7 @@ export function AccountingSection({ jobId }: AccountingSectionProps) {
           label="Profit"
           value={formatMoney(summary?.grossProfit)}
           secondaryText={
-            summary?.projectedProfit != null
-              ? `Projected ${formatMoney(summary.projectedProfit)}`
-              : undefined
+            summary?.projectedProfit != null ? `Projected ${formatMoney(summary.projectedProfit)}` : undefined
           }
         />
         <SummaryCard
@@ -293,9 +453,9 @@ export function AccountingSection({ jobId }: AccountingSectionProps) {
         />
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8" data-testid="category-totals-grid">
         {JOB_COST_CATEGORIES.map((category) => (
-          <div key={category} className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+          <div key={category} className="min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
             <p className="text-xs font-medium uppercase tracking-wider text-slate-500">
               {JOB_COST_CATEGORY_LABELS[category]}
             </p>
@@ -304,15 +464,143 @@ export function AccountingSection({ jobId }: AccountingSectionProps) {
         ))}
       </div>
 
-      <div className="flex flex-wrap gap-2 mb-4">
-        <FilterButton active={filter === "ALL"} onClick={() => setFilter("ALL")}>
-          All
-        </FilterButton>
-        {JOB_COST_CATEGORIES.map((category) => (
-          <FilterButton key={category} active={filter === category} onClick={() => setFilter(category)}>
-            {JOB_COST_CATEGORY_LABELS[category]}
+      <div className="mb-8" data-testid="receipts-section">
+        <div className="flex items-center justify-between gap-4 mb-4">
+          <div>
+            <h3 className="text-base font-semibold text-slate-800">Receipts</h3>
+            <p className="text-sm text-slate-500 mt-1">Upload receipt images or PDFs and link them to job costs.</p>
+          </div>
+        </div>
+
+        {receiptError && (
+          <div className="mb-4 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+            {receiptError}
+          </div>
+        )}
+
+        {canEdit && (
+          <div className="flex flex-wrap items-end gap-3 mb-4">
+            <input
+              ref={receiptFileInputRef}
+              type="file"
+              accept="image/*,.pdf,application/pdf"
+              onChange={handleReceiptFileChange}
+              className="hidden"
+              aria-label="Choose receipt file"
+            />
+            <div className="flex-1 min-w-[220px]">
+              <label htmlFor="receipt-description" className="block text-sm font-medium text-slate-700 mb-1">
+                Receipt label
+              </label>
+              <input
+                id="receipt-description"
+                type="text"
+                value={receiptDescription}
+                onChange={(event) => setReceiptDescription(event.target.value)}
+                placeholder="Optional note for this receipt"
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => receiptFileInputRef.current?.click()}
+              disabled={uploadReceiptMutation.isPending}
+              className="px-4 py-2.5 text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 rounded-lg disabled:opacity-60"
+            >
+              {uploadReceiptMutation.isPending ? "Uploading…" : "Upload Receipt"}
+            </button>
+          </div>
+        )}
+
+        {receipts.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-8 text-center">
+            <p className="text-sm text-slate-600">No receipts uploaded yet.</p>
+            {canEdit && (
+              <button
+                type="button"
+                onClick={() => receiptFileInputRef.current?.click()}
+                className="mt-4 inline-flex rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700"
+              >
+                Upload Receipt
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {receipts.map((receipt) => (
+              <div
+                key={receipt.id}
+                className="rounded-lg border border-slate-200 px-4 py-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-sm font-medium text-slate-800 truncate">{receipt.fileName}</p>
+                    <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+                      Receipt
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Uploaded {formatDate(receipt.uploadedAt)}
+                    {receipt.fileSize ? ` · ${formatFileSize(receipt.fileSize)}` : ""}
+                    {receipt.contentType ? ` · ${receipt.contentType}` : ""}
+                  </p>
+                  {receipt.description && <p className="text-sm text-slate-600 mt-2">{receipt.description}</p>}
+                  <p className="text-sm text-slate-600 mt-2">
+                    {receipt.linkedCostEntryId
+                      ? `Linked to: ${receipt.linkedCostEntryDescription ?? "Cost entry"}${
+                          receipt.linkedCostEntryAmount != null
+                            ? ` — ${formatMoney(receipt.linkedCostEntryAmount)}`
+                            : ""
+                        }`
+                      : "Unlinked"}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2 lg:justify-end">
+                  <ReceiptActionButton onClick={() => handleViewReceipt(receipt)}>View / Download</ReceiptActionButton>
+                  {!receipt.linkedCostEntryId && canEdit && (
+                    <ReceiptActionButton onClick={() => openCreateFromReceiptModal(receipt)}>
+                      Create Cost
+                    </ReceiptActionButton>
+                  )}
+                  {!receipt.linkedCostEntryId && canEdit && entries.length > 0 && (
+                    <ReceiptActionButton onClick={() => openLinkModal(receipt)}>Link to Cost</ReceiptActionButton>
+                  )}
+                  {receipt.linkedCostEntryId && canEdit && (
+                    <ReceiptActionButton
+                      onClick={() => handleUnlinkReceipt(receipt.id)}
+                      disabled={unlinkReceiptMutation.isPending}
+                    >
+                      Unlink
+                    </ReceiptActionButton>
+                  )}
+                  {canEdit && (
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteReceipt(receipt.id)}
+                      disabled={deleteReceiptMutation.isPending}
+                      className="px-3 py-1.5 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 disabled:opacity-60"
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div className="flex flex-wrap gap-2">
+          <FilterButton active={filter === "ALL"} onClick={() => setFilter("ALL")}>
+            All
           </FilterButton>
-        ))}
+          {JOB_COST_CATEGORIES.map((category) => (
+            <FilterButton key={category} active={filter === category} onClick={() => setFilter(category)}>
+              {JOB_COST_CATEGORY_LABELS[category]}
+            </FilterButton>
+          ))}
+        </div>
       </div>
 
       {entries.length === 0 ? (
@@ -338,9 +626,7 @@ export function AccountingSection({ jobId }: AccountingSectionProps) {
             <div key={group.category}>
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-sm font-semibold text-slate-800">{JOB_COST_CATEGORY_LABELS[group.category]}</h3>
-                <span className="text-xs font-medium text-slate-500">
-                  {formatMoney(categoryTotals[group.category])}
-                </span>
+                <span className="text-xs font-medium text-slate-500">{formatMoney(categoryTotals[group.category])}</span>
               </div>
               <div className="overflow-x-auto rounded-lg border border-slate-200">
                 <table className="min-w-full divide-y divide-slate-200">
@@ -408,12 +694,15 @@ export function AccountingSection({ jobId }: AccountingSectionProps) {
         </p>
       )}
 
-      {showModal && (
+      {showCostModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 p-6">
-            <h3 className="text-lg font-semibold text-slate-800 mb-4">
-              {editingEntry ? "Edit Cost" : "Add Cost"}
+            <h3 className="text-lg font-semibold text-slate-800 mb-2">
+              {editingEntry ? "Edit Cost" : receiptCreateTarget ? "Create Cost from Receipt" : "Add Cost"}
             </h3>
+            {receiptCreateTarget && (
+              <p className="text-sm text-slate-500 mb-4">Receipt: {receiptCreateTarget.fileName}</p>
+            )}
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
@@ -535,7 +824,7 @@ export function AccountingSection({ jobId }: AccountingSectionProps) {
               <div className="flex gap-3 justify-end pt-2">
                 <button
                   type="button"
-                  onClick={closeModal}
+                  onClick={closeCostModal}
                   className="px-4 py-2 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50"
                 >
                   Cancel
@@ -545,7 +834,59 @@ export function AccountingSection({ jobId }: AccountingSectionProps) {
                   disabled={isSaving}
                   className="px-4 py-2 text-sm font-medium text-white bg-sky-600 rounded-lg hover:bg-sky-700 disabled:opacity-50"
                 >
-                  {isSaving ? "Saving…" : editingEntry ? "Save Changes" : "Add Cost"}
+                  {isSaving
+                    ? "Saving…"
+                    : editingEntry
+                      ? "Save Changes"
+                      : receiptCreateTarget
+                        ? "Create Cost"
+                        : "Add Cost"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showLinkModal && linkReceiptTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
+            <h3 className="text-lg font-semibold text-slate-800 mb-2">Link Receipt to Cost</h3>
+            <p className="text-sm text-slate-500 mb-4">{linkReceiptTarget.fileName}</p>
+            <form onSubmit={handleLinkSubmit} className="space-y-4">
+              <div>
+                <label htmlFor="receipt-link-cost" className="block text-sm font-medium text-slate-700 mb-1">
+                  Cost entry
+                </label>
+                <select
+                  id="receipt-link-cost"
+                  value={selectedLinkCostId}
+                  onChange={(event) => setSelectedLinkCostId(event.target.value)}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+                  required
+                >
+                  <option value="">Select cost entry…</option>
+                  {entries.map((entry) => (
+                    <option key={entry.id} value={entry.id}>
+                      {entry.description} — {formatMoney(entry.amount)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex gap-3 justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={closeLinkModal}
+                  className="px-4 py-2 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!selectedLinkCostId || linkReceiptMutation.isPending}
+                  className="px-4 py-2 text-sm font-medium text-white bg-sky-600 rounded-lg hover:bg-sky-700 disabled:opacity-50"
+                >
+                  {linkReceiptMutation.isPending ? "Linking…" : "Link Receipt"}
                 </button>
               </div>
             </form>
@@ -581,7 +922,7 @@ function FilterButton({
 }: {
   active: boolean;
   onClick: () => void;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <button
@@ -592,6 +933,27 @@ function FilterButton({
           ? "border-sky-300 bg-sky-50 text-sky-700"
           : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
       }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function ReceiptActionButton({
+  children,
+  onClick,
+  disabled = false,
+}: {
+  children: ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="px-3 py-1.5 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-60"
     >
       {children}
     </button>

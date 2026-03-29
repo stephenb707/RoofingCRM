@@ -3,6 +3,7 @@ package com.roofingcrm.api.v1.accounting;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.roofingcrm.domain.enums.JobCostCategory;
 import com.roofingcrm.security.AuthenticatedUser;
+import com.roofingcrm.service.accounting.JobAccountingReceiptService;
 import com.roofingcrm.service.accounting.JobAccountingService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,6 +30,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -47,6 +49,8 @@ class JobAccountingControllerTest {
 
     @MockBean
     private JobAccountingService jobAccountingService;
+    @MockBean
+    private JobAccountingReceiptService jobAccountingReceiptService;
 
     private UUID userId;
 
@@ -186,5 +190,113 @@ class JobAccountingControllerTest {
                 .andExpect(status().isNoContent());
 
         verify(jobAccountingService).deleteJobCostEntry(tenantId, userId, jobId, costEntryId);
+    }
+
+    @Test
+    void listJobReceipts_returnsList() throws Exception {
+        UUID tenantId = UUID.randomUUID();
+        UUID jobId = UUID.randomUUID();
+
+        JobReceiptDto dto = new JobReceiptDto();
+        dto.setId(UUID.randomUUID());
+        dto.setFileName("receipt.pdf");
+
+        when(jobAccountingReceiptService.listReceiptsForJob(tenantId, userId, jobId)).thenReturn(List.of(dto));
+
+        mockMvc.perform(get("/api/v1/jobs/{jobId}/receipts", jobId)
+                        .header("X-Tenant-Id", tenantId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()", is(1)))
+                .andExpect(jsonPath("$[0].fileName", is("receipt.pdf")));
+    }
+
+    @Test
+    void uploadReceipt_returnsCreated() throws Exception {
+        UUID tenantId = UUID.randomUUID();
+        UUID jobId = UUID.randomUUID();
+
+        JobReceiptDto dto = new JobReceiptDto();
+        dto.setId(UUID.randomUUID());
+        dto.setFileName("receipt.pdf");
+
+        when(jobAccountingReceiptService.uploadReceiptForJob(eq(tenantId), eq(userId), eq(jobId), any(), eq("Receipt upload")))
+                .thenReturn(dto);
+
+        mockMvc.perform(multipart("/api/v1/jobs/{jobId}/receipts", jobId)
+                        .file("file", "pdf".getBytes())
+                        .param("description", "Receipt upload")
+                        .header("X-Tenant-Id", tenantId.toString()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.fileName", is("receipt.pdf")));
+    }
+
+    @Test
+    void createCostFromReceipt_returnsCreated() throws Exception {
+        UUID tenantId = UUID.randomUUID();
+        UUID jobId = UUID.randomUUID();
+        UUID receiptId = UUID.randomUUID();
+
+        JobCostEntryDto dto = new JobCostEntryDto();
+        dto.setId(UUID.randomUUID());
+        dto.setJobId(jobId);
+        dto.setDescription("Materials");
+
+        when(jobAccountingReceiptService.createCostFromReceipt(eq(tenantId), eq(userId), eq(jobId), eq(receiptId), any(CreateCostFromReceiptRequest.class)))
+                .thenReturn(dto);
+
+        mockMvc.perform(post("/api/v1/jobs/{jobId}/receipts/{receiptId}/create-cost", jobId, receiptId)
+                        .header("X-Tenant-Id", tenantId.toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "category":"MATERIAL",
+                                  "description":"Materials",
+                                  "amount":120.00,
+                                  "incurredAt":"2026-03-28T12:00:00Z"
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.description", is("Materials")));
+    }
+
+    @Test
+    void linkAndUnlinkReceiptToCost_returnOk() throws Exception {
+        UUID tenantId = UUID.randomUUID();
+        UUID jobId = UUID.randomUUID();
+        UUID receiptId = UUID.randomUUID();
+        UUID costEntryId = UUID.randomUUID();
+
+        JobReceiptDto linked = new JobReceiptDto();
+        linked.setId(receiptId);
+        linked.setLinkedCostEntryId(costEntryId);
+
+        JobReceiptDto unlinked = new JobReceiptDto();
+        unlinked.setId(receiptId);
+
+        when(jobAccountingReceiptService.linkReceiptToCost(tenantId, userId, jobId, receiptId, costEntryId)).thenReturn(linked);
+        when(jobAccountingReceiptService.unlinkReceiptFromCost(tenantId, userId, jobId, receiptId)).thenReturn(unlinked);
+
+        mockMvc.perform(put("/api/v1/jobs/{jobId}/receipts/{receiptId}/link-cost/{costEntryId}", jobId, receiptId, costEntryId)
+                        .header("X-Tenant-Id", tenantId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.linkedCostEntryId", is(costEntryId.toString())));
+
+        mockMvc.perform(delete("/api/v1/jobs/{jobId}/receipts/{receiptId}/link-cost", jobId, receiptId)
+                        .header("X-Tenant-Id", tenantId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id", is(receiptId.toString())));
+    }
+
+    @Test
+    void deleteReceipt_returnsNoContent() throws Exception {
+        UUID tenantId = UUID.randomUUID();
+        UUID jobId = UUID.randomUUID();
+        UUID receiptId = UUID.randomUUID();
+
+        doNothing().when(jobAccountingReceiptService).deleteReceipt(tenantId, userId, jobId, receiptId);
+
+        mockMvc.perform(delete("/api/v1/jobs/{jobId}/receipts/{receiptId}", jobId, receiptId)
+                        .header("X-Tenant-Id", tenantId.toString()))
+                .andExpect(status().isNoContent());
     }
 }
