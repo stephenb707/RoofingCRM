@@ -9,8 +9,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Parses labeled summary totals from <strong>numeric summary OCR</strong> only (totals block).
- * Not used as primary numeric truth for full-page body OCR.
+ * Parses labeled summary totals from numeric summary text (typically vision transcriptions of the totals block).
  */
 @Component
 public class ReceiptSummaryTextParser {
@@ -21,7 +20,7 @@ public class ReceiptSummaryTextParser {
     private static final Pattern TAX_RATE_PATTERN =
             Pattern.compile("(?:^|[^\\d])(\\d{1,2}(?:\\.\\d{1,3})?)\\s*%");
 
-    private static final int OCR_SUMMARY_CONFIDENCE = 92;
+    private static final int SUMMARY_TEXT_CONFIDENCE = 92;
 
     public record NumericSummaryExtraction(
             ParsedNumericSummary parsed,
@@ -30,10 +29,10 @@ public class ReceiptSummaryTextParser {
     }
 
     /**
-     * Single pass: parse numeric summary OCR and build consensus-oriented {@link ReceiptExtractionClient.ExtractedReceiptData}.
+     * Single pass: parse numeric summary text and build consensus-oriented {@link ReceiptExtractionClient.ExtractedReceiptData}.
      */
-    public NumericSummaryExtraction extractNumericSummary(String summaryNumericOcrText) {
-        String primary = trimToNull(summaryNumericOcrText);
+    public NumericSummaryExtraction extractNumericSummary(String summaryNumericText) {
+        String primary = trimToNull(summaryNumericText);
         if (primary == null || primary.length() < 4) {
             return new NumericSummaryExtraction(
                     new ParsedNumericSummary(null, null, null, null, null),
@@ -52,25 +51,25 @@ public class ReceiptSummaryTextParser {
                 null,
                 null,
                 null,
-                OCR_SUMMARY_CONFIDENCE,
+                SUMMARY_TEXT_CONFIDENCE,
                 primary
         );
         return new NumericSummaryExtraction(parsed, data);
     }
 
     /**
-     * Builds structured summary fields from numeric summary OCR text only (no full-page fallback for money).
+     * Builds structured summary fields from numeric summary text only (no full-page fallback for money).
      */
-    public ReceiptExtractionClient.ExtractedReceiptData toExtractedReceiptDataFromNumericSummary(String summaryNumericOcrText) {
-        return extractNumericSummary(summaryNumericOcrText).extractedData();
+    public ReceiptExtractionClient.ExtractedReceiptData toExtractedReceiptDataFromNumericSummary(String summaryNumericText) {
+        return extractNumericSummary(summaryNumericText).extractedData();
     }
 
     /**
      * @deprecated Use {@link #toExtractedReceiptDataFromNumericSummary(String)} for dual-path extraction.
      */
     @Deprecated
-    public ReceiptExtractionClient.ExtractedReceiptData toExtractedReceiptData(String summaryOcrText, String fullOcrFallback) {
-        String primary = choosePrimaryText(summaryOcrText, fullOcrFallback);
+    public ReceiptExtractionClient.ExtractedReceiptData toExtractedReceiptData(String summaryText, String fullTextFallback) {
+        String primary = choosePrimaryText(summaryText, fullTextFallback);
         if (primary == null || primary.isBlank()) {
             return new ReceiptExtractionClient.ExtractedReceiptData(
                     null, null, null, null, null, null, null, null, null, null, null
@@ -87,17 +86,17 @@ public class ReceiptSummaryTextParser {
                 null,
                 null,
                 null,
-                OCR_SUMMARY_CONFIDENCE,
+                SUMMARY_TEXT_CONFIDENCE,
                 primary
         );
     }
 
-    private static String choosePrimaryText(String summaryOcrText, String fullOcrFallback) {
-        String s = trimToNull(summaryOcrText);
+    private static String choosePrimaryText(String summaryText, String fullTextFallback) {
+        String s = trimToNull(summaryText);
         if (s != null && s.length() >= 8) {
             return s;
         }
-        return trimToNull(fullOcrFallback);
+        return trimToNull(fullTextFallback);
     }
 
     private static String trimToNull(String value) {
@@ -109,7 +108,7 @@ public class ReceiptSummaryTextParser {
     }
 
     /**
-     * Parses subtotal/tax/total/amount paid and optional tax rate from summary OCR text.
+     * Parses subtotal/tax/total/amount paid and optional tax rate from summary text.
      */
     public ParsedNumericSummary parseNumericSummary(String text) {
         String[] lines = text.split("\\R");
@@ -157,7 +156,7 @@ public class ReceiptSummaryTextParser {
         return new ParsedNumericSummary(subtotal, tax, total, amountPaid, taxRatePercent);
     }
 
-    /** Collapses noisy OCR spacing for label matching. */
+    /** Collapses noisy spacing for label matching. */
     private static String normalizeForMatching(String upper) {
         return upper.replaceAll("\\s+", " ").trim();
     }

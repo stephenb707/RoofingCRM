@@ -56,7 +56,7 @@ public class OpenAiReceiptExtractionClient implements ReceiptExtractionClient {
             """;
 
     private static final String INTERPRETATION_SYSTEM_PROMPT = """
-            You interpret OCR text from a receipt. Return only JSON with these keys:
+            You interpret transcribed text from a receipt (e.g. embedded PDF text). Return only JSON with these keys:
             vendorName: string or null
             incurredDate: string in YYYY-MM-DD format or null
             suggestedCategory: one of MATERIAL, TRANSPORTATION, LABOR, OTHER, or null
@@ -66,7 +66,7 @@ public class OpenAiReceiptExtractionClient implements ReceiptExtractionClient {
             Rules:
             - Do NOT include any numeric money fields (no subtotal, tax, total, amount paid, suggested amount).
             - Prefer null over guessing.
-            - Use only the provided OCR text.
+            - Use only the provided text.
             - Never include markdown or extra text outside the JSON object.
             """;
 
@@ -147,16 +147,16 @@ public class OpenAiReceiptExtractionClient implements ReceiptExtractionClient {
 
     @Override
     public ExtractedReceiptData interpretFromTranscribedText(
-            String fullOcrText,
-            String summaryOcrText,
+            String fullTranscribedText,
+            String summaryTranscribedText,
             ReceiptTextInterpretationContext context) {
-        return executeInterpretation(fullOcrText, summaryOcrText, context);
+        return executeInterpretation(fullTranscribedText, summaryTranscribedText, context);
     }
 
-    private ExtractedReceiptData executeInterpretation(String fullOcrText,
-                                                       String summaryOcrText,
+    private ExtractedReceiptData executeInterpretation(String fullTranscribedText,
+                                                       String summaryTranscribedText,
                                                        ReceiptTextInterpretationContext context) {
-        String userPrompt = buildInterpretationUserPrompt(fullOcrText, summaryOcrText, context);
+        String userPrompt = buildInterpretationUserPrompt(fullTranscribedText, summaryTranscribedText, context);
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("model", model);
         payload.put("temperature", 0);
@@ -231,26 +231,26 @@ public class OpenAiReceiptExtractionClient implements ReceiptExtractionClient {
         throw new ReceiptExtractionProviderException("Receipt interpretation provider request failed.");
     }
 
-    private static String buildInterpretationUserPrompt(String fullOcrText,
-                                                        String summaryOcrText,
+    private static String buildInterpretationUserPrompt(String fullTranscribedText,
+                                                        String summaryTranscribedText,
                                                         ReceiptTextInterpretationContext context) {
         return """
-                Interpret vendor and metadata from this OCR text. Do not include money amounts in your reasoning output.
+                Interpret vendor and metadata from this text. Do not include money amounts in your reasoning output.
                 File name: %s
                 Content type: %s
                 Context: %s
 
-                Full OCR text:
+                Full text:
                 %s
 
-                Summary-region OCR text:
+                Summary-region text:
                 %s
                 """.formatted(
                 nullSafe(context.fileName()),
                 nullSafe(context.contentType()),
                 nullSafe(context.promptContext()),
-                nullSafeBlock(fullOcrText),
-                nullSafeBlock(summaryOcrText)
+                nullSafeBlock(fullTranscribedText),
+                nullSafeBlock(summaryTranscribedText)
         );
     }
 

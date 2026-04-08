@@ -73,7 +73,7 @@ public class ReceiptDateCandidateRanker {
         }
 
         return bestScore.entrySet().stream()
-                .max(Comparator.<Map.Entry<LocalDate, Integer>>comparingInt(Map.Entry::getValue)
+                .max(Comparator.comparing(Map.Entry<LocalDate, Integer>::getValue)
                         .thenComparing(Map.Entry::getKey))
                 .map(e -> e.getKey().atTime(12, 0).toInstant(ZoneOffset.UTC))
                 .orElse(null);
@@ -114,7 +114,7 @@ public class ReceiptDateCandidateRanker {
             }
             int score = yearPlausibility(d.getYear(), currentYear)
                     + labelProximityScore(raw, matcher.start(), matcher.end());
-            bestScore.merge(d, score, Integer::max);
+            mergeMaxScore(bestScore, d, score);
         }
     }
 
@@ -127,7 +127,7 @@ public class ReceiptDateCandidateRanker {
             }
             int score = yearPlausibility(d.getYear(), currentYear)
                     + labelProximityScore(raw, matcher.start(), matcher.end());
-            bestScore.merge(d, score, Integer::max);
+            mergeMaxScore(bestScore, d, score);
         }
     }
 
@@ -141,7 +141,16 @@ public class ReceiptDateCandidateRanker {
             int score = yearPlausibility(d.getYear(), currentYear)
                     + labelProximityScore(raw, matcher.start(), matcher.end())
                     + 2;
-            bestScore.merge(d, score, Integer::max);
+            mergeMaxScore(bestScore, d, score);
+        }
+    }
+
+    private static void mergeMaxScore(Map<LocalDate, Integer> bestScore, LocalDate d, int score) {
+        Integer prev = bestScore.get(d);
+        if (prev == null) {
+            bestScore.put(d, score);
+        } else {
+            bestScore.put(d, Math.max(prev.intValue(), score));
         }
     }
 

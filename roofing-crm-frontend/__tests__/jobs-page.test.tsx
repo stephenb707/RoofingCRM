@@ -5,6 +5,25 @@ import * as jobsApi from "@/lib/jobsApi";
 import { JobDto, PageResponse } from "@/lib/types";
 import { __setPathname } from "./pathnameState";
 
+const mockPush = jest.fn();
+jest.mock("next/navigation", () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const pathnameState = require("@/__tests__/pathnameState");
+  return {
+    useRouter: () => ({
+      push: mockPush,
+      replace: jest.fn(),
+      back: jest.fn(),
+      forward: jest.fn(),
+      refresh: jest.fn(),
+      prefetch: jest.fn(),
+    }),
+    usePathname: () => pathnameState.__pathname,
+    useParams: () => ({}),
+    useSearchParams: () => new URLSearchParams(),
+  };
+});
+
 jest.mock("@/lib/jobsApi");
 const mockedJobsApi = jobsApi as jest.Mocked<typeof jobsApi>;
 
@@ -44,6 +63,7 @@ const mockPage: PageResponse<JobDto> = {
 describe("JobsPage", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockPush.mockClear();
     __setPathname("/app/jobs");
   });
 
@@ -138,5 +158,32 @@ describe("JobsPage", () => {
     const viewLinks = await screen.findAllByRole("link", { name: "View" });
     expect(viewLinks[0]).toHaveAttribute("href", "/app/jobs/job-1");
     expect(viewLinks[1]).toHaveAttribute("href", "/app/jobs/job-2");
+  });
+
+  it("navigates to job detail when clicking the row", async () => {
+    mockedJobsApi.listJobs.mockResolvedValue(mockPage);
+
+    render(<JobsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Replacement")).toBeInTheDocument();
+    });
+
+    mockPush.mockClear();
+    fireEvent.click(screen.getByLabelText("Open job: Replacement"));
+
+    expect(mockPush).toHaveBeenCalledWith("/app/jobs/job-1");
+  });
+
+  it("does not fire row navigation when clicking the View link", async () => {
+    mockedJobsApi.listJobs.mockResolvedValue(mockPage);
+
+    render(<JobsPage />);
+
+    const viewLinks = await screen.findAllByRole("link", { name: "View" });
+    mockPush.mockClear();
+    fireEvent.click(viewLinks[0]);
+
+    expect(mockPush).not.toHaveBeenCalled();
   });
 });

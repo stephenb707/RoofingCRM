@@ -33,7 +33,6 @@ import java.util.List;
 
 /**
  * Vision-first receipt extraction: OpenAI full-image and summary-crop calls drive amounts and fields.
- * Tesseract/OCR is not used in this pipeline (see {@link ReceiptOcrConfig} for optional future use).
  */
 @Service
 public class ReceiptExtractionServiceImpl implements ReceiptExtractionService {
@@ -42,7 +41,7 @@ public class ReceiptExtractionServiceImpl implements ReceiptExtractionService {
     private static final int MAX_RAW_TEXT_LENGTH = 4000;
     /**
      * Multiple crop/variant pairs so {@link SummaryFieldConsensusService} can vote (see
-     * {@code SummaryFieldConsensusServiceTest}). A single attempt regresses to one noisy OCR read
+     * {@code SummaryFieldConsensusServiceTest}). A single attempt regresses to one noisy vision read
      * and wrong subtotal/tax/total/amountPaid for typical receipts.
      */
     private static final List<SummaryAttemptPlan> PRIMARY_SUMMARY_ATTEMPTS = List.of(
@@ -441,14 +440,6 @@ public class ReceiptExtractionServiceImpl implements ReceiptExtractionService {
             return primary;
         }
         return secondary;
-    }
-
-    private static String abbreviateForLog(String text, int max) {
-        if (text == null || text.isBlank()) {
-            return "(empty)";
-        }
-        String trimmed = text.trim();
-        return trimmed.length() <= max ? trimmed : trimmed.substring(0, max) + "...";
     }
 
     private ProviderAttemptResult attemptFullExtraction(Attachment receipt, BufferedImage image) throws IOException {

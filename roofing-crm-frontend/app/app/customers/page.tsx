@@ -9,6 +9,7 @@ import { queryKeys } from "@/lib/queryKeys";
 import { formatPhone } from "@/lib/format";
 import Link from "next/link";
 import { keepPreviousData } from "@tanstack/react-query";
+import { ClickableTableRow } from "@/components/ClickableTableRow";
 
 export default function CustomersPage() {
   const { api, auth, ready } = useAuthReady();
@@ -168,9 +169,10 @@ export default function CustomersPage() {
             </thead>
             <tbody className="divide-y divide-slate-200">
               {customers.map((customer) => (
-                <tr
+                <ClickableTableRow
                   key={customer.id}
-                  className="hover:bg-slate-50 transition-colors"
+                  href={`/app/customers/${customer.id}`}
+                  aria-label={`Open customer ${customer.firstName} ${customer.lastName}`}
                 >
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
@@ -193,7 +195,7 @@ export default function CustomersPage() {
                       <span className="text-slate-400">—</span>
                     )}
                   </td>
-                  <td className="px-6 py-4 text-right">
+                  <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                     <Link
                       href={`/app/customers/${customer.id}`}
                       className="text-sm text-sky-600 hover:text-sky-700 font-medium"
@@ -201,7 +203,7 @@ export default function CustomersPage() {
                       View
                     </Link>
                   </td>
-                </tr>
+                </ClickableTableRow>
               ))}
             </tbody>
           </table>

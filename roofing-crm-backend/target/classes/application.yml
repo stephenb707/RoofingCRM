@@ -79,13 +79,3 @@ app:
         connect-timeout-seconds: ${APP_RECEIPT_EXTRACTION_OPENAI_CONNECT_TIMEOUT_SECONDS:10}
         read-timeout-seconds: ${APP_RECEIPT_EXTRACTION_OPENAI_READ_TIMEOUT_SECONDS:45}
         max-retries: ${APP_RECEIPT_EXTRACTION_OPENAI_MAX_RETRIES:1}
-    receipt-ocr:
-      enabled: ${APP_RECEIPT_OCR_ENABLED:false}
-      provider: ${APP_RECEIPT_OCR_PROVIDER:tesseract}
-      tessdata-path: ${APP_RECEIPT_OCR_TESSDATA_PATH:}
-      language: ${APP_RECEIPT_OCR_LANGUAGE:eng}
-      # When false (default), OCR never suppresses OpenAI vision based on text length alone.
-      allow-ocr-text-length-to-skip-vision: ${APP_RECEIPT_OCR_ALLOW_TEXT_LENGTH_TO_SKIP_VISION:false}
-      min-full-text-chars-to-skip-full-vision: ${APP_RECEIPT_OCR_MIN_FULL_TEXT_CHARS_TO_SKIP_FULL_VISION:80}
-      min-summary-text-chars-to-skip-summary-vision: ${APP_RECEIPT_OCR_MIN_SUMMARY_TEXT_CHARS_TO_SKIP_SUMMARY_VISION:40}
-      min-chars-for-usable-ocr: ${APP_RECEIPT_OCR_MIN_CHARS_FOR_USABLE_OCR:20}

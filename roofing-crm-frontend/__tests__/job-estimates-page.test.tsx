@@ -1,12 +1,13 @@
 import React from "react";
-import { render, screen, waitFor } from "./test-utils";
+import { render, screen, waitFor, fireEvent } from "./test-utils";
 import JobEstimatesPage from "@/app/app/jobs/[jobId]/estimates/page";
 import * as estimatesApi from "@/lib/estimatesApi";
 import type { EstimateDto } from "@/lib/types";
 
+const mockPush = jest.fn();
 jest.mock("@/lib/estimatesApi");
 jest.mock("next/navigation", () => ({
-  useRouter: () => ({ push: jest.fn(), replace: jest.fn(), back: jest.fn() }),
+  useRouter: () => ({ push: mockPush, replace: jest.fn(), back: jest.fn() }),
   usePathname: () => "/app/jobs/job-1/estimates",
   useParams: () => ({ jobId: "job-1" }),
   useSearchParams: () => new URLSearchParams(),
@@ -33,6 +34,7 @@ const mockEstimate: EstimateDto = {
 describe("JobEstimatesPage", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockPush.mockClear();
     mockedEstimatesApi.listEstimatesForJob.mockResolvedValue([mockEstimate]);
   });
 
@@ -75,5 +77,30 @@ describe("JobEstimatesPage", () => {
     await waitFor(() => {
       expect(screen.getByText("Failed to load estimates")).toBeInTheDocument();
     });
+  });
+
+  it("navigates to estimate detail when clicking the row", async () => {
+    render(<JobEstimatesPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Roof Replacement")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByLabelText("Open estimate Roof Replacement"));
+
+    expect(mockPush).toHaveBeenCalledWith("/app/estimates/est-1");
+  });
+
+  it("does not fire row navigation when clicking the View link", async () => {
+    render(<JobEstimatesPage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("link", { name: /View/i })).toBeInTheDocument();
+    });
+
+    mockPush.mockClear();
+    fireEvent.click(screen.getByRole("link", { name: /View/i }));
+
+    expect(mockPush).not.toHaveBeenCalled();
   });
 });

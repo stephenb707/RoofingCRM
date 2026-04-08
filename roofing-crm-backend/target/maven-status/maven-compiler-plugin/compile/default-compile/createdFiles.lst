@@ -65,6 +65,7 @@ com\roofingcrm\api\v1\communication\CreateCommunicationLogRequest.class
 com\roofingcrm\domain\entity\User.class
 com\roofingcrm\service\invoice\InvoiceServiceImpl.class
 com\roofingcrm\domain\repository\LeadRepository.class
+com\roofingcrm\service\accounting\ReceiptExtractionServiceImpl$1.class
 com\roofingcrm\domain\entity\Customer.class
 com\roofingcrm\domain\repository\JobRepository.class
 com\roofingcrm\service\estimate\EstimateService.class

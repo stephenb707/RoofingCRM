@@ -2,8 +2,9 @@
 
 import { useState, useMemo, useCallback } from "react";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { ClickableTableRow } from "@/components/ClickableTableRow";
 import { useAuthReady } from "@/lib/AuthContext";
 import { listLeads } from "@/lib/leadsApi";
 import { getApiErrorMessage } from "@/lib/apiError";
@@ -19,7 +20,6 @@ import { LeadStatus } from "@/lib/types";
 
 export default function LeadsPage() {
   const { api, auth, ready } = useAuthReady();
-  const router = useRouter();
   const searchParams = useSearchParams();
   const customerIdFromQuery = searchParams.get("customerId");
   const [statusFilter, setStatusFilter] = useState<LeadStatus | "">("");
@@ -225,9 +225,10 @@ export default function LeadsPage() {
               </thead>
               <tbody className="divide-y divide-slate-200">
                 {leads.map((lead) => (
-                  <tr
+                  <ClickableTableRow
                     key={lead.id}
-                    className="hover:bg-slate-50 transition-colors"
+                    href={`/app/leads/${lead.id}`}
+                    aria-label={`Open lead for ${[lead.customerFirstName, lead.customerLastName].filter(Boolean).join(" ") || "lead"}`}
                   >
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
@@ -268,7 +269,7 @@ export default function LeadsPage() {
                         View
                       </Link>
                     </td>
-                  </tr>
+                  </ClickableTableRow>
                 ))}
               </tbody>
             </table>

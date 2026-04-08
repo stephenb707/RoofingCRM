@@ -20,8 +20,8 @@ public class NoopReceiptExtractionClient implements ReceiptExtractionClient {
 
     @Override
     public ExtractedReceiptData interpretFromTranscribedText(
-            String fullOcrText,
-            String summaryOcrText,
+            String fullTranscribedText,
+            String summaryTranscribedText,
             ReceiptTextInterpretationContext context) {
         return new ExtractedReceiptData(
                 null, null, null, null, null, null, null, null, null, null, null

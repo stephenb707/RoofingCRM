@@ -3,7 +3,6 @@ package com.roofingcrm.service.accounting;
 import org.springframework.stereotype.Component;
 
 import java.awt.Color;
-import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
@@ -29,9 +28,6 @@ public class ReceiptImagePreprocessor {
     private static final float VISION_CONTRAST_OFFSET = -18f;
     /** Soft binarization for the "threshold" variant only (milder than legacy 170 cutoff). */
     private static final int VISION_SOFT_THRESHOLD_CUTOFF = 198;
-    /** Upscaled summary crop for numeric-only OCR (totals block). */
-    private static final int SUMMARY_NUMERIC_TARGET_WIDTH = 2400;
-    private static final int SUMMARY_NUMERIC_MAX_WIDTH = 3200;
 
     public ProcessedReceiptImage preprocess(BufferedImage source) {
         BufferedImage grayscale = toGrayscale(source);
@@ -58,19 +54,6 @@ public class ReceiptImagePreprocessor {
         int targetWidth = visionTargetWidth(contrasted.getWidth());
         BufferedImage scaled = resizeToWidthBicubic(contrasted, targetWidth);
         return sharpen(scaled);
-    }
-
-    /**
-     * Strong preprocessing for the summary/totals crop only: upscale, grayscale, contrast, threshold, sharpen.
-     * Intended for Tesseract numeric mode — separate from full-page text OCR.
-     */
-    public BufferedImage preprocessSummaryForNumericOcr(BufferedImage source) {
-        BufferedImage grayscale = toGrayscale(source);
-        BufferedImage strong = increaseContrastStrong(grayscale);
-        int target = Math.min(SUMMARY_NUMERIC_MAX_WIDTH, Math.max(SUMMARY_NUMERIC_TARGET_WIDTH, strong.getWidth() * 2));
-        BufferedImage scaled = resizeToWidth(strong, target);
-        BufferedImage thresholded = applyThreshold(scaled);
-        return sharpen(thresholded);
     }
 
     public SummaryImageVariant preprocessSummaryVariant(BufferedImage source, String variantId) {
@@ -146,31 +129,6 @@ public class ReceiptImagePreprocessor {
         RescaleOp op = new RescaleOp(CONTRAST_SCALE, CONTRAST_OFFSET, null);
         op.filter(source, contrasted);
         return contrasted;
-    }
-
-    private BufferedImage increaseContrastStrong(BufferedImage source) {
-        BufferedImage contrasted = new BufferedImage(source.getWidth(), source.getHeight(), BufferedImage.TYPE_BYTE_GRAY);
-        RescaleOp op = new RescaleOp(1.55f, -20f, null);
-        op.filter(source, contrasted);
-        return contrasted;
-    }
-
-    private BufferedImage applyThreshold(BufferedImage source) {
-        BufferedImage thresholded = new BufferedImage(source.getWidth(), source.getHeight(), BufferedImage.TYPE_BYTE_GRAY);
-        Graphics graphics = thresholded.getGraphics();
-        try {
-            graphics.drawImage(source, 0, 0, null);
-        } finally {
-            graphics.dispose();
-        }
-        for (int y = 0; y < thresholded.getHeight(); y++) {
-            for (int x = 0; x < thresholded.getWidth(); x++) {
-                int rgb = thresholded.getRGB(x, y) & 0xFF;
-                int value = rgb > 170 ? 0xFFFFFF : 0x000000;
-                thresholded.setRGB(x, y, value);
-            }
-        }
-        return thresholded;
     }
 
     private BufferedImage sharpen(BufferedImage source) {

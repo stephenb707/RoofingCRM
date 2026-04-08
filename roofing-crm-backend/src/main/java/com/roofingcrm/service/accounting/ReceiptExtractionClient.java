@@ -11,11 +11,12 @@ public interface ReceiptExtractionClient {
     ExtractedReceiptData extractSummary(ReceiptVisionDocument document);
 
     /**
-     * Text-only interpretation (vendor, date, category, notes). Numeric totals must come from OCR / reconciliation, not from this call.
+     * Text-only interpretation (vendor, date, category, notes) from embedded PDF text or other transcriptions.
+     * Numeric totals must come from vision extraction / reconciliation, not from this call.
      */
     ExtractedReceiptData interpretFromTranscribedText(
-            String fullOcrText,
-            String summaryOcrText,
+            String fullTranscribedText,
+            String summaryTranscribedText,
             ReceiptTextInterpretationContext context
     );
 

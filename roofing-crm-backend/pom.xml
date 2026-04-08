@@ -119,13 +119,6 @@
             <version>2.0.31</version>
         </dependency>
 
-        <!-- OCR for receipt text extraction (requires Tesseract native install; see README / ops docs) -->
-        <dependency>
-            <groupId>net.sourceforge.tess4j</groupId>
-            <artifactId>tess4j</artifactId>
-            <version>5.11.0</version>
-        </dependency>
-
         <!-- Lombok -->
         <dependency>
             <groupId>org.projectlombok</groupId>

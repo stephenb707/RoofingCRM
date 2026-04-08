@@ -11,6 +11,7 @@ import { ESTIMATE_STATUS_LABELS, ESTIMATE_STATUS_COLORS } from "@/lib/estimatesC
 import type { EstimateStatus } from "@/lib/types";
 import { formatDate, formatMoney } from "@/lib/format";
 import { StatusBadge } from "@/components/StatusBadge";
+import { ClickableTableRow } from "@/components/ClickableTableRow";
 
 export default function JobEstimatesPage() {
   const params = useParams();
@@ -104,7 +105,11 @@ export default function JobEstimatesPage() {
             </thead>
             <tbody className="divide-y divide-slate-200">
               {list.map((est) => (
-                <tr key={est.id} className="hover:bg-slate-50 transition-colors">
+                <ClickableTableRow
+                  key={est.id}
+                  href={`/app/estimates/${est.id}`}
+                  aria-label={`Open estimate ${est.title || est.id}`}
+                >
                   <td className="px-6 py-4">
                     <div className="font-medium text-slate-800">
                       {est.title || `Estimate ${est.id.slice(0, 8)}…`}
@@ -122,7 +127,7 @@ export default function JobEstimatesPage() {
                   <td className="px-6 py-4 text-sm text-slate-600">
                     {formatDate(est.updatedAt ?? est.createdAt)}
                   </td>
-                  <td className="px-6 py-4 text-right">
+                  <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center justify-end gap-3">
                       <Link
                         href={`/app/estimates/${est.id}`}
@@ -132,7 +137,7 @@ export default function JobEstimatesPage() {
                       </Link>
                     </div>
                   </td>
-                </tr>
+                </ClickableTableRow>
               ))}
             </tbody>
           </table>
