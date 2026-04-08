@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   DndContext,
@@ -61,6 +62,8 @@ function getDatesInRange(start: string, end: string): string[] {
 export default function SchedulePage() {
   const { api, auth, ready } = useAuthReady();
   const queryClient = useQueryClient();
+  const searchParams = useSearchParams();
+  const focusJobId = searchParams.get("focusJob");
 
   const today = useMemo(() => new Date(), []);
   const defaultStart = useMemo(() => getMondayOfWeek(today), [today]);
@@ -97,6 +100,20 @@ export default function SchedulePage() {
       }),
     enabled: ready && !!auth.selectedTenantId,
   });
+
+  useEffect(() => {
+    if (focusJobId) {
+      setIncludeUnscheduled(true);
+    }
+  }, [focusJobId]);
+
+  const jobsSignature = useMemo(() => jobs.map((j) => j.id).sort().join(","), [jobs]);
+
+  useEffect(() => {
+    if (!focusJobId || isLoading || jobs.length === 0) return;
+    const el = document.querySelector(`[data-testid^="schedule-card-${focusJobId}-"]`);
+    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [focusJobId, isLoading, jobs.length, jobsSignature]);
 
   const updateJobMutation = useMutation({
     mutationFn: (args: {

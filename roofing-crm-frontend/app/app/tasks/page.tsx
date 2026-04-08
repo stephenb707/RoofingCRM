@@ -17,6 +17,7 @@ import { queryKeys } from "@/lib/queryKeys";
 import { formatDateTime } from "@/lib/format";
 import { StatusBadge } from "@/components/StatusBadge";
 import { DatePicker } from "@/components/DatePicker";
+import { ClickableTableRow } from "@/components/ClickableTableRow";
 import type { TaskStatus, TaskDto } from "@/lib/types";
 
 function TaskRelatedCell({ task }: { task: { leadId?: string | null; jobId?: string | null; customerId?: string | null } }) {
@@ -244,14 +245,13 @@ export default function TasksPage() {
               </thead>
               <tbody className="divide-y divide-slate-200">
                 {tasks.map((task: TaskDto) => (
-                  <tr key={task.taskId} className="hover:bg-slate-50 transition-colors">
+                  <ClickableTableRow
+                    key={task.taskId}
+                    href={`/app/tasks/${task.taskId}`}
+                    aria-label={`Open task: ${task.title || "Task"}`}
+                  >
                     <td className="px-6 py-4">
-                      <Link
-                        href={`/app/tasks/${task.taskId}`}
-                        className="font-medium text-slate-800 hover:text-sky-600"
-                      >
-                        {task.title || "—"}
-                      </Link>
+                      <span className="font-medium text-slate-800">{task.title || "—"}</span>
                     </td>
                     <td className="px-6 py-4">
                       <StatusBadge label={TASK_STATUS_LABELS[task.status]} className={TASK_STATUS_COLORS[task.status]} />
@@ -265,10 +265,10 @@ export default function TasksPage() {
                     <td className="px-6 py-4 text-sm text-slate-600">
                       {task.assignedToName || "Unassigned"}
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
                       <TaskRelatedCell task={task} />
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                       <Link
                         href={`/app/tasks/${task.taskId}`}
                         className="text-sm text-sky-600 hover:text-sky-700 font-medium"
@@ -276,7 +276,7 @@ export default function TasksPage() {
                         View
                       </Link>
                     </td>
-                  </tr>
+                  </ClickableTableRow>
                 ))}
               </tbody>
             </table>

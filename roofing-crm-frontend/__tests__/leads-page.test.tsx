@@ -4,6 +4,14 @@ import LeadsPage from "@/app/app/leads/page";
 import * as leadsApi from "@/lib/leadsApi";
 import { LeadDto, PageResponse } from "@/lib/types";
 
+const mockPush = jest.fn();
+jest.mock("next/navigation", () => ({
+  usePathname: () => "/app/leads",
+  useParams: () => ({}),
+  useSearchParams: () => new URLSearchParams(),
+  useRouter: () => ({ push: mockPush, replace: jest.fn(), back: jest.fn() }),
+}));
+
 // Mock the leadsApi module
 jest.mock("@/lib/leadsApi");
 const mockedLeadsApi = leadsApi as jest.Mocked<typeof leadsApi>;
@@ -51,6 +59,7 @@ const mockPageWithLeads: PageResponse<LeadDto> = {
 describe("LeadsPage", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockPush.mockClear();
   });
 
   it("renders loading state initially", async () => {
@@ -173,6 +182,36 @@ describe("LeadsPage", () => {
 
     const viewLink = screen.getByRole("link", { name: "View" });
     expect(viewLink).toHaveAttribute("href", "/app/leads/lead-123");
+  });
+
+  it("navigates to lead detail when clicking the row", async () => {
+    mockedLeadsApi.listLeads.mockResolvedValue(mockPageWithLeads);
+
+    render(<LeadsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("John Doe")).toBeInTheDocument();
+    });
+
+    mockPush.mockClear();
+    fireEvent.click(screen.getByLabelText(/Open lead for John Doe/i));
+
+    expect(mockPush).toHaveBeenCalledWith("/app/leads/lead-123");
+  });
+
+  it("does not fire row navigation when clicking the View link", async () => {
+    mockedLeadsApi.listLeads.mockResolvedValue(mockPageWithLeads);
+
+    render(<LeadsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("link", { name: "View" })).toBeInTheDocument();
+    });
+
+    mockPush.mockClear();
+    fireEvent.click(screen.getByRole("link", { name: "View" }));
+
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
   it("does not render undefined when customer name fields are missing", async () => {

@@ -333,6 +333,58 @@ export interface SendInvoiceEmailResponse {
   reusedExistingToken: boolean;
 }
 
+export type JobCostCategory =
+  | "MATERIAL"
+  | "TRANSPORTATION"
+  | "LABOR"
+  | "OTHER";
+
+export interface JobCostEntryDto {
+  id: string;
+  jobId: string;
+  category: JobCostCategory;
+  vendorName?: string | null;
+  description: string;
+  amount: number;
+  incurredAt: string;
+  notes?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface CreateJobCostEntryRequest {
+  category: JobCostCategory;
+  vendorName?: string | null;
+  description: string;
+  amount: number;
+  incurredAt: string;
+  notes?: string | null;
+}
+
+export interface UpdateJobCostEntryRequest {
+  category?: JobCostCategory | null;
+  vendorName?: string | null;
+  description?: string | null;
+  amount?: number | null;
+  incurredAt?: string | null;
+  notes?: string | null;
+}
+
+export interface JobAccountingSummaryDto {
+  agreedAmount?: number | null;
+  invoicedAmount: number;
+  paidAmount: number;
+  totalCosts: number;
+  grossProfit: number;
+  marginPercent?: number | null;
+  projectedProfit?: number | null;
+  actualProfit: number;
+  projectedMarginPercent?: number | null;
+  actualMarginPercent?: number | null;
+  categoryTotals: Record<JobCostCategory, number>;
+  hasAcceptedEstimate: boolean;
+}
+
 export interface PublicEstimateItemDto {
   name: string;
   description?: string | null;
@@ -440,6 +492,7 @@ export type AttachmentTag =
   | "DAMAGE"
   | "AFTER"
   | "INVOICE"
+  | "RECEIPT"
   | "DOCUMENT"
   | "OTHER";
 
@@ -456,6 +509,89 @@ export interface AttachmentDto {
   tag?: AttachmentTag | null;
   createdAt?: string | null;
   updatedAt?: string | null;
+}
+
+export interface JobReceiptDto {
+  id: string;
+  fileName: string;
+  contentType?: string | null;
+  fileSize?: number | null;
+  description?: string | null;
+  uploadedAt?: string | null;
+  linkedCostEntryId?: string | null;
+  linkedCostEntryDescription?: string | null;
+  linkedCostEntryAmount?: number | null;
+  extractionStatus?: ReceiptExtractionStatus | null;
+  extractedAt?: string | null;
+  extractionError?: string | null;
+  extractionConfidence?: number | null;
+  extractionResult?: ReceiptExtractionResultDto | null;
+}
+
+export interface CreateCostFromReceiptRequest {
+  category: JobCostCategory;
+  vendorName?: string | null;
+  description: string;
+  amount: number;
+  incurredAt: string;
+  notes?: string | null;
+}
+
+export type ReceiptExtractionStatus =
+  | "NOT_STARTED"
+  | "PROCESSING"
+  | "COMPLETED"
+  | "FAILED";
+
+export type ReceiptAmountConfidence = "HIGH" | "MEDIUM" | "LOW";
+
+export type ReceiptFieldConfidence = "UNKNOWN" | "LOW" | "MEDIUM" | "HIGH";
+
+/** Final reconciled extraction values (match backend ReceiptExtractionResultDto). */
+export interface ReceiptExtractionResultDto {
+  vendorName?: string | null;
+  incurredAt?: string | null;
+  amount?: number | null;
+  extractedSubtotal?: number | null;
+  extractedTax?: number | null;
+  extractedTotal?: number | null;
+  extractedAmountPaid?: number | null;
+  computedTotal?: number | null;
+  subtotalConfidence?: ReceiptFieldConfidence | null;
+  taxConfidence?: ReceiptFieldConfidence | null;
+  totalConfidence?: ReceiptFieldConfidence | null;
+  amountPaidConfidence?: ReceiptFieldConfidence | null;
+  summaryRegionSubtotal?: number | null;
+  summaryRegionTax?: number | null;
+  summaryRegionTotal?: number | null;
+  summaryRegionAmountPaid?: number | null;
+  extractedTaxRatePercent?: number | null;
+  amountCandidates?: number[] | null;
+  amountConfidence?: ReceiptAmountConfidence | null;
+  suggestedCategory?: JobCostCategory | null;
+  notes?: string | null;
+  confidence?: number | null;
+  rawExtractedText?: string | null;
+  summaryRegionRawText?: string | null;
+  extractionWarnings?: string[] | null;
+}
+
+export interface ExtractReceiptResponseDto {
+  receiptId: string;
+  status: ReceiptExtractionStatus;
+  extractedAt?: string | null;
+  error?: string | null;
+  confidence?: number | null;
+  result?: ReceiptExtractionResultDto | null;
+}
+
+export interface ConfirmReceiptCostRequest {
+  category: JobCostCategory;
+  vendorName?: string | null;
+  description: string;
+  amount: number;
+  incurredAt: string;
+  notes?: string | null;
 }
 
 // Task-related types
@@ -546,7 +682,14 @@ export type ActivityEventType =
   | "INVOICE_CREATED"
   | "INVOICE_SHARED"
   | "INVOICE_EMAIL_SENT"
-  | "INVOICE_STATUS_CHANGED";
+  | "INVOICE_STATUS_CHANGED"
+  | "COST_ENTRY_CREATED"
+  | "COST_ENTRY_UPDATED"
+  | "COST_ENTRY_DELETED"
+  | "RECEIPT_UPLOADED"
+  | "RECEIPT_LINKED_TO_COST"
+  | "RECEIPT_UNLINKED_FROM_COST"
+  | "RECEIPT_DELETED";
 
 export interface ActivityEventDto {
   activityId: string;

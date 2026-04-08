@@ -9,11 +9,13 @@ import * as communicationLogsApi from "@/lib/communicationLogsApi";
 import * as tasksApi from "@/lib/tasksApi";
 import * as activityApi from "@/lib/activityApi";
 import * as invoicesApi from "@/lib/invoicesApi";
+import * as accountingApi from "@/lib/accountingApi";
 import { JobDto } from "@/lib/types";
 
 jest.mock("@/lib/jobsApi");
 jest.mock("@/lib/estimatesApi");
 jest.mock("@/lib/invoicesApi");
+jest.mock("@/lib/accountingApi");
 jest.mock("@/lib/attachmentsApi");
 jest.mock("@/lib/communicationLogsApi");
 jest.mock("@/lib/tasksApi");
@@ -33,6 +35,7 @@ const mockedCommLogsApi = communicationLogsApi as jest.Mocked<typeof communicati
 const mockedTasksApi = tasksApi as jest.Mocked<typeof tasksApi>;
 const mockedActivityApi = activityApi as jest.Mocked<typeof activityApi>;
 const mockedInvoicesApi = invoicesApi as jest.Mocked<typeof invoicesApi>;
+const mockedAccountingApi = accountingApi as jest.Mocked<typeof accountingApi>;
 
 const mockJob: JobDto = {
   id: "job-1",
@@ -70,6 +73,27 @@ describe("JobDetailPage", () => {
       last: true,
     });
     mockedInvoicesApi.listInvoicesForJob.mockResolvedValue([]);
+    mockedAccountingApi.getJobAccountingSummary.mockResolvedValue({
+      agreedAmount: null,
+      invoicedAmount: 0,
+      paidAmount: 0,
+      totalCosts: 0,
+      grossProfit: 0,
+      marginPercent: null,
+      projectedProfit: null,
+      actualProfit: 0,
+      projectedMarginPercent: null,
+      actualMarginPercent: null,
+      categoryTotals: {
+        MATERIAL: 0,
+        TRANSPORTATION: 0,
+        LABOR: 0,
+        OTHER: 0,
+      },
+      hasAcceptedEstimate: false,
+    });
+    mockedAccountingApi.listJobCostEntries.mockResolvedValue([]);
+    mockedAccountingApi.listJobReceipts.mockResolvedValue([]);
   });
 
   it("renders job overview and status", async () => {
@@ -129,7 +153,10 @@ describe("JobDetailPage", () => {
       expect(screen.getByRole("heading", { name: /latest estimate/i })).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole("button", { name: /share link/i }));
+    expect(screen.getByRole("button", { name: /send email/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /share link/i })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /generate link/i }));
     await waitFor(() => {
       expect(mockedEstimatesApi.shareEstimate).toHaveBeenCalledWith(
         expect.anything(),
@@ -138,7 +165,8 @@ describe("JobDetailPage", () => {
       );
     });
     expect(screen.getByText("Link copied")).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("job-share-next-step-preview"));
+    expect(screen.getByRole("button", { name: /set follow-up in 2 days/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("share-next-step-preview"));
     expect(openMock).toHaveBeenCalledWith(
       expect.stringContaining("/estimate/abc123"),
       "_blank",
@@ -263,6 +291,18 @@ describe("JobDetailPage", () => {
     expect(screen.getByRole("heading", { name: /^Communication Logs$/ })).toBeInTheDocument();
   });
 
+  it("renders the Accounting section", async () => {
+    render(<JobDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: /^Accounting$/ })).toBeInTheDocument();
+    });
+
+    expect(mockedAccountingApi.getJobAccountingSummary).toHaveBeenCalledWith(expect.anything(), "job-1");
+    expect(mockedAccountingApi.listJobCostEntries).toHaveBeenCalledWith(expect.anything(), "job-1");
+    expect(mockedAccountingApi.listJobReceipts).toHaveBeenCalledWith(expect.anything(), "job-1");
+  });
+
   it("uploading file calls uploadJobAttachment", async () => {
     mockedAttachmentsApi.uploadJobAttachment.mockResolvedValue({
       id: "att-1",
@@ -281,7 +321,7 @@ describe("JobDetailPage", () => {
       expect(screen.getByRole("heading", { name: /^Attachments$/ })).toBeInTheDocument();
     });
 
-    const fileInput = document.querySelector('input[type="file"]');
+    const fileInput = screen.getByLabelText("Choose file to upload");
     expect(fileInput).toBeInTheDocument();
     if (fileInput) {
       const file = new File(["content"], "doc.pdf", { type: "application/pdf" });

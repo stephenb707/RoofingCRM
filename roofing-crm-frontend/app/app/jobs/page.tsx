@@ -2,8 +2,9 @@
 
 import { useState, useMemo, useCallback } from "react";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { ClickableTableRow } from "@/components/ClickableTableRow";
 import { useAuthReady } from "@/lib/AuthContext";
 import { listJobs } from "@/lib/jobsApi";
 import { getApiErrorMessage } from "@/lib/apiError";
@@ -18,7 +19,6 @@ import { formatAddress, formatDate } from "@/lib/format";
 import type { JobStatus } from "@/lib/types";
 
 export default function JobsPage() {
-  const router = useRouter();
   const { api, auth, ready } = useAuthReady();
   const searchParams = useSearchParams();
   const customerIdFromQuery = searchParams.get("customerId");
@@ -206,10 +206,10 @@ export default function JobsPage() {
               </thead>
               <tbody className="divide-y divide-slate-200">
                 {jobs.map((job) => (
-                  <tr
+                  <ClickableTableRow
                     key={job.id}
-                    className="hover:bg-slate-50 transition-colors cursor-pointer"
-                    onClick={() => router.push(`/app/jobs/${job.id}`)}
+                    href={`/app/jobs/${job.id}`}
+                    aria-label={`Open job: ${JOB_TYPE_LABELS[job.type]}`}
                   >
                     <td className="px-6 py-4 text-sm text-slate-800">
                       {JOB_TYPE_LABELS[job.type]}
@@ -249,7 +249,7 @@ export default function JobsPage() {
                         View
                       </Link>
                     </td>
-                  </tr>
+                  </ClickableTableRow>
                 ))}
               </tbody>
             </table>

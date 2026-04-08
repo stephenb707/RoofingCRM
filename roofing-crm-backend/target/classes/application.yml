@@ -22,6 +22,11 @@ spring:
     enabled: true
     locations: classpath:db/migration
 
+  servlet:
+    multipart:
+      max-file-size: ${APP_MULTIPART_MAX_FILE_SIZE:20MB}
+      max-request-size: ${APP_MULTIPART_MAX_REQUEST_SIZE:20MB}
+
 server:
   port: ${PORT:8080}
 
@@ -62,3 +67,15 @@ app:
     from-name: ${APP_MAIL_FROM_NAME:VivaCRM}
     resend:
       api-key: ${APP_MAIL_RESEND_API_KEY:}
+  ai:
+    receipt-extraction:
+      enabled: ${APP_RECEIPT_EXTRACTION_ENABLED:false}
+      debug-write-summary-images: ${APP_RECEIPT_EXTRACTION_DEBUG_WRITE_SUMMARY_IMAGES:false}
+      provider: ${APP_RECEIPT_EXTRACTION_PROVIDER:openai}
+      openai:
+        base-url: ${APP_RECEIPT_EXTRACTION_OPENAI_BASE_URL:https://api.openai.com}
+        api-key: ${APP_RECEIPT_EXTRACTION_OPENAI_API_KEY:}
+        model: ${APP_RECEIPT_EXTRACTION_OPENAI_MODEL:gpt-4o-mini}
+        connect-timeout-seconds: ${APP_RECEIPT_EXTRACTION_OPENAI_CONNECT_TIMEOUT_SECONDS:10}
+        read-timeout-seconds: ${APP_RECEIPT_EXTRACTION_OPENAI_READ_TIMEOUT_SECONDS:45}
+        max-retries: ${APP_RECEIPT_EXTRACTION_OPENAI_MAX_RETRIES:1}

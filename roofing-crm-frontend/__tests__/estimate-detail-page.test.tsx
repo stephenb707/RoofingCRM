@@ -139,7 +139,70 @@ describe("EstimateDetailPage", () => {
     });
   });
 
-  it("shows Share section and calls shareEstimate when Generate link clicked", async () => {
+  it("SENT estimate Next Best Actions has Send Email, Generate Link, and Set follow-up; no Share link", async () => {
+    mockedEstimatesApi.getEstimate.mockResolvedValue({ ...mockEstimate, status: "SENT" });
+    render(<EstimateDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Estimate 1")).toBeInTheDocument();
+    });
+
+    expect(screen.queryByRole("link", { name: /^Share link$/i })).not.toBeInTheDocument();
+    expect(screen.getByTestId("nba-estimate-send-email")).toBeInTheDocument();
+    expect(screen.getByTestId("nba-estimate-generate-link")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Set follow-up/i })).toHaveAttribute(
+      "href",
+      "/app/tasks/new?jobId=job-1&customerId=cust-1"
+    );
+  });
+
+  it("Share section shows Send Email (primary) and Generate Link when no public link; stale Share Link absent", async () => {
+    render(<EstimateDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Estimate 1")).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText(/send by email for the fastest delivery/i)).not.toBeInTheDocument();
+    const sendBtn = screen.getByTestId("estimate-share-send-email");
+    const generateBtn = screen.getByTestId("estimate-share-generate-link");
+    expect(sendBtn).toHaveTextContent(/^Send Email$/);
+    expect(generateBtn).toHaveTextContent(/^Generate Link$/);
+    expect(sendBtn.compareDocumentPosition(generateBtn) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(sendBtn.className).toMatch(/bg-sky-600/);
+    expect(generateBtn.className).toMatch(/border-sky-300/);
+    expect(screen.queryByRole("button", { name: /Share link/i })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("estimate-share-refresh-link")).not.toBeInTheDocument();
+  });
+
+  it("Next Best Actions Generate Link triggers shareEstimate like the Share section", async () => {
+    mockedEstimatesApi.shareEstimate.mockResolvedValue({
+      token: "nba-token",
+      expiresAt: "2026-02-16T00:00:00Z",
+    });
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: jest.fn().mockResolvedValue(undefined) },
+      configurable: true,
+    });
+
+    render(<EstimateDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Estimate 1")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("nba-estimate-generate-link"));
+
+    await waitFor(() => {
+      expect(mockedEstimatesApi.shareEstimate).toHaveBeenCalledWith(
+        expect.anything(),
+        "est-1",
+        expect.objectContaining({ expiresInDays: 14 })
+      );
+    });
+  });
+
+  it("calls shareEstimate from Generate Link; then shows Send Email, Refresh Link, Copy Link; stale Share Link absent", async () => {
     const shareResponse = { token: "abc123", expiresAt: "2026-02-16T00:00:00Z" };
     mockedEstimatesApi.shareEstimate.mockResolvedValue(shareResponse);
 
@@ -155,7 +218,7 @@ describe("EstimateDetailPage", () => {
       expect(screen.getByText("Estimate 1")).toBeInTheDocument();
     });
 
-    const generateBtn = screen.getByRole("button", { name: /Generate link/i });
+    const generateBtn = screen.getByTestId("estimate-share-generate-link");
     fireEvent.click(generateBtn);
 
     await waitFor(() => {
@@ -170,7 +233,10 @@ describe("EstimateDetailPage", () => {
       const linkInput = screen.getByTestId("share-link-input") as HTMLInputElement;
       expect(linkInput.value).toContain("/estimate/abc123");
     });
-    expect(screen.getByRole("button", { name: /Copy link/i })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /^Send Email$/ })).toHaveLength(2);
+    expect(screen.getByTestId("estimate-share-refresh-link")).toHaveTextContent(/^Refresh Link$/);
+    expect(screen.getByTestId("estimate-share-copy-link")).toHaveTextContent(/^Copy Link$/);
+    expect(screen.queryByRole("button", { name: /Share link/i })).not.toBeInTheDocument();
     expect(writeTextMock).toHaveBeenCalledWith(expect.stringContaining("/estimate/abc123"));
     expect(screen.getByText("Link copied")).toBeInTheDocument();
   });
@@ -192,7 +258,7 @@ describe("EstimateDetailPage", () => {
       expect(screen.getByText("Estimate 1")).toBeInTheDocument();
     });
 
-    const generateBtn = screen.getByRole("button", { name: /Generate link/i });
+    const generateBtn = screen.getByTestId("estimate-share-generate-link");
     fireEvent.click(generateBtn);
 
     await waitFor(() => {
@@ -212,7 +278,7 @@ describe("EstimateDetailPage", () => {
     });
 
     // Re-open prompt by copying existing link and close with Done.
-    fireEvent.click(screen.getByRole("button", { name: /Copy link/i }));
+    fireEvent.click(screen.getByTestId("estimate-share-copy-link"));
     await waitFor(() => {
       expect(screen.getByText("Link copied")).toBeInTheDocument();
     });
@@ -242,7 +308,7 @@ describe("EstimateDetailPage", () => {
     await waitFor(() => {
       expect(screen.getByText("Estimate 1")).toBeInTheDocument();
     });
-    fireEvent.click(screen.getByRole("button", { name: /generate link/i }));
+    fireEvent.click(screen.getByTestId("estimate-share-generate-link"));
     await waitFor(() => {
       expect(screen.getByRole("button", { name: /set follow-up in 2 days/i })).toBeInTheDocument();
     });
@@ -278,7 +344,7 @@ describe("EstimateDetailPage", () => {
       expect(screen.getByText("Estimate 1")).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole("button", { name: /Send email/i }));
+    fireEvent.click(screen.getByTestId("nba-estimate-send-email"));
     const dialog = screen.getByRole("dialog", { name: /send estimate by email/i });
     fireEvent.change(within(dialog).getByLabelText(/recipient email/i), {
       target: { value: "customer@example.com" },
@@ -314,7 +380,7 @@ describe("EstimateDetailPage", () => {
       expect(screen.getByText("Estimate 1")).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole("button", { name: /Send email/i }));
+    fireEvent.click(screen.getByTestId("nba-estimate-send-email"));
     const dialog = screen.getByRole("dialog", { name: /send estimate by email/i });
     const emailInput = within(dialog).getByLabelText(/recipient email/i) as HTMLInputElement;
     const nameInput = within(dialog).getByLabelText(/recipient name/i) as HTMLInputElement;
@@ -342,7 +408,7 @@ describe("EstimateDetailPage", () => {
       expect(screen.getByText("Estimate 1")).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole("button", { name: /Send email/i }));
+    fireEvent.click(screen.getByTestId("nba-estimate-send-email"));
     const dialog = screen.getByRole("dialog", { name: /send estimate by email/i });
 
     expect((within(dialog).getByLabelText(/recipient email/i) as HTMLInputElement).value).toBe("");

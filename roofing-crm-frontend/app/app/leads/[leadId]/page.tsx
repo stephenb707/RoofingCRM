@@ -460,6 +460,7 @@ export default function LeadDetailPage() {
             status={lead.status}
             leadId={leadId}
             leadConvertedJobId={lead.convertedJobId ?? null}
+            customerId={lead.customerId ?? null}
           />
 
           {/* Status Update */}

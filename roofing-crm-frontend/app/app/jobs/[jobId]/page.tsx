@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuthReady } from "@/lib/AuthContext";
 import { getJob, updateJobStatus } from "@/lib/jobsApi";
-import { listEstimatesForJob, shareEstimate } from "@/lib/estimatesApi";
+import { listEstimatesForJob } from "@/lib/estimatesApi";
 import { getCustomer } from "@/lib/customersApi";
 import { getApiErrorMessage } from "@/lib/apiError";
 import {
@@ -27,9 +27,10 @@ import { CommunicationLogSection } from "@/components/CommunicationLogSection";
 import { ActivitySection } from "@/components/ActivitySection";
 import { TasksSection } from "@/components/TasksSection";
 import { InvoicesSection } from "@/components/InvoicesSection";
+import { AccountingSection } from "@/components/AccountingSection";
 import { StatusBadge } from "@/components/StatusBadge";
 import { NextBestActions } from "@/components/NextBestActions";
-import { NextStepPromptDialog } from "@/components/NextStepPromptDialog";
+import { EstimateSharePanel } from "@/components/EstimateSharePanel";
 import { ESTIMATE_STATUS_COLORS, ESTIMATE_STATUS_LABELS } from "@/lib/estimatesConstants";
 import type { EstimateStatus, JobStatus, CreateCommunicationLogRequest, AttachmentTag } from "@/lib/types";
 import { PREFERRED_CONTACT_LABELS } from "@/lib/preferredContactConstants";
@@ -45,8 +46,6 @@ export default function JobDetailPage() {
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [commLogError, setCommLogError] = useState<string | null>(null);
   const [latestEstimateError, setLatestEstimateError] = useState<string | null>(null);
-  const [shareLink, setShareLink] = useState<string | null>(null);
-  const [showSharePrompt, setShowSharePrompt] = useState(false);
   const [createFromEstimateId, setCreateFromEstimateId] = useState<string | null>(null);
 
   const { data: job, isLoading, isError, error } = useQuery({
@@ -67,10 +66,31 @@ export default function JobDetailPage() {
     enabled: ready && !!jobId,
   });
 
+  const selectedTenant = auth.tenants.find((t) => t.tenantId === auth.selectedTenantId);
+  const canShare =
+    selectedTenant?.role === "OWNER" ||
+    selectedTenant?.role === "ADMIN" ||
+    selectedTenant?.role === "SALES";
+
   useEffect(() => {
     if (job) setSelectedStatus(job.status);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sync only when server status changes
   }, [job?.status]);
+
+  useEffect(() => {
+    const id = "attachments";
+    const scrollToAttachments = () => {
+      if (typeof window === "undefined") return;
+      if (window.location.hash === `#${id}`) {
+        requestAnimationFrame(() => {
+          document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+      }
+    };
+    scrollToAttachments();
+    window.addEventListener("hashchange", scrollToAttachments);
+    return () => window.removeEventListener("hashchange", scrollToAttachments);
+  }, [jobId]);
 
   const statusMutation = useMutation({
     mutationFn: (newStatus: JobStatus) => updateJobStatus(api, jobId, newStatus),
@@ -98,6 +118,7 @@ export default function JobDetailPage() {
     queryFn: () => listJobAttachments(api, jobId),
     enabled: ready && !!jobId,
   });
+  const nonReceiptAttachments = (attachmentsQuery.data ?? []).filter((attachment) => attachment.tag !== "RECEIPT");
 
   const uploadAttachmentMutation = useMutation({
     mutationFn: ({
@@ -154,27 +175,6 @@ export default function JobDetailPage() {
     onError: (err: unknown) => {
       console.error("Failed to add communication log:", err);
       setCommLogError(getApiErrorMessage(err, "Failed to add log. Please try again."));
-    },
-  });
-
-  const shareLatestEstimateMutation = useMutation({
-    mutationFn: async (estimateToShareId: string) => {
-      const response = await shareEstimate(api, estimateToShareId, { expiresInDays: 14 });
-      return response;
-    },
-    onSuccess: async (data) => {
-      const url = `${window.location.origin}/estimate/${data.token}`;
-      setShareLink(url);
-      try {
-        await navigator.clipboard.writeText(url);
-      } catch {
-        // no-op
-      }
-      setLatestEstimateError(null);
-      setShowSharePrompt(true);
-    },
-    onError: (err: unknown) => {
-      setLatestEstimateError(getApiErrorMessage(err, "Failed to share estimate link."));
     },
   });
 
@@ -376,18 +376,23 @@ export default function JobDetailPage() {
             onCreateFromEstimateHandled={() => setCreateFromEstimateId(null)}
           />
 
-          {/* Attachments */}
-          <AttachmentSection
-            title="Attachments"
-            attachments={attachmentsQuery.data ?? []}
-            onUpload={(file, options) =>
-              uploadAttachmentMutation.mutate({ file, tag: options?.tag, description: options?.description })
-            }
-            onDownload={handleDownloadAttachment}
-            isLoading={attachmentsQuery.isLoading}
-            isUploading={uploadAttachmentMutation.isPending}
-            errorMessage={attachmentError}
-          />
+          {/* Accounting */}
+          <AccountingSection jobId={jobId} />
+
+          {/* Attachments — #attachments is used by Next Best Actions “Upload photos” */}
+          <div id="attachments" className="scroll-mt-6">
+            <AttachmentSection
+              title="Attachments"
+              attachments={nonReceiptAttachments}
+              onUpload={(file, options) =>
+                uploadAttachmentMutation.mutate({ file, tag: options?.tag, description: options?.description })
+              }
+              onDownload={handleDownloadAttachment}
+              isLoading={attachmentsQuery.isLoading}
+              isUploading={uploadAttachmentMutation.isPending}
+              errorMessage={attachmentError}
+            />
+          </div>
 
           {/* Communication Logs */}
           <CommunicationLogSection
@@ -444,16 +449,28 @@ export default function JobDetailPage() {
                     Finish & Share
                   </Link>
                 )}
-                {latestEstimate.status === "SENT" && (
-                  <button
-                    type="button"
-                    onClick={() => shareLatestEstimateMutation.mutate(latestEstimate.id)}
-                    disabled={shareLatestEstimateMutation.isPending}
-                    className="inline-flex w-full justify-center rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-60"
-                  >
-                    {shareLatestEstimateMutation.isPending ? "Sharing..." : "Share link"}
-                  </button>
-                )}
+                {latestEstimate.status === "SENT" &&
+                  (canShare ? (
+                    <EstimateSharePanel
+                      estimateId={latestEstimate.id}
+                      jobId={jobId}
+                      customerId={job.customerId}
+                      customerEmail={customer?.email ?? ""}
+                      customerName={
+                        customer ? `${customer.firstName} ${customer.lastName}`.trim() : ""
+                      }
+                      estimateTitle={latestEstimate.title ?? null}
+                      canShare
+                      variant="compact"
+                    />
+                  ) : (
+                    <Link
+                      href={`/app/estimates/${latestEstimate.id}`}
+                      className="inline-flex w-full justify-center rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-sky-700"
+                    >
+                      View estimate
+                    </Link>
+                  ))}
                 {latestEstimate.status === "ACCEPTED" && (
                   <button
                     type="button"
@@ -554,30 +571,6 @@ export default function JobDetailPage() {
         </div>
       </div>
     </div>
-    {showSharePrompt && shareLink && (
-      <NextStepPromptDialog
-        title="Link copied"
-        description="Your estimate link is ready."
-        actions={[
-          {
-            label: "Preview customer view",
-            onClick: () => {
-              window.open(shareLink, "_blank", "noopener,noreferrer");
-              setShowSharePrompt(false);
-            },
-            testId: "job-share-next-step-preview",
-          },
-          {
-            label: "Done",
-            onClick: () => setShowSharePrompt(false),
-            variant: "secondary",
-            testId: "job-share-next-step-done",
-          },
-        ]}
-        onClose={() => setShowSharePrompt(false)}
-        dismissLabel="Done"
-      />
-    )}
     </>
   );
 }

@@ -51,6 +51,21 @@ describe("InvoiceDetailPage", () => {
     });
   });
 
+  it("Share section shows Send email as the primary action before link actions", async () => {
+    render(<InvoiceDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Invoice INV-1")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText(/send by email for the fastest delivery/i)).toBeInTheDocument();
+    const sendBtn = screen.getByTestId("invoice-share-send-email");
+    const linkBtn = screen.getByTestId("invoice-share-generate-or-copy-link");
+    expect(sendBtn.compareDocumentPosition(linkBtn) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(sendBtn.className).toMatch(/bg-sky-600/);
+    expect(linkBtn.className).toMatch(/border-sky-300/);
+  });
+
   it("generates share link, copies, and preview opens public invoice", async () => {
     mockedInvoicesApi.shareInvoice.mockResolvedValue({
       token: "tok-abc",

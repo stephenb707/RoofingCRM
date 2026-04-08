@@ -5,6 +5,13 @@ import * as jobsApi from "@/lib/jobsApi";
 
 jest.mock("@/lib/jobsApi");
 
+const mockSearchParamsGet = jest.fn();
+jest.mock("next/navigation", () => ({
+  useSearchParams: () => ({
+    get: (key: string) => mockSearchParamsGet(key),
+  }),
+}));
+
 jest.mock("@/components/DateRangePicker", () => ({
   DateRangePicker: ({
     startDate,
@@ -74,6 +81,7 @@ const unscheduledJob = {
 describe("SchedulePage", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockSearchParamsGet.mockReturnValue(null);
     mockedJobsApi.listJobSchedule.mockResolvedValue([job1, job2]);
   });
 

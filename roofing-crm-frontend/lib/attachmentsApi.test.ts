@@ -53,6 +53,7 @@ describe("attachmentsApi", () => {
         "/api/v1/leads/lead-1/attachments",
         expect.any(FormData)
       );
+      expect((mockApi.post as jest.Mock).mock.calls[0]).toHaveLength(2);
       const formData = (mockApi.post as jest.Mock).mock.calls[0][1] as FormData;
       expect(formData.get("file")).toBe(file);
     });
@@ -118,6 +119,7 @@ describe("attachmentsApi", () => {
         "/api/v1/jobs/job-1/attachments",
         expect.any(FormData)
       );
+      expect((mockApi.post as jest.Mock).mock.calls[0]).toHaveLength(2);
       const formData = (mockApi.post as jest.Mock).mock.calls[0][1] as FormData;
       expect(formData.get("file")).toBe(file);
     });
