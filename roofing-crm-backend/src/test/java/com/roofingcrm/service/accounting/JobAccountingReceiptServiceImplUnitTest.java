@@ -1,5 +1,6 @@
 package com.roofingcrm.service.accounting;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.roofingcrm.api.v1.accounting.CreateCostFromReceiptRequest;
 import com.roofingcrm.api.v1.accounting.JobCostEntryDto;
 import com.roofingcrm.domain.entity.Attachment;
@@ -10,6 +11,9 @@ import com.roofingcrm.domain.enums.ActivityEntityType;
 import com.roofingcrm.domain.enums.ActivityEventType;
 import com.roofingcrm.domain.enums.AttachmentTag;
 import com.roofingcrm.domain.enums.JobCostCategory;
+import com.roofingcrm.domain.enums.ReceiptAmountConfidence;
+import com.roofingcrm.domain.enums.ReceiptFieldConfidence;
+import com.roofingcrm.domain.enums.ReceiptExtractionStatus;
 import com.roofingcrm.domain.repository.AttachmentRepository;
 import com.roofingcrm.domain.repository.JobCostEntryRepository;
 import com.roofingcrm.domain.repository.JobRepository;
@@ -37,6 +41,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -58,6 +63,8 @@ class JobAccountingReceiptServiceImplUnitTest {
     private ActivityEventService activityEventService;
     @Mock
     private JobAccountingService jobAccountingService;
+    @Mock
+    private ReceiptExtractionService receiptExtractionService;
 
     private JobAccountingReceiptServiceImpl service;
     private UUID tenantId;
@@ -77,7 +84,9 @@ class JobAccountingReceiptServiceImplUnitTest {
                 jobCostEntryRepository,
                 attachmentStorageService,
                 activityEventService,
-                jobAccountingService);
+                jobAccountingService,
+                receiptExtractionService,
+                new ObjectMapper());
 
         tenantId = UUID.randomUUID();
         userId = UUID.randomUUID();
@@ -178,6 +187,205 @@ class JobAccountingReceiptServiceImplUnitTest {
         assertEquals(costEntryId, receipt.getJobCostEntry().getId());
         verify(activityEventService).recordEvent(eq(tenant), eq(userId), eq(ActivityEntityType.JOB), eq(jobId),
                 eq(ActivityEventType.RECEIPT_LINKED_TO_COST), anyString(), any());
+    }
+
+    @Test
+    void extractReceipt_successStoresDraftWithoutCreatingCost() {
+        Attachment receipt = receipt();
+
+        when(tenantAccessService.requireAnyRole(eq(tenantId), eq(userId), any(), anyString()))
+                .thenReturn(mock(com.roofingcrm.domain.entity.TenantUserMembership.class));
+        when(tenantAccessService.loadTenantForUserOrThrow(tenantId, userId)).thenReturn(tenant);
+        when(attachmentRepository.findByIdAndJobIdAndTenantAndArchivedFalse(receiptId, jobId, tenant))
+                .thenReturn(Optional.of(receipt));
+        when(attachmentRepository.save(any(Attachment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(receiptExtractionService.extractReceipt(receipt)).thenReturn(new ReceiptExtractionService.ExtractionDraft(
+                ReceiptExtractionStatus.COMPLETED,
+                Instant.parse("2026-03-29T12:00:00Z"),
+                null,
+                "ABC Supply",
+                Instant.parse("2026-03-28T12:00:00Z"),
+                new BigDecimal("98.76"),
+                new BigDecimal("90.00"),
+                new BigDecimal("8.76"),
+                new BigDecimal("98.76"),
+                new BigDecimal("98.76"),
+                new BigDecimal("98.76"),
+                ReceiptFieldConfidence.HIGH,
+                ReceiptFieldConfidence.HIGH,
+                ReceiptFieldConfidence.HIGH,
+                ReceiptFieldConfidence.MEDIUM,
+                new BigDecimal("90.00"),
+                new BigDecimal("8.76"),
+                new BigDecimal("98.76"),
+                new BigDecimal("98.76"),
+                List.of(new BigDecimal("98.76"), new BigDecimal("95.76")),
+                ReceiptAmountConfidence.MEDIUM,
+                JobCostCategory.MATERIAL,
+                "Store receipt for shingles",
+                91,
+                "TOTAL 98.76",
+                "SUMMARY TOTAL 98.76",
+                List.of("Multiple possible totals detected. Please confirm before saving."),
+                null
+        ));
+
+        var result = service.extractReceipt(tenantId, userId, jobId, receiptId);
+
+        assertEquals(ReceiptExtractionStatus.COMPLETED, result.getStatus());
+        assertEquals("ABC Supply", result.getResult().getVendorName());
+        assertEquals(new BigDecimal("98.76"), result.getResult().getAmount());
+        assertEquals(new BigDecimal("90.00"), result.getResult().getExtractedSubtotal());
+        assertEquals(new BigDecimal("8.76"), result.getResult().getExtractedTax());
+        assertEquals(new BigDecimal("98.76"), result.getResult().getExtractedTotal());
+        assertEquals(new BigDecimal("98.76"), result.getResult().getExtractedAmountPaid());
+        assertEquals(new BigDecimal("98.76"), result.getResult().getComputedTotal());
+        assertEquals(new BigDecimal("98.76"), result.getResult().getSummaryRegionTotal());
+        assertEquals(ReceiptFieldConfidence.HIGH, result.getResult().getTotalConfidence());
+        assertEquals(2, result.getResult().getAmountCandidates().size());
+        assertEquals(ReceiptAmountConfidence.MEDIUM, result.getResult().getAmountConfidence());
+        verify(jobAccountingService, never()).createJobCostEntry(any(), any(), any(), any());
+        verify(activityEventService).recordEvent(eq(tenant), eq(userId), eq(ActivityEntityType.JOB), eq(jobId),
+                eq(ActivityEventType.RECEIPT_EXTRACTION_COMPLETED), anyString(), any());
+    }
+
+    @Test
+    void extractReceipt_apiResultReflectsReconciledTaxTaxRateAndDateNotSummaryRegionOnly() {
+        Attachment receipt = receipt();
+
+        when(tenantAccessService.requireAnyRole(eq(tenantId), eq(userId), any(), anyString()))
+                .thenReturn(mock(com.roofingcrm.domain.entity.TenantUserMembership.class));
+        when(tenantAccessService.loadTenantForUserOrThrow(tenantId, userId)).thenReturn(tenant);
+        when(attachmentRepository.findByIdAndJobIdAndTenantAndArchivedFalse(receiptId, jobId, tenant))
+                .thenReturn(Optional.of(receipt));
+        when(attachmentRepository.save(any(Attachment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(receiptExtractionService.extractReceipt(receipt)).thenReturn(new ReceiptExtractionService.ExtractionDraft(
+                ReceiptExtractionStatus.COMPLETED,
+                Instant.parse("2026-03-29T12:00:00Z"),
+                null,
+                "Roof Supply Co",
+                Instant.parse("2026-04-01T12:00:00Z"),
+                new BigDecimal("1109.14"),
+                new BigDecimal("1000.00"),
+                new BigDecimal("109.14"),
+                new BigDecimal("1109.14"),
+                new BigDecimal("1109.14"),
+                new BigDecimal("1109.14"),
+                ReceiptFieldConfidence.HIGH,
+                ReceiptFieldConfidence.HIGH,
+                ReceiptFieldConfidence.HIGH,
+                ReceiptFieldConfidence.MEDIUM,
+                new BigDecimal("1000.00"),
+                new BigDecimal("108.41"),
+                new BigDecimal("1109.14"),
+                new BigDecimal("1109.14"),
+                List.of(new BigDecimal("1109.14")),
+                ReceiptAmountConfidence.HIGH,
+                JobCostCategory.MATERIAL,
+                "Invoice",
+                95,
+                "FULL PAGE TEXT",
+                "SUMMARY TAX 108.41",
+                List.of(),
+                new BigDecimal("9.85")
+        ));
+
+        var result = service.extractReceipt(tenantId, userId, jobId, receiptId);
+
+        assertEquals(ReceiptExtractionStatus.COMPLETED, result.getStatus());
+        assertEquals(Instant.parse("2026-04-01T12:00:00Z"), result.getResult().getIncurredAt());
+        assertEquals(new BigDecimal("109.14"), result.getResult().getExtractedTax());
+        assertEquals(new BigDecimal("108.41"), result.getResult().getSummaryRegionTax());
+        assertEquals(new BigDecimal("9.85"), result.getResult().getExtractedTaxRatePercent());
+        assertEquals(new BigDecimal("1000.00"), result.getResult().getExtractedSubtotal());
+        assertEquals(new BigDecimal("1109.14"), result.getResult().getExtractedTotal());
+    }
+
+    @Test
+    void extractReceipt_failureSetsFailedStatus() {
+        Attachment receipt = receipt();
+
+        when(tenantAccessService.requireAnyRole(eq(tenantId), eq(userId), any(), anyString()))
+                .thenReturn(mock(com.roofingcrm.domain.entity.TenantUserMembership.class));
+        when(tenantAccessService.loadTenantForUserOrThrow(tenantId, userId)).thenReturn(tenant);
+        when(attachmentRepository.findByIdAndJobIdAndTenantAndArchivedFalse(receiptId, jobId, tenant))
+                .thenReturn(Optional.of(receipt));
+        when(attachmentRepository.save(any(Attachment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(receiptExtractionService.extractReceipt(receipt)).thenReturn(new ReceiptExtractionService.ExtractionDraft(
+                ReceiptExtractionStatus.FAILED,
+                Instant.parse("2026-03-29T12:00:00Z"),
+                "We couldn't reliably extract details from this receipt. You can retry or enter it manually.",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                ReceiptFieldConfidence.UNKNOWN,
+                ReceiptFieldConfidence.UNKNOWN,
+                ReceiptFieldConfidence.UNKNOWN,
+                ReceiptFieldConfidence.UNKNOWN,
+                null,
+                null,
+                null,
+                null,
+                List.of(),
+                ReceiptAmountConfidence.LOW,
+                null,
+                null,
+                null,
+                null,
+                null,
+                List.of("No reliable total was detected from the extracted text."),
+                null
+        ));
+
+        var result = service.extractReceipt(tenantId, userId, jobId, receiptId);
+
+        assertEquals(ReceiptExtractionStatus.FAILED, result.getStatus());
+        assertEquals("We couldn't reliably extract details from this receipt. You can retry or enter it manually.",
+                result.getError());
+        verify(jobAccountingService, never()).createJobCostEntry(any(), any(), any(), any());
+        verify(activityEventService).recordEvent(eq(tenant), eq(userId), eq(ActivityEntityType.JOB), eq(jobId),
+                eq(ActivityEventType.RECEIPT_EXTRACTION_FAILED), anyString(), any());
+    }
+
+    @Test
+    void confirmReceiptCost_reusesCostCreationFlow() {
+        Attachment receipt = receipt();
+        JobCostEntry costEntry = costEntry();
+
+        var request = new com.roofingcrm.api.v1.accounting.ConfirmReceiptCostRequest();
+        request.setCategory(JobCostCategory.MATERIAL);
+        request.setVendorName("ABC Supply");
+        request.setDescription("Receipt-confirmed cost");
+        request.setAmount(new BigDecimal("120.00"));
+        request.setIncurredAt(Instant.parse("2026-03-28T12:00:00Z"));
+
+        JobCostEntryDto createdCost = new JobCostEntryDto();
+        createdCost.setId(costEntryId);
+        createdCost.setJobId(jobId);
+        createdCost.setDescription("Receipt-confirmed cost");
+        createdCost.setAmount(new BigDecimal("120.00"));
+
+        when(tenantAccessService.requireAnyRole(eq(tenantId), eq(userId), any(), anyString()))
+                .thenReturn(mock(com.roofingcrm.domain.entity.TenantUserMembership.class));
+        when(tenantAccessService.loadTenantForUserOrThrow(tenantId, userId)).thenReturn(tenant);
+        when(attachmentRepository.findByIdAndJobIdAndTenantAndArchivedFalse(receiptId, jobId, tenant))
+                .thenReturn(Optional.of(receipt));
+        when(jobAccountingService.createJobCostEntry(eq(tenantId), eq(userId), eq(jobId), any()))
+                .thenReturn(createdCost);
+        when(jobCostEntryRepository.findByIdAndJobIdAndTenantAndArchivedFalse(costEntryId, jobId, tenant))
+                .thenReturn(Optional.of(costEntry));
+        when(attachmentRepository.save(any(Attachment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var result = service.confirmReceiptCost(tenantId, userId, jobId, receiptId, request);
+
+        assertEquals(costEntryId, result.getId());
+        assertEquals(costEntryId, receipt.getJobCostEntry().getId());
+        verify(jobAccountingService).createJobCostEntry(eq(tenantId), eq(userId), eq(jobId), any());
     }
 
     @Test

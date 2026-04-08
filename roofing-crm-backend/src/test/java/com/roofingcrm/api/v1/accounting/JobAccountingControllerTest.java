@@ -2,6 +2,9 @@ package com.roofingcrm.api.v1.accounting;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.roofingcrm.domain.enums.JobCostCategory;
+import com.roofingcrm.domain.enums.ReceiptAmountConfidence;
+import com.roofingcrm.domain.enums.ReceiptFieldConfidence;
+import com.roofingcrm.domain.enums.ReceiptExtractionStatus;
 import com.roofingcrm.security.AuthenticatedUser;
 import com.roofingcrm.service.accounting.JobAccountingReceiptService;
 import com.roofingcrm.service.accounting.JobAccountingService;
@@ -257,6 +260,94 @@ class JobAccountingControllerTest {
                                 """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.description", is("Materials")));
+    }
+
+    @Test
+    void extractAndGetReceiptExtraction_returnOk() throws Exception {
+        UUID tenantId = UUID.randomUUID();
+        UUID jobId = UUID.randomUUID();
+        UUID receiptId = UUID.randomUUID();
+
+        ReceiptExtractionResultDto resultDto = new ReceiptExtractionResultDto();
+        resultDto.setVendorName("ABC Supply");
+        resultDto.setAmount(new BigDecimal("84.99"));
+        resultDto.setExtractedSubtotal(new BigDecimal("80.00"));
+        resultDto.setExtractedTax(new BigDecimal("4.99"));
+        resultDto.setExtractedTotal(new BigDecimal("84.99"));
+        resultDto.setExtractedAmountPaid(new BigDecimal("84.99"));
+        resultDto.setComputedTotal(new BigDecimal("84.99"));
+        resultDto.setSubtotalConfidence(ReceiptFieldConfidence.HIGH);
+        resultDto.setTaxConfidence(ReceiptFieldConfidence.HIGH);
+        resultDto.setTotalConfidence(ReceiptFieldConfidence.HIGH);
+        resultDto.setAmountPaidConfidence(ReceiptFieldConfidence.MEDIUM);
+        resultDto.setSummaryRegionSubtotal(new BigDecimal("80.00"));
+        resultDto.setSummaryRegionTax(new BigDecimal("4.99"));
+        resultDto.setSummaryRegionTotal(new BigDecimal("84.99"));
+        resultDto.setSummaryRegionAmountPaid(new BigDecimal("84.99"));
+        resultDto.setAmountCandidates(List.of(new BigDecimal("84.99"), new BigDecimal("81.44")));
+        resultDto.setAmountConfidence(ReceiptAmountConfidence.MEDIUM);
+        resultDto.setSuggestedCategory(JobCostCategory.MATERIAL);
+        resultDto.setExtractionWarnings(List.of("Multiple possible totals detected. Please confirm before saving."));
+        resultDto.setRawExtractedText("SUBTOTAL 80.00\nTAX 4.99\nTOTAL 84.99");
+        resultDto.setSummaryRegionRawText("TOTAL 84.99");
+
+        ExtractReceiptResponseDto dto = new ExtractReceiptResponseDto();
+        dto.setReceiptId(receiptId);
+        dto.setStatus(ReceiptExtractionStatus.COMPLETED);
+        dto.setConfidence(88);
+        dto.setResult(resultDto);
+
+        when(jobAccountingReceiptService.extractReceipt(tenantId, userId, jobId, receiptId)).thenReturn(dto);
+        when(jobAccountingReceiptService.getReceiptExtraction(tenantId, userId, jobId, receiptId)).thenReturn(dto);
+
+        mockMvc.perform(post("/api/v1/jobs/{jobId}/receipts/{receiptId}/extract", jobId, receiptId)
+                        .header("X-Tenant-Id", tenantId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status", is("COMPLETED")))
+                .andExpect(jsonPath("$.result.vendorName", is("ABC Supply")))
+                .andExpect(jsonPath("$.result.extractedSubtotal", is(80.00)))
+                .andExpect(jsonPath("$.result.extractedTax", is(4.99)))
+                .andExpect(jsonPath("$.result.extractedTotal", is(84.99)))
+                .andExpect(jsonPath("$.result.computedTotal", is(84.99)))
+                .andExpect(jsonPath("$.result.totalConfidence", is("HIGH")))
+                .andExpect(jsonPath("$.result.summaryRegionTotal", is(84.99)))
+                .andExpect(jsonPath("$.result.amountCandidates[0]", is(84.99)))
+                .andExpect(jsonPath("$.result.amountConfidence", is("MEDIUM")));
+
+        mockMvc.perform(get("/api/v1/jobs/{jobId}/receipts/{receiptId}/extraction", jobId, receiptId)
+                        .header("X-Tenant-Id", tenantId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.confidence", is(88)));
+    }
+
+    @Test
+    void confirmReceiptCost_returnsCreated() throws Exception {
+        UUID tenantId = UUID.randomUUID();
+        UUID jobId = UUID.randomUUID();
+        UUID receiptId = UUID.randomUUID();
+
+        JobCostEntryDto dto = new JobCostEntryDto();
+        dto.setId(UUID.randomUUID());
+        dto.setJobId(jobId);
+        dto.setDescription("Reviewed receipt cost");
+
+        when(jobAccountingReceiptService.confirmReceiptCost(eq(tenantId), eq(userId), eq(jobId), eq(receiptId),
+                any(ConfirmReceiptCostRequest.class)))
+                .thenReturn(dto);
+
+        mockMvc.perform(post("/api/v1/jobs/{jobId}/receipts/{receiptId}/confirm-cost", jobId, receiptId)
+                        .header("X-Tenant-Id", tenantId.toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "category":"MATERIAL",
+                                  "description":"Reviewed receipt cost",
+                                  "amount":84.99,
+                                  "incurredAt":"2026-03-28T12:00:00Z"
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.description", is("Reviewed receipt cost")));
     }
 
     @Test

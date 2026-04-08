@@ -1,12 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useState, useEffect, useRef } from "react";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuthReady } from "@/lib/AuthContext";
-import { getEstimate, updateEstimate, updateEstimateStatus, shareEstimate, sendEstimateEmail } from "@/lib/estimatesApi";
-import { createTask } from "@/lib/tasksApi";
+import { getEstimate, updateEstimate, updateEstimateStatus } from "@/lib/estimatesApi";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { queryKeys } from "@/lib/queryKeys";
 import {
@@ -18,8 +17,7 @@ import type { EstimateDto, EstimateItemDto, EstimateItemRequest, EstimateStatus 
 import { formatDate, formatMoney } from "@/lib/format";
 import { StatusBadge } from "@/components/StatusBadge";
 import { NextBestActions } from "@/components/NextBestActions";
-import { NextStepPromptDialog } from "@/components/NextStepPromptDialog";
-import { SendEmailModal } from "@/components/SendEmailModal";
+import { EstimateSharePanel, type EstimateSharePanelHandle } from "@/components/EstimateSharePanel";
 
 type ItemDraft = {
   name: string;
@@ -72,7 +70,6 @@ function lineTotal(it: { quantity: number; unitPrice: number }): number {
 
 export default function EstimateDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const estimateId = params.estimateId as string;
   const { api, auth, ready } = useAuthReady();
   const queryClient = useQueryClient();
@@ -89,82 +86,12 @@ export default function EstimateDetailPage() {
     unit: "ea",
   });
   const [editForm, setEditForm] = useState<ItemDraft | null>(null);
-  const [shareLink, setShareLink] = useState<string | null>(null);
-  const [shareExpiresAt, setShareExpiresAt] = useState<string | null>(null);
-  const [showSharePrompt, setShowSharePrompt] = useState(false);
-  const [showEmailModal, setShowEmailModal] = useState(false);
-  const [emailSuccess, setEmailSuccess] = useState<string | null>(null);
-
   const canShare =
     auth.tenants.find((t) => t.tenantId === auth.selectedTenantId)?.role === "OWNER" ||
     auth.tenants.find((t) => t.tenantId === auth.selectedTenantId)?.role === "ADMIN" ||
     auth.tenants.find((t) => t.tenantId === auth.selectedTenantId)?.role === "SALES";
 
-  const shareMutation = useMutation({
-    mutationFn: () => shareEstimate(api, estimateId, { expiresInDays: 14 }),
-    onSuccess: async (data) => {
-      const url = typeof window !== "undefined"
-        ? `${window.location.origin}/estimate/${data.token}`
-        : "";
-      setShareLink(url);
-      setShareExpiresAt(data.expiresAt ?? null);
-      queryClient.invalidateQueries({ queryKey: queryKeys.estimate(auth.selectedTenantId, estimateId) });
-      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText && url) {
-        try {
-          await navigator.clipboard.writeText(url);
-        } catch {
-          // no-op
-        }
-      }
-      setShowSharePrompt(true);
-    },
-  });
-
-  const followUpMutation = useMutation({
-    mutationFn: async () => {
-      if (!estimate) {
-        throw new Error("Estimate unavailable");
-      }
-      const dueAt = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString();
-      return createTask(api, {
-        title: `Follow up on ${estimate.title || "estimate"}`,
-        description: shareLink ? `Shared estimate link: ${shareLink}` : "Follow up on shared estimate.",
-        priority: "MEDIUM",
-        status: "TODO",
-        dueAt,
-        jobId: estimate.jobId,
-        customerId: estimate.customerId ?? null,
-      });
-    },
-    onSuccess: (task) => {
-      router.push(`/app/tasks/${task.taskId}`);
-    },
-    onError: () => {
-      if (!estimate) return;
-      const customer = estimate.customerId ? `&customerId=${estimate.customerId}` : "";
-      router.push(`/app/tasks/new?jobId=${estimate.jobId}${customer}`);
-    },
-  });
-
-  const sendEmailMutation = useMutation({
-    mutationFn: (payload: {
-      recipientEmail: string;
-      recipientName?: string;
-      message?: string;
-      expiresInDays?: number;
-    }) => sendEstimateEmail(api, estimateId, payload),
-    onSuccess: (data, variables) => {
-      setShareLink(data.publicUrl);
-      setShareExpiresAt(null);
-      setEmailSuccess(`Email sent to ${variables.recipientEmail}.`);
-      setShowEmailModal(false);
-      queryClient.invalidateQueries({ queryKey: queryKeys.estimate(auth.selectedTenantId, estimateId) });
-      if (estimate?.jobId) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.activityForEntity(auth.selectedTenantId, "JOB", estimate.jobId) });
-        queryClient.invalidateQueries({ queryKey: queryKeys.estimatesForJob(auth.selectedTenantId, estimate.jobId) });
-      }
-    },
-  });
+  const sharePanelRef = useRef<EstimateSharePanelHandle>(null);
 
   const { data: estimate, isLoading, isError, error } = useQuery({
     queryKey: queryKeys.estimate(auth.selectedTenantId, estimateId),
@@ -178,18 +105,6 @@ export default function EstimateDetailPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sync only when server status changes
   }, [estimate?.status]);
-
-  const handleCopyLink = async () => {
-    if (!shareLink) return;
-    try {
-      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(shareLink);
-      }
-    } catch {
-      // no-op
-    }
-    setShowSharePrompt(true);
-  };
 
   const statusMutation = useMutation({
     mutationFn: (status: EstimateStatus) => updateEstimateStatus(api, estimateId, status),
@@ -541,6 +456,15 @@ export default function EstimateDetailPage() {
             status={estimate.status}
             estimateId={estimateId}
             jobId={jobId}
+            customerId={estimate.customerId ?? null}
+            estimateShareActions={
+              canShare
+                ? {
+                    onSendEmail: () => sharePanelRef.current?.openSendEmailModal(),
+                    onGenerateLink: () => sharePanelRef.current?.generateLink(),
+                  }
+                : undefined
+            }
           />
 
           <div className="bg-white rounded-xl border border-slate-200 p-6">
@@ -566,71 +490,18 @@ export default function EstimateDetailPage() {
             </div>
           </div>
 
-          {/* Share */}
           {canShare && (
-            <div className="bg-white rounded-xl border border-slate-200 p-6">
-              <h2 className="text-lg font-semibold text-slate-800 mb-4">
-                Share
-              </h2>
-              {emailSuccess && (
-                <div className="mb-3 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
-                  {emailSuccess}
-                </div>
-              )}
-              <button
-                type="button"
-                onClick={() => {
-                  if (shareLink) {
-                    handleCopyLink();
-                  } else {
-                    shareMutation.mutate();
-                  }
-                }}
-                disabled={shareMutation.isPending}
-                className="w-full px-4 py-2.5 text-sm font-medium text-sky-600 border border-sky-300 rounded-lg hover:bg-sky-50 disabled:opacity-60"
-              >
-                {shareMutation.isPending ? "Generating…" : shareLink ? "Copy link" : "Generate link"}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setEmailSuccess(null);
-                  setShowEmailModal(true);
-                }}
-                disabled={sendEmailMutation.isPending}
-                className="mt-2 w-full px-4 py-2.5 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-60"
-              >
-                {sendEmailMutation.isPending ? "Sending..." : "Send email"}
-              </button>
-              {shareLink && (
-                <button
-                  type="button"
-                  onClick={() => shareMutation.mutate()}
-                  disabled={shareMutation.isPending}
-                  className="mt-2 w-full px-4 py-2.5 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-60"
-                >
-                  Refresh link
-                </button>
-              )}
-              {shareLink && (
-                <div className="mt-4 space-y-2">
-                  <div className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-center">
-                    <input
-                      readOnly
-                      value={shareLink}
-                      data-testid="share-link-input"
-                      className="w-full min-w-0 truncate border border-slate-300 rounded-lg px-3 py-2 text-sm bg-slate-50"
-                    />
-                    <span className="hidden sm:block" />
-                  </div>
-                  {shareExpiresAt && (
-                    <p className="text-xs text-slate-500">
-                      Expires {new Date(shareExpiresAt).toLocaleString()}
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
+            <EstimateSharePanel
+              ref={sharePanelRef}
+              estimateId={estimateId}
+              jobId={jobId}
+              customerId={estimate.customerId}
+              customerEmail={estimate.customerEmail ?? ""}
+              customerName={estimate.customerName ?? ""}
+              estimateTitle={estimate.title}
+              canShare={canShare}
+              variant="default"
+            />
           )}
 
           {/* Actions */}
@@ -656,49 +527,6 @@ export default function EstimateDetailPage() {
         </div>
       </div>
     </div>
-    {showSharePrompt && estimate && (
-      <NextStepPromptDialog
-        title="Link copied"
-        description="Your estimate link is ready."
-        actions={[
-          {
-            label: "Preview customer view",
-            onClick: () => {
-              if (shareLink) {
-                window.open(shareLink, "_blank", "noopener,noreferrer");
-              }
-            },
-            testId: "share-next-step-preview",
-          },
-          {
-            label: followUpMutation.isPending ? "Creating follow-up..." : "Set follow-up in 2 days",
-            onClick: () => followUpMutation.mutate(),
-            variant: "secondary",
-            disabled: followUpMutation.isPending,
-            testId: "share-next-step-followup",
-          },
-          {
-            label: "Done",
-            onClick: () => setShowSharePrompt(false),
-            variant: "secondary",
-            testId: "share-next-step-done",
-          },
-        ]}
-        onClose={() => setShowSharePrompt(false)}
-        showDismissButton={false}
-      />
-    )}
-    {showEmailModal && (
-      <SendEmailModal
-        title="Send estimate by email"
-        isSubmitting={sendEmailMutation.isPending}
-        error={sendEmailMutation.isError ? getApiErrorMessage(sendEmailMutation.error, "Failed to send estimate email.") : null}
-        initialRecipientEmail={estimate.customerEmail ?? ""}
-        initialRecipientName={estimate.customerName ?? ""}
-        onClose={() => setShowEmailModal(false)}
-        onSubmit={(values) => sendEmailMutation.mutate(values)}
-      />
-    )}
     </>
   );
 }

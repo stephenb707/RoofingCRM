@@ -1,5 +1,6 @@
 package com.roofingcrm.api.v1.accounting;
 
+import com.roofingcrm.domain.enums.ReceiptExtractionStatus;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -20,4 +21,9 @@ public class JobReceiptDto {
     private UUID linkedCostEntryId;
     private String linkedCostEntryDescription;
     private BigDecimal linkedCostEntryAmount;
+    private ReceiptExtractionStatus extractionStatus;
+    private Instant extractedAt;
+    private String extractionError;
+    private Integer extractionConfidence;
+    private ReceiptExtractionResultDto extractionResult;
 }

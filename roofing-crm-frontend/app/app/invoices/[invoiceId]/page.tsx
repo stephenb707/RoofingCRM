@@ -270,7 +270,10 @@ export default function InvoiceDetailPage() {
         <div className="space-y-6">
           {canEdit && status !== "VOID" && (
             <div className="bg-white rounded-xl border border-slate-200 p-6">
-              <h2 className="text-lg font-semibold text-slate-800 mb-4">Share</h2>
+              <h2 className="text-lg font-semibold text-slate-800 mb-1">Share</h2>
+              <p className="text-xs text-slate-500 mb-4">
+                Send by email for the fastest delivery, or share a link.
+              </p>
               {emailSuccess && (
                 <div className="mb-3 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
                   {emailSuccess}
@@ -278,6 +281,19 @@ export default function InvoiceDetailPage() {
               )}
               <button
                 type="button"
+                data-testid="invoice-share-send-email"
+                onClick={() => {
+                  setEmailSuccess(null);
+                  setShowEmailModal(true);
+                }}
+                disabled={sendEmailMutation.isPending}
+                className="w-full px-4 py-2.5 text-sm font-medium text-white bg-sky-600 rounded-lg hover:bg-sky-700 disabled:opacity-60"
+              >
+                {sendEmailMutation.isPending ? "Sending..." : "Send email"}
+              </button>
+              <button
+                type="button"
+                data-testid="invoice-share-generate-or-copy-link"
                 onClick={() => {
                   if (shareLink) {
                     handleCopyLink();
@@ -286,20 +302,9 @@ export default function InvoiceDetailPage() {
                   }
                 }}
                 disabled={shareMutation.isPending}
-                className="w-full px-4 py-2.5 text-sm font-medium text-sky-600 border border-sky-300 rounded-lg hover:bg-sky-50 disabled:opacity-60"
+                className="mt-2 w-full px-4 py-2.5 text-sm font-medium text-sky-700 border border-sky-300 rounded-lg hover:bg-sky-50 disabled:opacity-60"
               >
                 {shareMutation.isPending ? "Generating…" : shareLink ? "Copy link" : "Generate link"}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setEmailSuccess(null);
-                  setShowEmailModal(true);
-                }}
-                disabled={sendEmailMutation.isPending}
-                className="mt-2 w-full px-4 py-2.5 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-60"
-              >
-                {sendEmailMutation.isPending ? "Sending..." : "Send email"}
               </button>
               {shareLink && (
                 <button

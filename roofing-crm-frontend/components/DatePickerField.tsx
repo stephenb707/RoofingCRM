@@ -1,10 +1,11 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useId } from "react";
 import { DatePicker } from "@/components/DatePicker";
 
 export interface DatePickerFieldProps {
-  label: string;
+  label: ReactNode;
   value: string | null | undefined;
   onChange: (next: string) => void;
   placeholder?: string;

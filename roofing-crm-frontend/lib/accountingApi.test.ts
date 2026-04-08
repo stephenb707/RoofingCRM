@@ -1,9 +1,15 @@
 import type { AxiosInstance } from "axios";
-import { uploadJobReceipt } from "./accountingApi";
+import {
+  confirmReceiptCost,
+  extractReceiptDetails,
+  getReceiptExtraction,
+  uploadJobReceipt,
+} from "./accountingApi";
 import type { JobReceiptDto } from "./types";
 
 describe("accountingApi", () => {
   const mockApi = {
+    get: jest.fn(),
     post: jest.fn(),
   } as unknown as AxiosInstance;
 
@@ -56,5 +62,71 @@ describe("accountingApi", () => {
       const formData = (mockApi.post as jest.Mock).mock.calls[0][1] as FormData;
       expect(formData.get("description")).toBe("Supplier receipt");
     });
+  });
+
+  it("triggers receipt extraction with the authenticated api client", async () => {
+    (mockApi.post as jest.Mock).mockResolvedValue({
+      data: {
+        receiptId: "receipt-1",
+        status: "COMPLETED",
+        extractedAt: "2024-01-01T00:00:00Z",
+        error: null,
+        confidence: 88,
+        result: {
+          vendorName: "ABC Supply",
+          amount: 98.76,
+          suggestedCategory: "MATERIAL",
+        },
+      },
+    });
+
+    await extractReceiptDetails(mockApi, "job-1", "receipt-1");
+
+    expect(mockApi.post).toHaveBeenCalledWith("/api/v1/jobs/job-1/receipts/receipt-1/extract");
+    expect((mockApi.post as jest.Mock).mock.calls[0]).toHaveLength(1);
+  });
+
+  it("loads the latest stored extraction result", async () => {
+    (mockApi.get as jest.Mock).mockResolvedValue({
+      data: {
+        receiptId: "receipt-1",
+        status: "COMPLETED",
+        result: { vendorName: "ABC Supply" },
+      },
+    });
+
+    await getReceiptExtraction(mockApi, "job-1", "receipt-1");
+
+    expect(mockApi.get).toHaveBeenCalledWith("/api/v1/jobs/job-1/receipts/receipt-1/extraction");
+  });
+
+  it("confirms a reviewed receipt into a cost entry", async () => {
+    (mockApi.post as jest.Mock).mockResolvedValue({
+      data: {
+        id: "cost-1",
+        jobId: "job-1",
+        category: "MATERIAL",
+        description: "Receipt from ABC Supply",
+        amount: 98.76,
+        incurredAt: "2024-01-01T12:00:00Z",
+      },
+    });
+
+    await confirmReceiptCost(mockApi, "job-1", "receipt-1", {
+      category: "MATERIAL",
+      vendorName: "ABC Supply",
+      description: "Receipt from ABC Supply",
+      amount: 98.76,
+      incurredAt: "2024-01-01T12:00:00Z",
+      notes: "Total visible on receipt",
+    });
+
+    expect(mockApi.post).toHaveBeenCalledWith(
+      "/api/v1/jobs/job-1/receipts/receipt-1/confirm-cost",
+      expect.objectContaining({
+        description: "Receipt from ABC Supply",
+        amount: 98.76,
+      })
+    );
   });
 });

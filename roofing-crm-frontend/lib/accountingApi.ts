@@ -1,7 +1,9 @@
 import type { AxiosInstance } from "axios";
 import type {
+  ConfirmReceiptCostRequest,
   CreateCostFromReceiptRequest,
   CreateJobCostEntryRequest,
+  ExtractReceiptResponseDto,
   JobAccountingSummaryDto,
   JobCostEntryDto,
   JobReceiptDto,
@@ -74,6 +76,24 @@ export async function uploadJobReceipt(
   return res.data;
 }
 
+export async function extractReceiptDetails(
+  api: AxiosInstance,
+  jobId: string,
+  receiptId: string
+): Promise<ExtractReceiptResponseDto> {
+  const res = await api.post<ExtractReceiptResponseDto>(`/api/v1/jobs/${jobId}/receipts/${receiptId}/extract`);
+  return res.data;
+}
+
+export async function getReceiptExtraction(
+  api: AxiosInstance,
+  jobId: string,
+  receiptId: string
+): Promise<ExtractReceiptResponseDto> {
+  const res = await api.get<ExtractReceiptResponseDto>(`/api/v1/jobs/${jobId}/receipts/${receiptId}/extraction`);
+  return res.data;
+}
+
 export async function createCostFromReceipt(
   api: AxiosInstance,
   jobId: string,
@@ -82,6 +102,19 @@ export async function createCostFromReceipt(
 ): Promise<JobCostEntryDto> {
   const res = await api.post<JobCostEntryDto>(
     `/api/v1/jobs/${jobId}/receipts/${receiptId}/create-cost`,
+    payload
+  );
+  return res.data;
+}
+
+export async function confirmReceiptCost(
+  api: AxiosInstance,
+  jobId: string,
+  receiptId: string,
+  payload: ConfirmReceiptCostRequest
+): Promise<JobCostEntryDto> {
+  const res = await api.post<JobCostEntryDto>(
+    `/api/v1/jobs/${jobId}/receipts/${receiptId}/confirm-cost`,
     payload
   );
   return res.data;

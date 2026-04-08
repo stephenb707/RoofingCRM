@@ -5,10 +5,13 @@ import { useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuthReady } from "@/lib/AuthContext";
 import {
+  confirmReceiptCost,
   createCostFromReceipt,
   createJobCostEntry,
   deleteJobCostEntry,
   deleteJobReceipt,
+  extractReceiptDetails,
+  getReceiptExtraction,
   getJobAccountingSummary,
   linkReceiptToCost,
   listJobCostEntries,
@@ -24,11 +27,15 @@ import { queryKeys } from "@/lib/queryKeys";
 import { formatDate, formatDateOnly, formatFileSize, formatMoney } from "@/lib/format";
 import { DatePickerField } from "@/components/DatePickerField";
 import type {
+  ConfirmReceiptCostRequest,
   CreateCostFromReceiptRequest,
+  ExtractReceiptResponseDto,
   CreateJobCostEntryRequest,
   JobCostCategory,
   JobCostEntryDto,
   JobReceiptDto,
+  ReceiptExtractionResultDto,
+  ReceiptExtractionStatus,
   UpdateJobCostEntryRequest,
 } from "@/lib/types";
 
@@ -74,6 +81,59 @@ function formatPercent(value?: number | null): string {
   return `${value.toFixed(1)}%`;
 }
 
+function ReviewCue() {
+  return (
+    <span
+      className="ml-1.5 inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-amber-100 text-amber-800"
+      data-testid="review-cue"
+    >
+      Review
+    </span>
+  );
+}
+
+function fieldRingClass(needs: boolean): string {
+  return needs ? "rounded-lg ring-2 ring-amber-200/90 border border-amber-200/80 p-2 -m-px" : "";
+}
+
+function extractionWarningsLower(ex: ReceiptExtractionResultDto | null): string {
+  return filterUiExtractionWarnings(ex?.extractionWarnings).join(" ").toLowerCase();
+}
+
+/** Backend reconciliation notes we do not surface in the simplified receipt review UI. */
+function isReconciliationWarningNoise(warning: string): boolean {
+  const t = warning.trim().toLowerCase();
+  if (!t) return true;
+  if (t.includes("tax total was derived from subtotal and tax rate")) return true;
+  if (t.includes("total was derived from subtotal and tax")) return true;
+  if (t.includes("amount paid was aligned")) return true;
+  if (t.includes("tax total was derived from subtotal and total")) return true;
+  return false;
+}
+
+function filterUiExtractionWarnings(warnings: string[] | null | undefined): string[] {
+  if (!warnings?.length) return [];
+  return warnings.filter((w) => !isReconciliationWarningNoise(w));
+}
+
+function vendorNeedsReview(ex: ReceiptExtractionResultDto | null, vendor: string): boolean {
+  if (!ex) return false;
+  if (!vendor.trim()) return true;
+  return (ex.confidence ?? 100) < 55;
+}
+
+function dateNeedsReview(ex: ReceiptExtractionResultDto | null): boolean {
+  if (!ex) return false;
+  const w = extractionWarningsLower(ex);
+  if (w.includes("date") || w.includes("incurred")) return true;
+  return !ex.incurredAt;
+}
+
+function amountFieldNeedsReview(ex: ReceiptExtractionResultDto | null): boolean {
+  if (!ex) return false;
+  return ex.amountConfidence === "LOW" || ex.amountConfidence === "MEDIUM";
+}
+
 export function AccountingSection({ jobId }: AccountingSectionProps) {
   const { api, auth, ready } = useAuthReady();
   const queryClient = useQueryClient();
@@ -82,7 +142,8 @@ export function AccountingSection({ jobId }: AccountingSectionProps) {
   const [filter, setFilter] = useState<CostFilter>("ALL");
   const [showCostModal, setShowCostModal] = useState(false);
   const [editingEntry, setEditingEntry] = useState<JobCostEntryDto | null>(null);
-  const [receiptCreateTarget, setReceiptCreateTarget] = useState<JobReceiptDto | null>(null);
+  const [manualReceiptTarget, setManualReceiptTarget] = useState<JobReceiptDto | null>(null);
+  const [reviewReceiptTarget, setReviewReceiptTarget] = useState<JobReceiptDto | null>(null);
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [linkReceiptTarget, setLinkReceiptTarget] = useState<JobReceiptDto | null>(null);
   const [selectedLinkCostId, setSelectedLinkCostId] = useState("");
@@ -90,6 +151,9 @@ export function AccountingSection({ jobId }: AccountingSectionProps) {
   const [formError, setFormError] = useState<string | null>(null);
   const [receiptError, setReceiptError] = useState<string | null>(null);
   const [receiptDescription, setReceiptDescription] = useState("");
+  const [extractingReceiptId, setExtractingReceiptId] = useState<string | null>(null);
+  const [loadingExtractionReceiptId, setLoadingExtractionReceiptId] = useState<string | null>(null);
+  const [reviewExtraction, setReviewExtraction] = useState<ReceiptExtractionResultDto | null>(null);
 
   const selectedTenant = auth.tenants.find((tenant) => tenant.tenantId === auth.selectedTenantId);
   const canEdit =
@@ -148,6 +212,18 @@ export function AccountingSection({ jobId }: AccountingSectionProps) {
     },
   });
 
+  const confirmReceiptCostMutation = useMutation({
+    mutationFn: ({ receiptId, payload }: { receiptId: string; payload: ConfirmReceiptCostRequest }) =>
+      confirmReceiptCost(api, jobId, receiptId, payload),
+    onSuccess: async () => {
+      closeCostModal();
+      await invalidateAccountingQueries();
+    },
+    onError: (error: unknown) => {
+      setFormError(getApiErrorMessage(error, "Failed to save reviewed receipt cost."));
+    },
+  });
+
   const updateMutation = useMutation({
     mutationFn: ({ costEntryId, payload }: { costEntryId: string; payload: UpdateJobCostEntryRequest }) =>
       updateJobCostEntry(api, jobId, costEntryId, payload),
@@ -177,6 +253,63 @@ export function AccountingSection({ jobId }: AccountingSectionProps) {
     },
     onError: (error: unknown) => {
       setReceiptError(getApiErrorMessage(error, "Failed to upload receipt."));
+    },
+  });
+
+  const extractReceiptMutation = useMutation({
+    mutationFn: ({ receiptId }: { receiptId: string }) => extractReceiptDetails(api, jobId, receiptId),
+    onMutate: ({ receiptId }) => {
+      setExtractingReceiptId(receiptId);
+      setReceiptError(null);
+    },
+    onSuccess: async (response, variables) => {
+      await invalidateAccountingQueries();
+      if (response.status === "COMPLETED" && response.result) {
+        const receipt = receipts.find((item) => item.id === variables.receiptId);
+        if (receipt) {
+          openReviewFromExtraction(receipt, response.result);
+        }
+        return;
+      }
+      setReceiptError(
+        response.error ??
+          "We couldn't reliably extract details from this receipt. You can retry or enter it manually."
+      );
+    },
+    onError: (error: unknown) => {
+      setReceiptError(getApiErrorMessage(error, "Failed to extract receipt details."));
+    },
+    onSettled: () => {
+      setExtractingReceiptId(null);
+    },
+  });
+
+  const loadExtractionMutation = useMutation({
+    mutationFn: ({ receiptId }: { receiptId: string }) => getReceiptExtraction(api, jobId, receiptId),
+    onMutate: ({ receiptId }) => {
+      setLoadingExtractionReceiptId(receiptId);
+      setReceiptError(null);
+    },
+    onSuccess: (response, variables) => {
+      if (response.status !== "COMPLETED" || !response.result) {
+        setReceiptError(
+          response.error ??
+            "We couldn't reliably extract details from this receipt. You can retry or enter it manually."
+        );
+        return;
+      }
+      const receipt = receipts.find((item) => item.id === variables.receiptId);
+      if (!receipt) {
+        setReceiptError("Receipt not found.");
+        return;
+      }
+      openReviewFromExtraction(receipt, response.result);
+    },
+    onError: (error: unknown) => {
+      setReceiptError(getApiErrorMessage(error, "Failed to load extracted receipt details."));
+    },
+    onSettled: () => {
+      setLoadingExtractionReceiptId(null);
     },
   });
 
@@ -234,13 +367,18 @@ export function AccountingSection({ jobId }: AccountingSectionProps) {
   }, [filteredEntries]);
 
   const isSaving =
-    createMutation.isPending || updateMutation.isPending || createFromReceiptMutation.isPending;
+    createMutation.isPending ||
+    updateMutation.isPending ||
+    createFromReceiptMutation.isPending ||
+    confirmReceiptCostMutation.isPending;
   const isLoading = summaryQuery.isLoading || costsQuery.isLoading || receiptsQuery.isLoading;
   const isError = summaryQuery.isError || costsQuery.isError || receiptsQuery.isError;
 
   const openCreateModal = () => {
     setEditingEntry(null);
-    setReceiptCreateTarget(null);
+    setManualReceiptTarget(null);
+    setReviewReceiptTarget(null);
+    setReviewExtraction(null);
     setFormError(null);
     setFormState(getDefaultFormState());
     setShowCostModal(true);
@@ -248,18 +386,39 @@ export function AccountingSection({ jobId }: AccountingSectionProps) {
 
   const openCreateFromReceiptModal = (receipt: JobReceiptDto) => {
     setEditingEntry(null);
-    setReceiptCreateTarget(receipt);
+    setManualReceiptTarget(receipt);
+    setReviewReceiptTarget(null);
+    setReviewExtraction(null);
     setFormError(null);
-    setFormState((current) => ({
+    setFormState({
       ...getDefaultFormState(),
-      description: receipt.description ?? "",
-    }));
+      description: receipt.description ?? "Receipt expense",
+    });
     setShowCostModal(true);
   };
 
+  function openReviewFromExtraction(receipt: JobReceiptDto, extraction: ReceiptExtractionResultDto) {
+    setEditingEntry(null);
+    setManualReceiptTarget(null);
+    setReviewReceiptTarget(receipt);
+    setReviewExtraction(extraction);
+    setFormError(null);
+    setFormState({
+      category: extraction.suggestedCategory ?? "MATERIAL",
+      vendorName: extraction.vendorName ?? "",
+      description: extraction.vendorName ? `Receipt from ${extraction.vendorName}` : "Receipt expense",
+      amount: extraction.amount != null ? String(extraction.amount) : "",
+      incurredAt: extraction.incurredAt ? extraction.incurredAt.slice(0, 10) : formatDateOnly(new Date()),
+      notes: extraction.notes ?? "",
+    });
+    setShowCostModal(true);
+  }
+
   const openEditModal = (entry: JobCostEntryDto) => {
     setEditingEntry(entry);
-    setReceiptCreateTarget(null);
+    setManualReceiptTarget(null);
+    setReviewReceiptTarget(null);
+    setReviewExtraction(null);
     setFormError(null);
     setFormState({
       category: entry.category,
@@ -275,7 +434,9 @@ export function AccountingSection({ jobId }: AccountingSectionProps) {
   const closeCostModal = () => {
     setShowCostModal(false);
     setEditingEntry(null);
-    setReceiptCreateTarget(null);
+    setManualReceiptTarget(null);
+    setReviewReceiptTarget(null);
+    setReviewExtraction(null);
     setFormError(null);
     setFormState(getDefaultFormState());
   };
@@ -309,13 +470,15 @@ export function AccountingSection({ jobId }: AccountingSectionProps) {
       return;
     }
 
+    const notesPayload = formState.notes.trim() || null;
+
     const payload = {
       category: formState.category,
       vendorName: formState.vendorName.trim() || null,
       description: formState.description.trim(),
       amount,
       incurredAt: toApiDate(formState.incurredAt),
-      notes: formState.notes.trim() || null,
+      notes: notesPayload,
     };
 
     if (editingEntry) {
@@ -323,8 +486,13 @@ export function AccountingSection({ jobId }: AccountingSectionProps) {
       return;
     }
 
-    if (receiptCreateTarget) {
-      createFromReceiptMutation.mutate({ receiptId: receiptCreateTarget.id, payload });
+    if (reviewReceiptTarget) {
+      confirmReceiptCostMutation.mutate({ receiptId: reviewReceiptTarget.id, payload });
+      return;
+    }
+
+    if (manualReceiptTarget) {
+      createFromReceiptMutation.mutate({ receiptId: manualReceiptTarget.id, payload });
       return;
     }
 
@@ -383,6 +551,14 @@ export function AccountingSection({ jobId }: AccountingSectionProps) {
       receiptId: linkReceiptTarget.id,
       costEntryId: selectedLinkCostId,
     });
+  };
+
+  const handleReviewExtractedReceipt = (receipt: JobReceiptDto) => {
+    if (receipt.extractionResult && receipt.extractionStatus === "COMPLETED") {
+      openReviewFromExtraction(receipt, receipt.extractionResult);
+      return;
+    }
+    loadExtractionMutation.mutate({ receiptId: receipt.id });
   };
 
   if (isLoading) {
@@ -453,10 +629,13 @@ export function AccountingSection({ jobId }: AccountingSectionProps) {
         />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8" data-testid="category-totals-grid">
+      <div
+        className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8 lg:grid-cols-[repeat(auto-fill,minmax(14rem,1fr))]"
+        data-testid="category-totals-grid"
+      >
         {JOB_COST_CATEGORIES.map((category) => (
           <div key={category} className="min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
-            <p className="text-xs font-medium uppercase tracking-wider text-slate-500">
+            <p className="text-xs font-medium uppercase tracking-wider text-slate-500 [overflow-wrap:anywhere]">
               {JOB_COST_CATEGORY_LABELS[category]}
             </p>
             <p className="mt-1 text-sm font-semibold text-slate-800">{formatMoney(categoryTotals[category])}</p>
@@ -538,6 +717,13 @@ export function AccountingSection({ jobId }: AccountingSectionProps) {
                     <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
                       Receipt
                     </span>
+                    <span
+                      className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${getExtractionBadgeClasses(
+                        receipt.extractionStatus
+                      )}`}
+                    >
+                      {getExtractionBadgeLabel(receipt.extractionStatus)}
+                    </span>
                   </div>
                   <p className="text-xs text-slate-500 mt-1">
                     Uploaded {formatDate(receipt.uploadedAt)}
@@ -554,12 +740,35 @@ export function AccountingSection({ jobId }: AccountingSectionProps) {
                         }`
                       : "Unlinked"}
                   </p>
+                  {receipt.extractionStatus === "FAILED" && receipt.extractionError && (
+                    <p className="text-sm text-red-600 mt-2">{receipt.extractionError}</p>
+                  )}
                 </div>
                 <div className="flex flex-wrap gap-2 lg:justify-end">
                   <ReceiptActionButton onClick={() => handleViewReceipt(receipt)}>View / Download</ReceiptActionButton>
                   {!receipt.linkedCostEntryId && canEdit && (
+                    <ReceiptActionButton
+                      onClick={() => extractReceiptMutation.mutate({ receiptId: receipt.id })}
+                      disabled={extractingReceiptId === receipt.id}
+                    >
+                      {extractingReceiptId === receipt.id
+                        ? "Extracting…"
+                        : receipt.extractionStatus === "FAILED"
+                          ? "Retry extraction"
+                          : "Extract details"}
+                    </ReceiptActionButton>
+                  )}
+                  {!receipt.linkedCostEntryId && canEdit && receipt.extractionStatus === "COMPLETED" && (
+                    <ReceiptActionButton
+                      onClick={() => handleReviewExtractedReceipt(receipt)}
+                      disabled={loadingExtractionReceiptId === receipt.id}
+                    >
+                      {loadingExtractionReceiptId === receipt.id ? "Loading review…" : "Review & Save Cost"}
+                    </ReceiptActionButton>
+                  )}
+                  {!receipt.linkedCostEntryId && canEdit && (
                     <ReceiptActionButton onClick={() => openCreateFromReceiptModal(receipt)}>
-                      Create Cost
+                      Create Cost manually
                     </ReceiptActionButton>
                   )}
                   {!receipt.linkedCostEntryId && canEdit && entries.length > 0 && (
@@ -696,14 +905,39 @@ export function AccountingSection({ jobId }: AccountingSectionProps) {
 
       {showCostModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 p-6">
-            <h3 className="text-lg font-semibold text-slate-800 mb-2">
-              {editingEntry ? "Edit Cost" : receiptCreateTarget ? "Create Cost from Receipt" : "Add Cost"}
+          <div
+            className="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 p-6"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="receipt-cost-modal-title"
+          >
+            <h3 id="receipt-cost-modal-title" className="text-lg font-semibold text-slate-800 mb-2">
+              {editingEntry
+                ? "Edit Cost"
+                : reviewReceiptTarget
+                  ? "Review Extracted Receipt"
+                  : manualReceiptTarget
+                    ? "Create Cost from Receipt"
+                    : "Add Cost"}
             </h3>
-            {receiptCreateTarget && (
-              <p className="text-sm text-slate-500 mb-4">Receipt: {receiptCreateTarget.fileName}</p>
+            {(
+              reviewReceiptTarget ?? manualReceiptTarget
+            ) && (
+              <p className="text-sm text-slate-500 mb-4">
+                Receipt: {(reviewReceiptTarget ?? manualReceiptTarget)?.fileName}
+              </p>
             )}
-            <form onSubmit={handleSubmit} className="space-y-4">
+            {reviewExtraction && hasReviewWarnings(reviewExtraction) && (
+              <p className="text-xs text-amber-900 bg-amber-50 border border-amber-100 rounded px-2 py-1.5 mb-3">
+                {(() => {
+                  const ui = filterUiExtractionWarnings(reviewExtraction.extractionWarnings);
+                  return ui.length > 0
+                    ? ui.join(" ")
+                    : "Please review the total before saving. We found multiple possible amounts.";
+                })()}
+              </p>
+            )}
+            <form onSubmit={handleSubmit} className="space-y-4" data-testid="receipt-review-form">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="cost-category" className="block text-sm font-medium text-slate-700 mb-1">
@@ -727,10 +961,21 @@ export function AccountingSection({ jobId }: AccountingSectionProps) {
                     ))}
                   </select>
                 </div>
-                <div>
+                <div
+                  className={fieldRingClass(
+                    Boolean(reviewReceiptTarget && reviewExtraction && dateNeedsReview(reviewExtraction))
+                  )}
+                >
                   <DatePickerField
                     id="cost-incurred-at"
-                    label="Incurred date"
+                    label={
+                      <>
+                        Incurred date
+                        {reviewReceiptTarget &&
+                          reviewExtraction &&
+                          dateNeedsReview(reviewExtraction) && <ReviewCue />}
+                      </>
+                    }
                     value={formState.incurredAt}
                     onChange={(value) =>
                       setFormState((current) => ({
@@ -738,14 +983,25 @@ export function AccountingSection({ jobId }: AccountingSectionProps) {
                         incurredAt: value,
                       }))
                     }
+                    placeholder="Select date…"
                   />
+                  {reviewReceiptTarget && reviewExtraction && dateNeedsReview(reviewExtraction) && (
+                    <p className="text-xs text-amber-800 mt-1">Confirm against the printed receipt date.</p>
+                  )}
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
+                <div
+                  className={fieldRingClass(
+                    Boolean(reviewReceiptTarget && reviewExtraction && vendorNeedsReview(reviewExtraction, formState.vendorName))
+                  )}
+                >
                   <label htmlFor="cost-vendor" className="block text-sm font-medium text-slate-700 mb-1">
                     Vendor name
+                    {reviewReceiptTarget &&
+                      reviewExtraction &&
+                      vendorNeedsReview(reviewExtraction, formState.vendorName) && <ReviewCue />}
                   </label>
                   <input
                     id="cost-vendor"
@@ -757,12 +1013,20 @@ export function AccountingSection({ jobId }: AccountingSectionProps) {
                         vendorName: event.target.value,
                       }))
                     }
+                    placeholder={reviewReceiptTarget ? "Enter vendor name" : undefined}
                     className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
                   />
                 </div>
-                <div>
+                <div
+                  className={fieldRingClass(
+                    Boolean(reviewReceiptTarget && reviewExtraction && amountFieldNeedsReview(reviewExtraction))
+                  )}
+                >
                   <label htmlFor="cost-amount" className="block text-sm font-medium text-slate-700 mb-1">
                     Amount
+                    {reviewReceiptTarget &&
+                      reviewExtraction &&
+                      amountFieldNeedsReview(reviewExtraction) && <ReviewCue />}
                   </label>
                   <input
                     id="cost-amount"
@@ -796,6 +1060,7 @@ export function AccountingSection({ jobId }: AccountingSectionProps) {
                       description: event.target.value,
                     }))
                   }
+                  placeholder={reviewReceiptTarget ? "Short description of this receipt" : undefined}
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
                   required
                 />
@@ -838,8 +1103,10 @@ export function AccountingSection({ jobId }: AccountingSectionProps) {
                     ? "Saving…"
                     : editingEntry
                       ? "Save Changes"
-                      : receiptCreateTarget
-                        ? "Create Cost"
+                      : reviewReceiptTarget
+                        ? "Review & Save Cost"
+                        : manualReceiptTarget
+                          ? "Create Cost"
                         : "Add Cost"}
                 </button>
               </div>
@@ -913,6 +1180,41 @@ function SummaryCard({
       {secondaryText && <p className="mt-1 text-xs text-slate-500">{secondaryText}</p>}
     </div>
   );
+}
+
+function getExtractionBadgeLabel(status?: ReceiptExtractionStatus | null): string {
+  switch (status) {
+    case "PROCESSING":
+      return "Extracting";
+    case "COMPLETED":
+      return "Ready for review";
+    case "FAILED":
+      return "Extraction failed";
+    case "NOT_STARTED":
+    default:
+      return "Not extracted";
+  }
+}
+
+function getExtractionBadgeClasses(status?: ReceiptExtractionStatus | null): string {
+  switch (status) {
+    case "PROCESSING":
+      return "bg-amber-50 text-amber-700";
+    case "COMPLETED":
+      return "bg-emerald-50 text-emerald-700";
+    case "FAILED":
+      return "bg-red-50 text-red-700";
+    case "NOT_STARTED":
+    default:
+      return "bg-slate-100 text-slate-600";
+  }
+}
+
+function hasReviewWarnings(extraction: ReceiptExtractionResultDto): boolean {
+  const amountNeedsReview =
+    extraction.amountConfidence === "LOW" || extraction.amountConfidence === "MEDIUM";
+  const hasUserFacingWarnings = filterUiExtractionWarnings(extraction.extractionWarnings).length > 0;
+  return amountNeedsReview || hasUserFacingWarnings;
 }
 
 function FilterButton({

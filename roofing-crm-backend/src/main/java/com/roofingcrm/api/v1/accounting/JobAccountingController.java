@@ -113,6 +113,35 @@ public class JobAccountingController {
                 .body(jobAccountingReceiptService.createCostFromReceipt(tenantId, userId, jobId, receiptId, request));
     }
 
+    @PostMapping("/api/v1/jobs/{jobId}/receipts/{receiptId}/extract")
+    public ResponseEntity<ExtractReceiptResponseDto> extractReceipt(
+            @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
+            @PathVariable("jobId") UUID jobId,
+            @PathVariable("receiptId") UUID receiptId) {
+        UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
+        return ResponseEntity.ok(jobAccountingReceiptService.extractReceipt(tenantId, userId, jobId, receiptId));
+    }
+
+    @GetMapping("/api/v1/jobs/{jobId}/receipts/{receiptId}/extraction")
+    public ResponseEntity<ExtractReceiptResponseDto> getReceiptExtraction(
+            @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
+            @PathVariable("jobId") UUID jobId,
+            @PathVariable("receiptId") UUID receiptId) {
+        UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
+        return ResponseEntity.ok(jobAccountingReceiptService.getReceiptExtraction(tenantId, userId, jobId, receiptId));
+    }
+
+    @PostMapping("/api/v1/jobs/{jobId}/receipts/{receiptId}/confirm-cost")
+    public ResponseEntity<JobCostEntryDto> confirmReceiptCost(
+            @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
+            @PathVariable("jobId") UUID jobId,
+            @PathVariable("receiptId") UUID receiptId,
+            @Valid @RequestBody ConfirmReceiptCostRequest request) {
+        UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(jobAccountingReceiptService.confirmReceiptCost(tenantId, userId, jobId, receiptId, request));
+    }
+
     @PutMapping("/api/v1/jobs/{jobId}/receipts/{receiptId}/link-cost/{costEntryId}")
     public ResponseEntity<JobReceiptDto> linkReceiptToCost(
             @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,

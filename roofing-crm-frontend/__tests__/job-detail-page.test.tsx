@@ -153,7 +153,10 @@ describe("JobDetailPage", () => {
       expect(screen.getByRole("heading", { name: /latest estimate/i })).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole("button", { name: /share link/i }));
+    expect(screen.getByRole("button", { name: /send email/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /share link/i })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /generate link/i }));
     await waitFor(() => {
       expect(mockedEstimatesApi.shareEstimate).toHaveBeenCalledWith(
         expect.anything(),
@@ -162,7 +165,8 @@ describe("JobDetailPage", () => {
       );
     });
     expect(screen.getByText("Link copied")).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("job-share-next-step-preview"));
+    expect(screen.getByRole("button", { name: /set follow-up in 2 days/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("share-next-step-preview"));
     expect(openMock).toHaveBeenCalledWith(
       expect.stringContaining("/estimate/abc123"),
       "_blank",

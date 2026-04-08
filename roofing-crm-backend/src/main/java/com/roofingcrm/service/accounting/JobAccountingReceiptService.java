@@ -1,6 +1,8 @@
 package com.roofingcrm.service.accounting;
 
+import com.roofingcrm.api.v1.accounting.ConfirmReceiptCostRequest;
 import com.roofingcrm.api.v1.accounting.CreateCostFromReceiptRequest;
+import com.roofingcrm.api.v1.accounting.ExtractReceiptResponseDto;
 import com.roofingcrm.api.v1.accounting.JobCostEntryDto;
 import com.roofingcrm.api.v1.accounting.JobReceiptDto;
 import org.springframework.lang.NonNull;
@@ -15,8 +17,15 @@ public interface JobAccountingReceiptService {
 
     JobReceiptDto uploadReceiptForJob(@NonNull UUID tenantId, @NonNull UUID userId, UUID jobId, MultipartFile file, String description);
 
+    ExtractReceiptResponseDto extractReceipt(@NonNull UUID tenantId, @NonNull UUID userId, UUID jobId, UUID receiptId);
+
+    ExtractReceiptResponseDto getReceiptExtraction(@NonNull UUID tenantId, @NonNull UUID userId, UUID jobId, UUID receiptId);
+
     JobCostEntryDto createCostFromReceipt(@NonNull UUID tenantId, @NonNull UUID userId, UUID jobId, UUID receiptId,
                                           CreateCostFromReceiptRequest request);
+
+    JobCostEntryDto confirmReceiptCost(@NonNull UUID tenantId, @NonNull UUID userId, UUID jobId, UUID receiptId,
+                                       ConfirmReceiptCostRequest request);
 
     JobReceiptDto linkReceiptToCost(@NonNull UUID tenantId, @NonNull UUID userId, UUID jobId, UUID receiptId, UUID costEntryId);
 

@@ -521,9 +521,71 @@ export interface JobReceiptDto {
   linkedCostEntryId?: string | null;
   linkedCostEntryDescription?: string | null;
   linkedCostEntryAmount?: number | null;
+  extractionStatus?: ReceiptExtractionStatus | null;
+  extractedAt?: string | null;
+  extractionError?: string | null;
+  extractionConfidence?: number | null;
+  extractionResult?: ReceiptExtractionResultDto | null;
 }
 
 export interface CreateCostFromReceiptRequest {
+  category: JobCostCategory;
+  vendorName?: string | null;
+  description: string;
+  amount: number;
+  incurredAt: string;
+  notes?: string | null;
+}
+
+export type ReceiptExtractionStatus =
+  | "NOT_STARTED"
+  | "PROCESSING"
+  | "COMPLETED"
+  | "FAILED";
+
+export type ReceiptAmountConfidence = "HIGH" | "MEDIUM" | "LOW";
+
+export type ReceiptFieldConfidence = "UNKNOWN" | "LOW" | "MEDIUM" | "HIGH";
+
+/** Final reconciled extraction values (match backend ReceiptExtractionResultDto). */
+export interface ReceiptExtractionResultDto {
+  vendorName?: string | null;
+  incurredAt?: string | null;
+  amount?: number | null;
+  extractedSubtotal?: number | null;
+  extractedTax?: number | null;
+  extractedTotal?: number | null;
+  extractedAmountPaid?: number | null;
+  computedTotal?: number | null;
+  subtotalConfidence?: ReceiptFieldConfidence | null;
+  taxConfidence?: ReceiptFieldConfidence | null;
+  totalConfidence?: ReceiptFieldConfidence | null;
+  amountPaidConfidence?: ReceiptFieldConfidence | null;
+  summaryRegionSubtotal?: number | null;
+  summaryRegionTax?: number | null;
+  summaryRegionTotal?: number | null;
+  summaryRegionAmountPaid?: number | null;
+  extractedTaxRatePercent?: number | null;
+  amountCandidates?: number[] | null;
+  amountConfidence?: ReceiptAmountConfidence | null;
+  suggestedCategory?: JobCostCategory | null;
+  notes?: string | null;
+  confidence?: number | null;
+  rawExtractedText?: string | null;
+  summaryRegionRawText?: string | null;
+  extractionWarnings?: string[] | null;
+}
+
+export interface ExtractReceiptResponseDto {
+  receiptId: string;
+  status: ReceiptExtractionStatus;
+  extractedAt?: string | null;
+  error?: string | null;
+  confidence?: number | null;
+  result?: ReceiptExtractionResultDto | null;
+}
+
+export interface ConfirmReceiptCostRequest {
   category: JobCostCategory;
   vendorName?: string | null;
   description: string;
