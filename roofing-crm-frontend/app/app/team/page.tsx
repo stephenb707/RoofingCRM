@@ -269,7 +269,7 @@ export default function TeamPage() {
               <button
                 type="submit"
                 disabled={createInviteMutation.isPending || !inviteEmail.trim()}
-                className="px-4 py-2 bg-sky-600 hover:bg-sky-700 disabled:bg-sky-400 text-white text-sm font-medium rounded-lg"
+                className="px-4 py-2 bg-sky-600 hover:bg-sky-700 disabled:bg-sky-400 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
               >
                 {createInviteMutation.isPending ? "Inviting…" : "Invite"}
               </button>

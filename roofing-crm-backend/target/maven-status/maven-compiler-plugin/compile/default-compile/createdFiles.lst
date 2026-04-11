@@ -61,6 +61,7 @@ com\roofingcrm\domain\enums\PreferredContactMethod.class
 com\roofingcrm\domain\value\Address.class
 com\roofingcrm\domain\enums\UserRole.class
 com\roofingcrm\service\customer\CustomerService.class
+com\roofingcrm\api\v1\report\AccountingReportController.class
 com\roofingcrm\api\v1\communication\CreateCommunicationLogRequest.class
 com\roofingcrm\domain\entity\User.class
 com\roofingcrm\service\invoice\InvoiceServiceImpl.class

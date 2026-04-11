@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { useAuthReady } from "@/lib/AuthContext";
 import {
+  downloadAccountingJobsExcel,
   downloadLeadsCsv,
   downloadJobsCsv,
   downloadPaidInvoicesPdf,
@@ -42,6 +43,9 @@ export default function ReportsPage() {
   const [selectedInvoiceYear, setSelectedInvoiceYear] = useState<number | null>(null);
   const [invoicePdfLoading, setInvoicePdfLoading] = useState(false);
   const [invoicePdfError, setInvoicePdfError] = useState<string | null>(null);
+
+  const [accountingXlsxLoading, setAccountingXlsxLoading] = useState(false);
+  const [accountingXlsxError, setAccountingXlsxError] = useState<string | null>(null);
 
   const handleDownloadLeads = useCallback(async () => {
     if (!ready) return;
@@ -124,6 +128,25 @@ export default function ReportsPage() {
       setInvoicePdfLoading(false);
     }
   }, [api, ready, selectedInvoiceYear]);
+
+  const handleDownloadAccountingExcel = useCallback(async () => {
+    if (!ready) return;
+    setAccountingXlsxError(null);
+    setAccountingXlsxLoading(true);
+    try {
+      const { blob, filename } = await downloadAccountingJobsExcel(api);
+      triggerBrowserDownload(blob, filename);
+    } catch (err) {
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status === 403) {
+        setAccountingXlsxError("You do not have permission to download this report.");
+      } else {
+        setAccountingXlsxError("Failed to download. Check backend is running.");
+      }
+    } finally {
+      setAccountingXlsxLoading(false);
+    }
+  }, [api, ready]);
 
   if (!ready) {
     return (
@@ -276,7 +299,7 @@ export default function ReportsPage() {
             <button
               type="button"
               disabled
-              className="px-4 py-2 bg-sky-400 text-white text-sm font-medium rounded-lg"
+              className="px-4 py-2 bg-sky-400 text-white text-sm font-medium rounded-lg shadow-sm"
             >
               Download PDF
             </button>
@@ -304,7 +327,7 @@ export default function ReportsPage() {
               type="button"
               onClick={handleDownloadPaidInvoicesPdf}
               disabled={invoicePdfLoading || selectedInvoiceYear == null}
-              className="px-4 py-2 bg-sky-600 hover:bg-sky-700 disabled:bg-sky-400 text-white text-sm font-medium rounded-lg transition-colors"
+              className="px-4 py-2 bg-sky-600 hover:bg-sky-700 disabled:bg-sky-400 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
             >
               {invoicePdfLoading ? "Downloading…" : "Download PDF"}
             </button>
@@ -315,6 +338,26 @@ export default function ReportsPage() {
         )}
         {invoicePdfError && (
           <p className="text-sm text-red-600 mt-3">{invoicePdfError}</p>
+        )}
+      </div>
+
+      {/* Accounting / job profitability (Excel) */}
+      <div className="bg-white rounded-xl border border-slate-200 p-6 mt-6">
+        <h2 className="text-lg font-semibold text-slate-800 mb-2">Accounting Report</h2>
+        <p className="text-sm text-slate-600 mb-4">
+          Export job-level accounting and profitability (agreed, invoiced, paid, costs, margins, and cost
+          categories) as an Excel file you can edit or import into Google Sheets.
+        </p>
+        <button
+          type="button"
+          onClick={handleDownloadAccountingExcel}
+          disabled={accountingXlsxLoading}
+          className="px-4 py-2 bg-sky-600 hover:bg-sky-700 disabled:bg-sky-400 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+        >
+          {accountingXlsxLoading ? "Downloading…" : "Download Excel"}
+        </button>
+        {accountingXlsxError && (
+          <p className="text-sm text-red-600 mt-3">{accountingXlsxError}</p>
         )}
       </div>
     </div>
