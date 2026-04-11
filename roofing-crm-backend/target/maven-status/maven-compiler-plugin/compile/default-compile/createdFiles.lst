@@ -13,6 +13,7 @@ com\roofingcrm\service\job\JobServiceImpl.class
 com\roofingcrm\api\v1\invoice\InvoiceItemDto.class
 com\roofingcrm\service\task\TaskService.class
 com\roofingcrm\service\exception\EstimateConflictException.class
+com\roofingcrm\api\v1\dashboard\DashboardTaskSnippetDto.class
 com\roofingcrm\api\publicapi\estimate\PublicEstimateController.class
 com\roofingcrm\service\accounting\ReceiptExtractionDecisionService$1.class
 com\roofingcrm\domain\enums\JobType.class
@@ -27,6 +28,7 @@ com\roofingcrm\service\estimate\PublicEstimateService.class
 com\roofingcrm\storage\LocalStorageProperties.class
 com\roofingcrm\api\v1\report\ReportController.class
 com\roofingcrm\api\v1\task\UpdateTaskRequest.class
+com\roofingcrm\service\dashboard\DashboardService.class
 com\roofingcrm\api\v1\invoice\InvoiceSummaryDto.class
 com\roofingcrm\api\v1\estimate\ShareEstimateResponse.class
 com\roofingcrm\domain\enums\ActivityEventType.class
@@ -35,6 +37,7 @@ com\roofingcrm\service\job\JobService.class
 com\roofingcrm\domain\enums\TaskStatus.class
 com\roofingcrm\api\v1\job\UpdateJobRequest.class
 com\roofingcrm\domain\repository\CustomerRepository.class
+com\roofingcrm\api\v1\dashboard\DashboardJobSnippetDto.class
 com\roofingcrm\api\v1\task\TaskController.class
 com\roofingcrm\api\v1\job\JobDto.class
 com\roofingcrm\domain\entity\Invoice.class
@@ -57,6 +60,7 @@ com\roofingcrm\service\invoice\InvoiceService.class
 com\roofingcrm\domain\entity\InvoiceItem.class
 com\roofingcrm\service\activity\ActivityEventService.class
 com\roofingcrm\domain\enums\InvoiceStatus.class
+com\roofingcrm\api\v1\dashboard\DashboardSummaryDto.class
 com\roofingcrm\domain\enums\PreferredContactMethod.class
 com\roofingcrm\domain\value\Address.class
 com\roofingcrm\domain\enums\UserRole.class
@@ -66,6 +70,7 @@ com\roofingcrm\api\v1\communication\CreateCommunicationLogRequest.class
 com\roofingcrm\domain\entity\User.class
 com\roofingcrm\service\invoice\InvoiceServiceImpl.class
 com\roofingcrm\domain\repository\LeadRepository.class
+com\roofingcrm\api\v1\dashboard\DashboardController.class
 com\roofingcrm\service\accounting\ReceiptExtractionServiceImpl$1.class
 com\roofingcrm\domain\entity\Customer.class
 com\roofingcrm\domain\repository\JobRepository.class
@@ -84,3 +89,4 @@ com\roofingcrm\api\v1\schedule\ScheduleController.class
 com\roofingcrm\domain\enums\LeadStatus.class
 com\roofingcrm\domain\enums\ActivityEntityType.class
 com\roofingcrm\domain\repository\InvoiceRepository.class
+com\roofingcrm\api\v1\dashboard\DashboardLeadSnippetDto.class

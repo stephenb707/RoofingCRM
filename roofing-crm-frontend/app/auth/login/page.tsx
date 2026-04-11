@@ -27,7 +27,7 @@ export default function LoginPage() {
       router.replace(nextUrl);
       return;
     }
-    if (auth.selectedTenantId) router.replace("/app/customers");
+    if (auth.selectedTenantId) router.replace("/app");
     else router.replace("/auth/select-tenant");
   }, [auth.token, auth.selectedTenantId, nextUrl, router]);
 
@@ -46,7 +46,7 @@ export default function LoginPage() {
       if (nextUrl && nextUrl.startsWith("/")) {
         router.push(nextUrl);
       } else if (tenants.length === 1) {
-        router.push("/app/customers");
+        router.push("/app");
       } else {
         router.push("/auth/select-tenant");
       }

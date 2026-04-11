@@ -18,6 +18,16 @@ import java.util.UUID;
 
 public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
 
+    long countByTenantAndArchivedFalse(Tenant tenant);
+
+    @Query("""
+            select count(i) from Invoice i
+            where i.tenant = :tenant
+              and i.archived = false
+              and i.status in (com.roofingcrm.domain.enums.InvoiceStatus.DRAFT, com.roofingcrm.domain.enums.InvoiceStatus.SENT)
+            """)
+    long countUnpaidByTenant(@Param("tenant") Tenant tenant);
+
     Optional<Invoice> findByIdAndTenantAndArchivedFalse(UUID id, Tenant tenant);
 
     @EntityGraph(attributePaths = {"job", "job.customer", "estimate", "items"})

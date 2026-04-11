@@ -4,6 +4,9 @@
  */
 
 export const queryKeys = {
+  dashboardSummary: (tenantId: string | null) =>
+    ["dashboardSummary", tenantId] as const,
+
   customers: (tenantId: string | null) => ["customers", tenantId] as const,
   customersList: (tenantId: string | null, q: string | null, page: number) =>
     ["customers", tenantId, q ?? "", page] as const,

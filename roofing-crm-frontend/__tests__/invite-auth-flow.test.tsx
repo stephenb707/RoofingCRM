@@ -153,7 +153,7 @@ describe("Invite auth flow", () => {
     });
 
     expect(mockSetAuthFromLogin).toHaveBeenCalled();
-    expect(mockPush).toHaveBeenCalledWith("/app/customers");
+    expect(mockPush).toHaveBeenCalledWith("/app");
   });
 
   it("accept invite redirects unauthenticated users to login while preserving token", async () => {
@@ -201,6 +201,6 @@ describe("Invite auth flow", () => {
       role: "SALES",
     });
     expect(mockSelectTenant).toHaveBeenCalledWith("tenant-1");
-    expect(mockReplace).toHaveBeenCalledWith("/app/customers");
+    expect(mockReplace).toHaveBeenCalledWith("/app");
   });
 });

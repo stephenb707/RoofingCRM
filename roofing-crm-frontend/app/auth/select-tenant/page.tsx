@@ -16,7 +16,7 @@ export default function SelectTenantPage() {
       return;
     }
     if (auth.tenants.length === 1 && auth.selectedTenantId) {
-      router.replace("/app/customers");
+      router.replace("/app");
     }
   }, [auth, router]);
 
@@ -83,7 +83,7 @@ export default function SelectTenantPage() {
               onClick={() => {
                 queryClient.clear();
                 selectTenant(t.tenantId);
-                router.push("/app/customers");
+                router.push("/app");
               }}
               className="w-full border border-slate-200 rounded-xl px-4 py-4 text-left hover:bg-sky-50 hover:border-sky-200 transition-colors group"
             >

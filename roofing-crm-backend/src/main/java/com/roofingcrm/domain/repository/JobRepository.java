@@ -21,6 +21,29 @@ import java.util.UUID;
 
 public interface JobRepository extends JpaRepository<Job, UUID>, JpaSpecificationExecutor<Job> {
 
+    long countByTenantAndArchivedFalse(Tenant tenant);
+
+    @Query("""
+            select count(j) from Job j
+            where j.tenant = :tenant
+              and j.archived = false
+              and j.scheduledStartDate is null
+            """)
+    long countWithNoScheduledStartByTenant(@Param("tenant") Tenant tenant);
+
+    @Query("""
+            select count(j) from Job j
+            where j.tenant = :tenant
+              and j.archived = false
+              and j.scheduledStartDate is not null
+              and j.scheduledStartDate <= :rangeEnd
+              and coalesce(j.scheduledEndDate, j.scheduledStartDate) >= :rangeStart
+            """)
+    long countScheduledInDateRange(
+            @Param("tenant") Tenant tenant,
+            @Param("rangeStart") LocalDate rangeStart,
+            @Param("rangeEnd") LocalDate rangeEnd);
+
     @EntityGraph(attributePaths = {"customer", "lead"})
     @NonNull List<Job> findAll(@NonNull Specification<Job> spec, @NonNull Sort sort);
 

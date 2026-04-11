@@ -47,5 +47,6 @@ C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\c
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\com\roofingcrm\service\lead\LeadServiceImplTest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\com\roofingcrm\api\v1\job\JobControllerTest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\com\roofingcrm\service\invoice\InvoiceMapperTest.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\com\roofingcrm\api\v1\dashboard\DashboardControllerTest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\com\roofingcrm\api\v1\estimate\EstimateControllerTest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\com\roofingcrm\api\v1\report\AccountingReportControllerTest.java

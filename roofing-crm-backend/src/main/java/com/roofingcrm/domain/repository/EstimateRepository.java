@@ -15,6 +15,10 @@ import java.util.UUID;
 
 public interface EstimateRepository extends JpaRepository<Estimate, UUID> {
 
+    long countByTenantAndArchivedFalse(Tenant tenant);
+
+    long countByTenantAndStatusAndArchivedFalse(Tenant tenant, EstimateStatus status);
+
     List<Estimate> findByJobAndArchivedFalse(Job job);
 
     List<Estimate> findByTenantAndStatusAndArchivedFalse(Tenant tenant, EstimateStatus status);

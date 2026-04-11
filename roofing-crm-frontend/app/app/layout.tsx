@@ -92,6 +92,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <nav className="bg-white border-b border-slate-200 px-6">
         <div className="flex gap-1">
           <Link
+            href="/app"
+            className={`px-4 py-3 text-sm font-medium transition-colors ${
+              pathname === "/app"
+                ? "text-sky-600 border-b-2 border-sky-600"
+                : "text-slate-600 hover:text-slate-800 border-b-2 border-transparent"
+            }`}
+          >
+            Dashboard
+          </Link>
+          <Link
             href="/app/customers"
             className={`px-4 py-3 text-sm font-medium transition-colors ${
               pathname.startsWith("/app/customers")

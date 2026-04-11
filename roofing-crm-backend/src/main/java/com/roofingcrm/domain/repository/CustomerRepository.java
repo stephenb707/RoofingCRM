@@ -13,6 +13,8 @@ import java.util.UUID;
 
 public interface CustomerRepository extends JpaRepository<Customer, UUID> {
 
+    long countByTenantAndArchivedFalse(Tenant tenant);
+
     Page<Customer> findByTenantAndArchivedFalse(Tenant tenant, Pageable pageable);
 
     Optional<Customer> findByIdAndTenantAndArchivedFalse(UUID id, Tenant tenant);

@@ -19,6 +19,14 @@ public final class TaskSpecifications {
     }
 
     @NonNull
+    public static Specification<Task> openTasksForTenant(@NonNull Tenant tenant) {
+        return (root, query, cb) -> cb.and(
+                cb.equal(root.get("tenant"), tenant),
+                cb.isFalse(root.get("archived")),
+                root.get("status").in(TaskStatus.TODO, TaskStatus.IN_PROGRESS));
+    }
+
+    @NonNull
     public static Specification<Task> forTenantAndFilters(
             Tenant tenant,
             TaskStatus status,
