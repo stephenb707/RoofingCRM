@@ -6,11 +6,28 @@ import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   DndContext,
+  DragOverlay,
+  DragCancelEvent,
   DragEndEvent,
+  DragStartEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
   useDraggable,
   useDroppable,
 } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
+import {
+  addMonths,
+  subMonths,
+  startOfMonth,
+  startOfWeek,
+  endOfWeek,
+  eachDayOfInterval,
+  endOfMonth,
+  isSameMonth,
+  format,
+} from "date-fns";
 import { useAuthReady } from "@/lib/AuthContext";
 import { listJobSchedule, updateJob } from "@/lib/jobsApi";
 import { getApiErrorMessage } from "@/lib/apiError";
@@ -25,38 +42,38 @@ import {
   formatLocalDateInput,
   parseLocalDateOnly,
 } from "@/lib/format";
-import { DateRangePicker } from "@/components/DateRangePicker";
 import { DatePickerField } from "@/components/DatePickerField";
 import { computeScheduleUpdate, applyOptimisticSchedulingTagChange } from "@/lib/scheduleDnd";
 import type { JobDto, JobStatus } from "@/lib/types";
+
+const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+const MAX_JOBS_VISIBLE_PER_DAY = 3;
 
 type ScheduleRenderItem = {
   job: JobDto;
   isDraggable: boolean;
 };
 
-function getMondayOfWeek(d: Date): string {
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-  const monday = new Date(d);
-  monday.setDate(diff);
-  return formatLocalDateInput(monday);
+type CalendarDay = {
+  dateKey: string;
+  inMonth: boolean;
+};
+
+/** Full month grid including leading/trailing days (weeks start Sunday). */
+function buildCalendarDays(viewMonthStart: Date): CalendarDay[] {
+  const monthStart = startOfMonth(viewMonthStart);
+  const monthEnd = endOfMonth(monthStart);
+  const gridStart = startOfWeek(monthStart, { weekStartsOn: 0 });
+  const gridEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
+  const monthIndex = monthStart.getMonth();
+  return eachDayOfInterval({ start: gridStart, end: gridEnd }).map((d) => ({
+    dateKey: format(d, "yyyy-MM-dd"),
+    inMonth: d.getMonth() === monthIndex,
+  }));
 }
 
-function getSundayOfWeek(d: Date): string {
-  const monday = parseLocalDateOnly(getMondayOfWeek(d));
-  monday.setDate(monday.getDate() + 6);
-  return formatLocalDateInput(monday);
-}
-
-function getDatesInRange(start: string, end: string): string[] {
-  const out: string[] = [];
-  const s = parseLocalDateOnly(start);
-  const e = parseLocalDateOnly(end);
-  for (let d = new Date(s); d <= e; d.setDate(d.getDate() + 1)) {
-    out.push(formatLocalDateInput(d));
-  }
-  return out;
+function isTodayDateKey(dateKey: string): boolean {
+  return dateKey === formatLocalDateInput(new Date());
 }
 
 export default function SchedulePage() {
@@ -65,11 +82,7 @@ export default function SchedulePage() {
   const searchParams = useSearchParams();
   const focusJobId = searchParams.get("focusJob");
 
-  const today = useMemo(() => new Date(), []);
-  const defaultStart = useMemo(() => getMondayOfWeek(today), [today]);
-  const defaultEnd = useMemo(() => getSundayOfWeek(today), [today]);
-  const [startDate, setStartDate] = useState(defaultStart);
-  const [endDate, setEndDate] = useState(defaultEnd);
+  const [viewMonth, setViewMonth] = useState(() => startOfMonth(new Date()));
   const [statusFilter, setStatusFilter] = useState<JobStatus | "">("");
   const [crewFilter, setCrewFilter] = useState("");
   const [includeUnscheduled, setIncludeUnscheduled] = useState(true);
@@ -78,11 +91,22 @@ export default function SchedulePage() {
   const [editStart, setEditStart] = useState("");
   const [editEnd, setEditEnd] = useState("");
   const [editCrew, setEditCrew] = useState("");
+  const [activeDragJob, setActiveDragJob] = useState<JobDto | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 8 },
+    })
+  );
+
+  const calendarDays = useMemo(() => buildCalendarDays(viewMonth), [viewMonth]);
+  const rangeFrom = calendarDays[0]?.dateKey ?? formatLocalDateInput(viewMonth);
+  const rangeTo = calendarDays[calendarDays.length - 1]?.dateKey ?? rangeFrom;
 
   const scheduleKey = queryKeys.jobSchedule(
     auth.selectedTenantId,
-    startDate,
-    endDate,
+    rangeFrom,
+    rangeTo,
     statusFilter || null,
     crewFilter || null,
     includeUnscheduled
@@ -92,8 +116,8 @@ export default function SchedulePage() {
     queryKey: scheduleKey,
     queryFn: () =>
       listJobSchedule(api, {
-        from: startDate,
-        to: endDate,
+        from: rangeFrom,
+        to: rangeTo,
         status: statusFilter || undefined,
         crewName: crewFilter || undefined,
         includeUnscheduled,
@@ -107,6 +131,7 @@ export default function SchedulePage() {
     }
   }, [focusJobId]);
 
+  const calendarDayKeys = useMemo(() => calendarDays.map((d) => d.dateKey), [calendarDays]);
   const jobsSignature = useMemo(() => jobs.map((j) => j.id).sort().join(","), [jobs]);
 
   useEffect(() => {
@@ -185,7 +210,22 @@ export default function SchedulePage() {
     });
   };
 
+  const handleDragStart = (event: DragStartEvent) => {
+    const activeId = String(event.active.id);
+    if (!activeId.startsWith("job:")) return;
+    const jobId =
+      (event.active.data.current?.jobId as string | undefined) ??
+      activeId.slice(4).split("@")[0];
+    const job = jobs.find((j) => j.id === jobId);
+    if (job) setActiveDragJob(job);
+  };
+
+  const handleDragCancel = (_event: DragCancelEvent) => {
+    setActiveDragJob(null);
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
+    setActiveDragJob(null);
     const { active, over } = event;
     if (!over) return;
     const activeId = String(active.id);
@@ -215,48 +255,18 @@ export default function SchedulePage() {
     });
   };
 
-  const goPrevWeek = () => {
-    const m = parseLocalDateOnly(startDate);
-    m.setDate(m.getDate() - 7);
-    const newStart = formatLocalDateInput(m);
-    const newEnd = getSundayOfWeek(m);
-    setStartDate(newStart);
-    setEndDate(newEnd);
-  };
-
-  const goNextWeek = () => {
-    const m = parseLocalDateOnly(startDate);
-    m.setDate(m.getDate() + 7);
-    const newStart = formatLocalDateInput(m);
-    const newEnd = getSundayOfWeek(m);
-    setStartDate(newStart);
-    setEndDate(newEnd);
-  };
-
-  const jumpToWeek = (dateStr: string) => {
-    if (!dateStr) return;
-    const d = parseLocalDateOnly(dateStr);
-    const newStart = getMondayOfWeek(d);
-    const newEnd = getSundayOfWeek(d);
-    setStartDate(newStart);
-    setEndDate(newEnd);
-  };
-
-  const datesInRange = useMemo(
-    () => getDatesInRange(startDate, endDate),
-    [startDate, endDate]
-  );
+  const goPrevMonth = () => setViewMonth((prev) => startOfMonth(subMonths(prev, 1)));
+  const goNextMonth = () => setViewMonth((prev) => startOfMonth(addMonths(prev, 1)));
+  const goThisMonth = () => setViewMonth(startOfMonth(new Date()));
 
   const hasActiveFilters =
     statusFilter !== "" ||
     crewFilter !== "" ||
     !includeUnscheduled ||
-    startDate !== defaultStart ||
-    endDate !== defaultEnd;
+    !isSameMonth(viewMonth, new Date());
 
   const handleClearFilters = () => {
-    setStartDate(defaultStart);
-    setEndDate(defaultEnd);
+    setViewMonth(startOfMonth(new Date()));
     setStatusFilter("");
     setCrewFilter("");
     setIncludeUnscheduled(true);
@@ -264,7 +274,7 @@ export default function SchedulePage() {
 
   const jobsByDate = useMemo(() => {
     const map = new Map<string, ScheduleRenderItem[]>();
-    for (const d of datesInRange) {
+    for (const d of calendarDayKeys) {
       map.set(d, []);
     }
     const unscheduled: ScheduleRenderItem[] = [];
@@ -274,7 +284,7 @@ export default function SchedulePage() {
         unscheduled.push({ job, isDraggable: true });
       } else {
         const end = job.scheduledEndDate && job.scheduledEndDate >= sd ? job.scheduledEndDate : sd;
-        for (const d of datesInRange) {
+        for (const d of calendarDayKeys) {
           if (d >= sd && d <= end) {
             const list = map.get(d) ?? [];
             list.push({ job, isDraggable: d === sd });
@@ -283,7 +293,6 @@ export default function SchedulePage() {
         }
       }
     }
-    // Ensure unique job IDs per day to avoid double rendering/counting.
     for (const [d, list] of map.entries()) {
       const unique = new Map<string, ScheduleRenderItem>();
       for (const item of list) {
@@ -294,7 +303,7 @@ export default function SchedulePage() {
       map.set(d, Array.from(unique.values()));
     }
     return { byDate: map, unscheduled };
-  }, [jobs, datesInRange]);
+  }, [jobs, calendarDayKeys]);
 
   if (!ready) {
     return (
@@ -305,55 +314,49 @@ export default function SchedulePage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto">
-      <h1 className="text-2xl font-bold text-slate-800 mb-6">Schedule</h1>
+    <div className="max-w-6xl mx-auto">
+      <h1 className="text-2xl font-bold text-slate-800 mb-4">Schedule</h1>
+
+      {/* Month navigation */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={goPrevMonth}
+            className="px-3 py-2 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50"
+          >
+            ← Prev
+          </button>
+          <h2 className="text-lg font-semibold text-slate-800 min-w-[10rem] text-center">
+            {format(viewMonth, "MMMM yyyy")}
+          </h2>
+          <button
+            type="button"
+            onClick={goNextMonth}
+            className="px-3 py-2 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50"
+          >
+            Next →
+          </button>
+          <button
+            type="button"
+            onClick={goThisMonth}
+            className="px-3 py-2 text-sm font-medium text-sky-700 border border-sky-200 bg-sky-50 rounded-lg hover:bg-sky-100"
+          >
+            This month
+          </button>
+        </div>
+        <div className="flex items-center gap-2 text-sm text-slate-600">
+          <span className="hidden sm:inline">Viewing</span>
+          <span className="font-medium text-slate-800">
+            {format(parseLocalDateOnly(rangeFrom), "MMM d")} –{" "}
+            {format(parseLocalDateOnly(rangeTo), "MMM d, yyyy")}
+          </span>
+        </div>
+      </div>
 
       {/* Filters */}
       <div className="bg-white rounded-xl border border-slate-200 p-4 mb-6">
         <div className="flex flex-wrap items-end gap-4">
-          <div className="min-w-[200px]">
-            <label
-              htmlFor="schedule-daterange"
-              className="block text-sm font-medium text-slate-700 mb-1"
-            >
-              Date range
-            </label>
-            <DateRangePicker
-              id="schedule-daterange"
-              startDate={startDate}
-              endDate={endDate}
-              onChange={(start, end) => {
-                setStartDate(start || defaultStart);
-                setEndDate(end || defaultEnd);
-              }}
-              placeholder="Select date range…"
-            />
-          </div>
-          <div>
-            <DatePickerField
-              id="schedule-jump-date"
-              label="Jump to week"
-              value={startDate}
-              onChange={jumpToWeek}
-              className="min-w-[180px]"
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={goPrevWeek}
-              className="px-3 py-2 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50"
-            >
-              ← Prev
-            </button>
-            <button
-              type="button"
-              onClick={goNextWeek}
-              className="px-3 py-2 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50"
-            >
-              Next →
-            </button>
-          </div>
           <div>
             <label
               htmlFor="schedule-status"
@@ -410,6 +413,7 @@ export default function SchedulePage() {
           </div>
           {hasActiveFilters && (
             <button
+              type="button"
               onClick={handleClearFilters}
               className="text-sm text-slate-500 hover:text-slate-700 underline"
             >
@@ -429,36 +433,55 @@ export default function SchedulePage() {
       )}
 
       {!isLoading && !isError && (
-        <DndContext onDragEnd={handleDragEnd}>
+        <DndContext
+          sensors={sensors}
+          onDragStart={handleDragStart}
+          onDragCancel={handleDragCancel}
+          onDragEnd={handleDragEnd}
+        >
           <div className="space-y-6">
-            {datesInRange.map((dateStr) => {
-              const dayJobs = jobsByDate.byDate.get(dateStr) ?? [];
-              return (
-                <ScheduleColumn
-                  key={dateStr}
-                  columnId={`date:${dateStr}`}
-                  title={formatDate(dateStr)}
-                  dateStr={dateStr}
-                  jobs={dayJobs}
-                  editingJobId={editingJobId}
-                  editStart={editStart}
-                  editEnd={editEnd}
-                  editCrew={editCrew}
-                  onEditStartChange={setEditStart}
-                  onEditEndChange={setEditEnd}
-                  onEditCrewChange={setEditCrew}
-                  openEdit={openEdit}
-                  handleSaveEdit={handleSaveEdit}
-                  setEditingJobId={setEditingJobId}
-                  isSaving={updateJobMutation.isPending}
-                  saveError={
-                    updateJobMutation.isError
-                      ? getApiErrorMessage(updateJobMutation.error, "Failed to update")
-                      : null
-                  }
-                />
-              );
-            })}
+            <div className="bg-white rounded-xl border border-slate-200 p-3 sm:p-4">
+              <div className="grid grid-cols-7 gap-1 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                {WEEKDAY_LABELS.map((d) => (
+                  <div key={d} className="py-2">
+                    {d}
+                  </div>
+                ))}
+              </div>
+              <div className="grid grid-cols-7 gap-1">
+                {calendarDays.map(({ dateKey, inMonth }) => {
+                  const dayJobs = jobsByDate.byDate.get(dateKey) ?? [];
+                  const dayNum = parseLocalDateOnly(dateKey).getDate();
+                  const todayCell = isTodayDateKey(dateKey);
+                  return (
+                    <DayGridCell
+                      key={dateKey}
+                      dateKey={dateKey}
+                      dayNum={dayNum}
+                      inMonth={inMonth}
+                      isToday={todayCell}
+                      jobs={dayJobs}
+                      editingJobId={editingJobId}
+                      editStart={editStart}
+                      editEnd={editEnd}
+                      editCrew={editCrew}
+                      onEditStartChange={setEditStart}
+                      onEditEndChange={setEditEnd}
+                      onEditCrewChange={setEditCrew}
+                      openEdit={openEdit}
+                      handleSaveEdit={handleSaveEdit}
+                      setEditingJobId={setEditingJobId}
+                      isSaving={updateJobMutation.isPending}
+                      saveError={
+                        updateJobMutation.isError
+                          ? getApiErrorMessage(updateJobMutation.error, "Failed to update")
+                          : null
+                      }
+                    />
+                  );
+                })}
+              </div>
+            </div>
 
             {includeUnscheduled && (
               <ScheduleColumn
@@ -466,6 +489,7 @@ export default function SchedulePage() {
                 title="Unscheduled"
                 dateStr={null}
                 jobs={jobsByDate.unscheduled}
+                compact={false}
                 editingJobId={editingJobId}
                 editStart={editStart}
                 editEnd={editEnd}
@@ -492,7 +516,116 @@ export default function SchedulePage() {
               </p>
             )}
           </div>
+
+          <DragOverlay dropAnimation={{ duration: 180, easing: "ease" }}>
+            {activeDragJob ? (
+              <div
+                className="min-w-[10rem] max-w-[14rem] rounded-lg border-2 border-sky-400 bg-white shadow-2xl opacity-[0.98] cursor-grabbing pointer-events-none"
+                data-testid="schedule-drag-overlay-preview"
+              >
+                <div className="p-2">
+                  <ScheduleCardCompactContent job={activeDragJob} />
+                </div>
+              </div>
+            ) : null}
+          </DragOverlay>
         </DndContext>
+      )}
+    </div>
+  );
+}
+
+function DayGridCell({
+  dateKey,
+  dayNum,
+  inMonth,
+  isToday,
+  jobs,
+  editingJobId,
+  editStart,
+  editEnd,
+  editCrew,
+  onEditStartChange,
+  onEditEndChange,
+  onEditCrewChange,
+  openEdit,
+  handleSaveEdit,
+  setEditingJobId,
+  isSaving,
+  saveError,
+}: {
+  dateKey: string;
+  dayNum: number;
+  inMonth: boolean;
+  isToday: boolean;
+  jobs: ScheduleRenderItem[];
+  editingJobId: string | null;
+  editStart: string;
+  editEnd: string;
+  editCrew: string;
+  onEditStartChange: (v: string) => void;
+  onEditEndChange: (v: string) => void;
+  onEditCrewChange: (v: string) => void;
+  openEdit: (job: JobDto) => void;
+  handleSaveEdit: (e: React.FormEvent, jobId: string) => void;
+  setEditingJobId: (id: string | null) => void;
+  isSaving: boolean;
+  saveError: string | null;
+}) {
+  const columnId = `date:${dateKey}`;
+  const { setNodeRef, isOver } = useDroppable({ id: columnId });
+  const dataTestId = `schedule-col-${dateKey}`;
+  const uniqueCount = new Set(jobs.map((item) => item.job.id)).size;
+  const visible = jobs.slice(0, MAX_JOBS_VISIBLE_PER_DAY);
+  const moreCount = jobs.length - visible.length;
+
+  return (
+    <div
+      ref={setNodeRef}
+      data-testid={dataTestId}
+      className={`min-h-[7rem] rounded-lg border p-1.5 flex flex-col transition-colors ${
+        isOver ? "border-sky-400 bg-sky-50/60" : "border-slate-200"
+      } ${!inMonth ? "bg-slate-50/80 text-slate-400" : "bg-white"} ${
+        isToday ? "ring-2 ring-sky-500 ring-offset-1" : ""
+      }`}
+    >
+      <div className="flex items-center justify-between gap-1 mb-1">
+        <span
+          className={`text-sm font-semibold tabular-nums ${inMonth ? "text-slate-800" : "text-slate-400"}`}
+        >
+          {dayNum}
+        </span>
+        <span className="sr-only" data-testid={`${dataTestId}-capacity`}>
+          Jobs: {uniqueCount}
+        </span>
+      </div>
+      <ul className="space-y-1 flex-1 min-h-0 overflow-y-auto max-h-[200px]">
+        {visible.map((item) => (
+          <ScheduleJobCard
+            key={`${item.job.id}-${columnId}`}
+            job={item.job}
+            columnId={columnId}
+            isDraggable={item.isDraggable}
+            compact
+            isEditing={editingJobId === item.job.id && dateKey === item.job.scheduledStartDate}
+            editStart={editStart}
+            editEnd={editEnd}
+            editCrew={editCrew}
+            onEditStartChange={onEditStartChange}
+            onEditEndChange={onEditEndChange}
+            onEditCrewChange={onEditCrewChange}
+            onEdit={() => openEdit(item.job)}
+            onSave={(e) => handleSaveEdit(e, item.job.id)}
+            onCancel={() => setEditingJobId(null)}
+            isSaving={isSaving}
+            saveError={saveError}
+          />
+        ))}
+      </ul>
+      {moreCount > 0 && (
+        <p className="text-[10px] text-slate-500 mt-1 text-center font-medium">
+          +{moreCount} more
+        </p>
       )}
     </div>
   );
@@ -503,6 +636,7 @@ function ScheduleColumn({
   title,
   dateStr,
   jobs,
+  compact,
   editingJobId,
   editStart,
   editEnd,
@@ -520,6 +654,7 @@ function ScheduleColumn({
   title: string;
   dateStr: string | null;
   jobs: ScheduleRenderItem[];
+  compact: boolean;
   editingJobId: string | null;
   editStart: string;
   editEnd: string;
@@ -550,7 +685,9 @@ function ScheduleColumn({
       }`}
     >
       <h2 className="text-lg font-semibold text-slate-800 mb-3">{title}</h2>
-      <p className="mb-3 text-xs text-slate-500" data-testid={`${dataTestId}-capacity`}>Jobs: {uniqueCount}</p>
+      <p className="mb-3 text-xs text-slate-500" data-testid={`${dataTestId}-capacity`}>
+        Jobs: {uniqueCount}
+      </p>
       <ul className="space-y-2">
         {jobs.map((item) => (
           <ScheduleJobCard
@@ -558,7 +695,10 @@ function ScheduleColumn({
             job={item.job}
             columnId={columnId}
             isDraggable={item.isDraggable}
-            isEditing={editingJobId === item.job.id && (dateStr == null || dateStr === item.job.scheduledStartDate)}
+            compact={compact}
+            isEditing={
+              editingJobId === item.job.id && (dateStr == null || dateStr === item.job.scheduledStartDate)
+            }
             editStart={editStart}
             editEnd={editEnd}
             editCrew={editCrew}
@@ -579,9 +719,11 @@ function ScheduleColumn({
 
 function ScheduleJobCard({
   isDraggable,
+  compact,
   ...props
 }: {
   isDraggable: boolean;
+  compact: boolean;
   job: JobDto;
   columnId: string;
   isEditing: boolean;
@@ -598,15 +740,16 @@ function ScheduleJobCard({
   saveError: string | null;
 }) {
   return isDraggable ? (
-    <DraggableJobCard {...props} />
+    <DraggableJobCard {...props} compact={compact} />
   ) : (
-    <StaticJobCard {...props} />
+    <StaticJobCard {...props} compact={compact} />
   );
 }
 
 function DraggableJobCard({
   job,
   columnId,
+  compact,
   isEditing,
   editStart,
   editEnd,
@@ -622,6 +765,7 @@ function DraggableJobCard({
 }: {
   job: JobDto;
   columnId: string;
+  compact: boolean;
   isEditing: boolean;
   editStart: string;
   editEnd: string;
@@ -641,23 +785,36 @@ function DraggableJobCard({
     setNodeRef,
     transform,
     isDragging,
-  } = useDraggable({ id: `job:${job.id}`, data: { jobId: job.id } });
+  } = useDraggable({
+    id: `job:${job.id}`,
+    data: { jobId: job.id },
+    disabled: isEditing,
+  });
 
-  const style = transform
-    ? { transform: CSS.Translate.toString(transform) }
-    : undefined;
+  const style =
+    !isDragging && transform
+      ? { transform: CSS.Translate.toString(transform) }
+      : undefined;
 
   return (
     <li
       ref={setNodeRef}
       style={style}
+      {...(!isEditing ? { ...listeners, ...attributes } : {})}
       data-testid={`schedule-card-${job.id}-${columnId.replace(":", "-")}`}
       className={`flex flex-col rounded-lg border transition-shadow ${
-        isDragging ? "opacity-80 shadow-lg z-10" : "bg-slate-50 border-slate-100"
+        isDragging
+          ? "opacity-45 border-sky-200/90 bg-slate-100/90 ring-1 ring-sky-200 scale-[0.98]"
+          : "bg-slate-50 border-slate-100"
+      } ${
+        !isEditing
+          ? "cursor-grab active:cursor-grabbing touch-manipulation"
+          : ""
       }`}
     >
       <JobScheduleCard
         job={job}
+        compact={compact}
         isEditing={isEditing}
         editStart={editStart}
         editEnd={editEnd}
@@ -670,11 +827,6 @@ function DraggableJobCard({
         onCancel={onCancel}
         isSaving={isSaving}
         saveError={saveError}
-        dragHandleProps={
-          attributes && listeners
-            ? { attributes: attributes as object, listeners: listeners as object }
-            : undefined
-        }
       />
     </li>
   );
@@ -683,6 +835,7 @@ function DraggableJobCard({
 function StaticJobCard({
   job,
   columnId,
+  compact,
   isEditing,
   editStart,
   editEnd,
@@ -698,6 +851,7 @@ function StaticJobCard({
 }: {
   job: JobDto;
   columnId: string;
+  compact: boolean;
   isEditing: boolean;
   editStart: string;
   editEnd: string;
@@ -718,6 +872,7 @@ function StaticJobCard({
     >
       <JobScheduleCard
         job={job}
+        compact={compact}
         isEditing={isEditing}
         editStart={editStart}
         editEnd={editEnd}
@@ -735,8 +890,33 @@ function StaticJobCard({
   );
 }
 
+/** Compact card body used in day cells and in the drag overlay preview. */
+function ScheduleCardCompactContent({ job }: { job: JobDto }) {
+  const addr = job.propertyAddress;
+  const customerName =
+    [job.customerFirstName, job.customerLastName].filter(Boolean).join(" ").trim() || "—";
+
+  return (
+    <div className="min-w-0 flex-1">
+      <div className="flex items-center gap-1 flex-wrap text-[10px]">
+        <span className="font-medium text-slate-500">{JOB_TYPE_LABELS[job.type]}</span>
+        <span className="text-slate-400">·</span>
+        <span className="text-slate-500">{job.status}</span>
+      </div>
+      <p className="font-medium text-slate-800 truncate text-xs">
+        {customerName}
+        {addr?.line1 ? ` · ${addr.line1}` : ""}
+      </p>
+      {job.crewName ? (
+        <p className="text-[10px] text-slate-500 truncate mt-0.5">{job.crewName}</p>
+      ) : null}
+    </div>
+  );
+}
+
 function JobScheduleCard({
   job,
+  compact,
   isEditing,
   editStart,
   editEnd,
@@ -749,9 +929,9 @@ function JobScheduleCard({
   onCancel,
   isSaving,
   saveError,
-  dragHandleProps,
 }: {
   job: JobDto;
+  compact: boolean;
   isEditing: boolean;
   editStart: string;
   editEnd: string;
@@ -764,70 +944,65 @@ function JobScheduleCard({
   onCancel: () => void;
   isSaving: boolean;
   saveError: string | null;
-  dragHandleProps?: { attributes: object; listeners: object } | undefined;
 }) {
   const addr = job.propertyAddress;
   const cityState = [addr?.city, addr?.state].filter(Boolean).join(", ");
   const customerName = [job.customerFirstName, job.customerLastName].filter(Boolean).join(" ").trim() || "—";
 
+  const padCls = compact ? "p-2" : "p-3";
+  const titleCls = compact ? "text-xs" : "text-sm";
+
   return (
-    <div className="flex flex-col p-3">
-      <div className="flex items-center justify-between gap-2">
-        {dragHandleProps && !isEditing && (
-          <div
-            {...dragHandleProps.listeners}
-            {...dragHandleProps.attributes}
-            data-testid={`schedule-drag-handle-${job.id}`}
-            className="cursor-grab active:cursor-grabbing p-1 -m-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100"
-            aria-label="Drag to reschedule"
-          >
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 16 16">
-              <path d="M4 3a1 1 0 000 2h8a1 1 0 100-2H4zm0 4a1 1 0 000 2h8a1 1 0 100-2H4zm0 4a1 1 0 100 2h8a1 1 0 100-2H4z" />
-            </svg>
+    <div className={`flex flex-col ${padCls}`}>
+      <div className={`flex items-start justify-between gap-1 ${compact ? "" : "gap-2"}`}>
+        {compact ? (
+          <ScheduleCardCompactContent job={job} />
+        ) : (
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1 flex-wrap text-xs">
+              <span className="font-medium text-slate-500">{JOB_TYPE_LABELS[job.type]}</span>
+              <span className="text-slate-400">·</span>
+              <span className="text-slate-500">{job.status}</span>
+            </div>
+            <p className={`font-medium text-slate-800 truncate ${titleCls}`}>
+              {customerName}
+              {addr ? ` — ${addr.line1 ?? ""}${cityState ? `, ${cityState}` : ""}` : ""}
+            </p>
+            <div className="flex items-center gap-3 text-xs text-slate-500 mt-1">
+              {job.scheduledStartDate ? (
+                <span>
+                  {formatDate(job.scheduledStartDate)}
+                  {job.scheduledEndDate &&
+                    job.scheduledEndDate !== job.scheduledStartDate &&
+                    ` – ${formatDate(job.scheduledEndDate)}`}
+                </span>
+              ) : (
+                <span className="inline-flex px-2 py-0.5 text-xs font-medium rounded bg-slate-100 text-slate-600 border border-slate-200">
+                  Unscheduled
+                </span>
+              )}
+              {job.crewName && <span className="font-medium">{job.crewName}</span>}
+            </div>
           </div>
         )}
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-medium text-slate-500">
-              {JOB_TYPE_LABELS[job.type]}
-            </span>
-            <span className="text-xs text-slate-400">·</span>
-            <span className="text-xs text-slate-500">{job.status}</span>
-          </div>
-          <p className="text-sm font-medium text-slate-800 truncate">
-            {customerName}
-            {addr ? ` — ${addr.line1 ?? ""}${cityState ? `, ${cityState}` : ""}` : ""}
-          </p>
-          <div className="flex items-center gap-3 text-xs text-slate-500 mt-1">
-            {job.scheduledStartDate ? (
-              <span>
-                {formatDate(job.scheduledStartDate)}
-                {job.scheduledEndDate &&
-                  job.scheduledEndDate !== job.scheduledStartDate &&
-                  ` – ${formatDate(job.scheduledEndDate)}`}
-              </span>
-            ) : (
-              <span className="inline-flex px-2 py-0.5 text-xs font-medium rounded bg-slate-100 text-slate-600 border border-slate-200">
-                Unscheduled
-              </span>
-            )}
-            {job.crewName && (
-              <span className="font-medium">{job.crewName}</span>
-            )}
-          </div>
-        </div>
         {!isEditing && (
-          <div className="flex items-center gap-2 shrink-0">
+          <div className={`flex items-center shrink-0 ${compact ? "flex-col gap-0.5" : "gap-2"}`}>
             <Link
               href={`/app/jobs/${job.id}`}
-              className="px-3 py-1.5 text-sm font-medium text-sky-600 hover:bg-sky-50 rounded-lg"
+              onPointerDown={(e) => e.stopPropagation()}
+              className={`font-medium text-sky-600 hover:bg-sky-50 rounded ${
+                compact ? "px-1.5 py-0.5 text-[10px]" : "px-3 py-1.5 text-sm"
+              }`}
             >
               Open
             </Link>
             <button
               type="button"
               onClick={onEdit}
-              className="px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 rounded-lg border border-slate-200"
+              onPointerDown={(e) => e.stopPropagation()}
+              className={`font-medium text-slate-700 hover:bg-slate-100 rounded border border-slate-200 ${
+                compact ? "px-1.5 py-0.5 text-[10px]" : "px-3 py-1.5 text-sm"
+              }`}
             >
               Edit
             </button>
@@ -855,7 +1030,9 @@ function JobScheduleCard({
               />
             </div>
             <div>
-              <label htmlFor="edit-crew" className="block text-xs font-medium text-slate-600 mb-1">Crew</label>
+              <label htmlFor="edit-crew" className="block text-xs font-medium text-slate-600 mb-1">
+                Crew
+              </label>
               <input
                 id="edit-crew"
                 type="text"
@@ -866,7 +1043,7 @@ function JobScheduleCard({
               />
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <button
               type="submit"
               disabled={isSaving}
@@ -881,9 +1058,7 @@ function JobScheduleCard({
             >
               Cancel
             </button>
-            {saveError && (
-              <span className="text-sm text-red-600">{saveError}</span>
-            )}
+            {saveError && <span className="text-sm text-red-600">{saveError}</span>}
           </div>
         </form>
       )}

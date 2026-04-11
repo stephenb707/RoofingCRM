@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, waitFor, fireEvent } from "./test-utils";
+import { render, screen, waitFor, fireEvent, within } from "./test-utils";
 import SchedulePage from "@/app/app/schedule/page";
 import * as jobsApi from "@/lib/jobsApi";
 
@@ -12,38 +12,11 @@ jest.mock("next/navigation", () => ({
   }),
 }));
 
-jest.mock("@/components/DateRangePicker", () => ({
-  DateRangePicker: ({
-    startDate,
-    endDate,
-    onChange,
-    id,
-  }: {
-    startDate: string;
-    endDate: string;
-    onChange: (start: string, end: string) => void;
-    id?: string;
-  }) => (
-    <div data-testid="date-range-picker" id={id}>
-      <input
-        id={id === "schedule-daterange" ? "schedule-date-start" : "reschedule-start"}
-        data-testid={id === "schedule-daterange" ? "schedule-date-start" : "reschedule-start"}
-        type="date"
-        value={startDate}
-        onChange={(e) => onChange(e.target.value, endDate)}
-      />
-      <input
-        id={id === "schedule-daterange" ? "schedule-date-end" : "reschedule-end"}
-        data-testid={id === "schedule-daterange" ? "schedule-date-end" : "reschedule-end"}
-        type="date"
-        value={endDate}
-        onChange={(e) => onChange(startDate, e.target.value)}
-      />
-    </div>
-  ),
-}));
-
 const mockedJobsApi = jobsApi as jest.Mocked<typeof jobsApi>;
+
+/** January 2026 calendar grid (Sun start): 2025-12-28 … 2026-01-31 */
+const JAN_2026_GRID_FROM = "2025-12-28";
+const JAN_2026_GRID_TO = "2026-01-31";
 
 const job1 = {
   id: "job-1",
@@ -80,31 +53,54 @@ const unscheduledJob = {
 
 describe("SchedulePage", () => {
   beforeEach(() => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date(2026, 0, 10, 12, 0, 0));
     jest.clearAllMocks();
     mockSearchParamsGet.mockReturnValue(null);
     mockedJobsApi.listJobSchedule.mockResolvedValue([job1, job2]);
   });
 
-  it("renders Unscheduled + day sections when listJobSchedule returns mixed jobs", async () => {
-    mockedJobsApi.listJobSchedule.mockResolvedValue([job1, job2, unscheduledJob]);
+  afterEach(() => {
+    jest.useRealTimers();
+  });
 
+  it("renders month title, weekday headers, and loads schedule for the visible grid range", async () => {
     render(<SchedulePage />);
 
     await waitFor(() => {
       expect(screen.getByText("Schedule")).toBeInTheDocument();
     });
 
-    const startInput = document.getElementById("schedule-date-start");
-    const endInput = document.getElementById("schedule-date-end");
-    if (!startInput || !endInput) throw new Error("Date inputs not found");
-    fireEvent.change(startInput, { target: { value: "2026-01-01" } });
-    fireEvent.change(endInput, { target: { value: "2026-01-31" } });
+    expect(screen.getByRole("heading", { level: 2, name: "January 2026" })).toBeInTheDocument();
 
     await waitFor(() => {
       expect(mockedJobsApi.listJobSchedule).toHaveBeenCalledWith(
         expect.anything(),
-        expect.objectContaining({ from: "2026-01-01", to: "2026-01-31" })
+        expect.objectContaining({
+          from: JAN_2026_GRID_FROM,
+          to: JAN_2026_GRID_TO,
+        })
       );
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText("Loading schedule…")).not.toBeInTheDocument();
+    });
+
+    for (const day of ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]) {
+      expect(screen.getByText(day)).toBeInTheDocument();
+    }
+
+    expect(screen.queryByTestId("schedule-drag-overlay-preview")).not.toBeInTheDocument();
+  });
+
+  it("renders Unscheduled + day cells when listJobSchedule returns mixed jobs", async () => {
+    mockedJobsApi.listJobSchedule.mockResolvedValue([job1, job2, unscheduledJob]);
+
+    render(<SchedulePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Schedule")).toBeInTheDocument();
     });
 
     await waitFor(() => {
@@ -151,21 +147,16 @@ describe("SchedulePage", () => {
       expect(screen.getByText("Schedule")).toBeInTheDocument();
     });
 
-    const startInput = document.getElementById("schedule-date-start");
-    const endInput = document.getElementById("schedule-date-end");
-    if (!startInput || !endInput) throw new Error("Date inputs not found");
-    fireEvent.change(startInput, { target: { value: "2026-01-01" } });
-    fireEvent.change(endInput, { target: { value: "2026-01-31" } });
-
     await waitFor(() => {
       expect(screen.getAllByText(/123 Main St/).length).toBeGreaterThanOrEqual(1);
     });
 
-    const editBtn = screen.getAllByRole("button", { name: /Edit/i })[0];
+    const job1Card = screen.getByTestId("schedule-card-job-1-date-2026-01-15");
+    const editBtn = within(job1Card).getByRole("button", { name: /Edit/i });
     fireEvent.click(editBtn);
 
     await waitFor(() => {
-      expect(screen.getAllByRole("button", { name: /^Save$/i }).length).toBeGreaterThan(0);
+      expect(within(job1Card).getAllByRole("button", { name: /^Save$/i }).length).toBeGreaterThan(0);
     });
 
     const startDateInput = document.getElementById("edit-start-date");
@@ -175,7 +166,7 @@ describe("SchedulePage", () => {
     if (endDateInput) fireEvent.change(endDateInput, { target: { value: "2026-01-22" } });
     if (crewInput) fireEvent.change(crewInput, { target: { value: "Bravo" } });
 
-    const saveBtn = screen.getAllByRole("button", { name: /^Save$/i })[0];
+    const saveBtn = within(job1Card).getByRole("button", { name: /^Save$/i });
     fireEvent.click(saveBtn);
 
     await waitFor(() => {
@@ -201,16 +192,10 @@ describe("SchedulePage", () => {
       expect(screen.getByText("Schedule")).toBeInTheDocument();
     });
 
-    const startInput = document.getElementById("schedule-date-start");
-    const endInput = document.getElementById("schedule-date-end");
-    if (!startInput || !endInput) throw new Error("Date inputs not found");
-    fireEvent.change(startInput, { target: { value: "2026-01-15" } });
-    fireEvent.change(endInput, { target: { value: "2026-01-17" } });
-
     await waitFor(() => {
       expect(mockedJobsApi.listJobSchedule).toHaveBeenCalledWith(
         expect.anything(),
-        expect.objectContaining({ from: "2026-01-15", to: "2026-01-17" })
+        expect.objectContaining({ from: JAN_2026_GRID_FROM, to: JAN_2026_GRID_TO })
       );
     });
 
@@ -218,12 +203,42 @@ describe("SchedulePage", () => {
       expect(screen.getAllByText(/123 Main St/).length).toBe(3);
     });
 
-    // Only start-day copy is draggable.
-    expect(screen.getAllByTestId("schedule-drag-handle-job-1")).toHaveLength(1);
+    expect(screen.queryByTestId("schedule-drag-handle-job-1")).not.toBeInTheDocument();
+    expect(screen.getByTestId("schedule-card-job-1-date-2026-01-15")).toHaveClass("cursor-grab");
+    expect(screen.getByTestId("schedule-card-job-1-date-2026-01-16")).not.toHaveClass("cursor-grab");
 
-    // Capacity counts unique jobs per day.
     expect(screen.getByTestId("schedule-col-2026-01-15-capacity")).toHaveTextContent("Jobs: 1");
     expect(screen.getByTestId("schedule-col-2026-01-16-capacity")).toHaveTextContent("Jobs: 1");
     expect(screen.getByTestId("schedule-col-2026-01-17-capacity")).toHaveTextContent("Jobs: 1");
+  });
+
+  it("navigates to the next month and refetches with the new grid range", async () => {
+    render(<SchedulePage />);
+
+    await waitFor(() => {
+      expect(mockedJobsApi.listJobSchedule).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ from: JAN_2026_GRID_FROM, to: JAN_2026_GRID_TO })
+      );
+    });
+
+    const initialCalls = mockedJobsApi.listJobSchedule.mock.calls.length;
+    fireEvent.click(screen.getByRole("button", { name: /Next/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { level: 2, name: "February 2026" })).toBeInTheDocument();
+    });
+
+    await waitFor(() => {
+      expect(mockedJobsApi.listJobSchedule.mock.calls.length).toBeGreaterThan(initialCalls);
+    });
+
+    const lastCall = mockedJobsApi.listJobSchedule.mock.calls[mockedJobsApi.listJobSchedule.mock.calls.length - 1];
+    expect(lastCall[1]).toEqual(
+      expect.objectContaining({
+        from: "2026-02-01",
+        to: "2026-02-28",
+      })
+    );
   });
 });
