@@ -18,6 +18,12 @@ describe("ReportsPage paid invoices report", () => {
       blob: new Blob(["job"], { type: "text/csv" }),
       filename: "jobs.csv",
     });
+    mockedReportsApi.downloadAccountingJobsExcel.mockResolvedValue({
+      blob: new Blob(["xlsx"], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      }),
+      filename: "accounting-report.xlsx",
+    });
   });
 
   it("shows no paid invoices message and disables Download PDF when no years exist", async () => {

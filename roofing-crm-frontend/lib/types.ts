@@ -708,3 +708,48 @@ export interface CreateNoteRequest {
   entityId: string;
   body: string;
 }
+
+// Dashboard (GET /api/v1/dashboard/summary)
+export interface DashboardLeadSnippetDto {
+  id: string;
+  status: LeadStatus;
+  customerLabel: string;
+  propertyLine1?: string | null;
+  updatedAt: string;
+}
+
+export interface DashboardJobSnippetDto {
+  id: string;
+  status: JobStatus;
+  scheduledStartDate?: string | null;
+  propertyLine1?: string | null;
+  customerLabel: string;
+}
+
+export interface DashboardTaskSnippetDto {
+  taskId: string;
+  title: string;
+  status: TaskStatus;
+  dueAt?: string | null;
+  leadId?: string | null;
+  jobId?: string | null;
+  customerId?: string | null;
+}
+
+export interface DashboardSummaryDto {
+  customerCount: number;
+  leadCount: number;
+  jobCount: number;
+  estimateCount: number;
+  invoiceCount: number;
+  openTaskCount: number;
+  leadCountByStatus: Record<string, number>;
+  jobsScheduledThisWeek: number;
+  unscheduledJobsCount: number;
+  estimatesSentCount: number;
+  unpaidInvoiceCount: number;
+  activePipelineLeadCount: number;
+  recentLeads: DashboardLeadSnippetDto[];
+  upcomingJobs: DashboardJobSnippetDto[];
+  openTasks: DashboardTaskSnippetDto[];
+}

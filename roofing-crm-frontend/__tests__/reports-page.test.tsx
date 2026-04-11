@@ -13,6 +13,12 @@ describe("ReportsPage", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockedReportsApi.getPaidInvoiceYears.mockResolvedValue([]);
+    mockedReportsApi.downloadAccountingJobsExcel.mockResolvedValue({
+      blob: new Blob(["xlsx"], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      }),
+      filename: "accounting-report-2026-04-09.xlsx",
+    });
   });
 
   it("renders both sections and download buttons", async () => {
@@ -29,6 +35,8 @@ describe("ReportsPage", () => {
     expect(screen.getByText("Jobs Export")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Download Leads CSV/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Download Jobs CSV/i })).toBeInTheDocument();
+    expect(screen.getByText("Accounting Report")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Download Excel/i })).toBeInTheDocument();
   });
 
   it("calls downloadLeadsCsv with selected filters when clicking Download Leads CSV", async () => {
@@ -103,6 +111,33 @@ describe("ReportsPage", () => {
     await waitFor(() => {
       expect(mockedReportsApi.triggerBrowserDownload).toHaveBeenCalledWith(mockBlob, "x.csv");
     });
+  });
+
+  it("calls downloadAccountingJobsExcel when clicking Download Excel", async () => {
+    const accountingResult = {
+      blob: new Blob(["xlsx"], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      }),
+      filename: "accounting-report-2026-04-09.xlsx",
+    };
+    mockedReportsApi.downloadAccountingJobsExcel.mockResolvedValue(accountingResult);
+    mockedReportsApi.triggerBrowserDownload = jest.fn();
+
+    render(<ReportsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Download Excel/i })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Download Excel/i }));
+
+    await waitFor(() => {
+      expect(mockedReportsApi.downloadAccountingJobsExcel).toHaveBeenCalledWith(expect.anything());
+    });
+    expect(mockedReportsApi.triggerBrowserDownload).toHaveBeenCalledWith(
+      accountingResult.blob,
+      accountingResult.filename
+    );
   });
 
   it("shows error message when leads download fails", async () => {

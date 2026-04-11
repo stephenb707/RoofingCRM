@@ -24,7 +24,7 @@ import {
   SOURCE_LABELS,
 } from "@/lib/leadsConstants";
 import { queryKeys } from "@/lib/queryKeys";
-import { formatAddress } from "@/lib/format";
+import { formatAddress, formatPhone } from "@/lib/format";
 import type { LeadDto, LeadStatus } from "@/lib/types";
 
 function customerName(lead: LeadDto): string {
@@ -45,7 +45,6 @@ export default function LeadsPipelinePage() {
   const { api, auth, ready } = useAuthReady();
   const queryClient = useQueryClient();
   const [activeLead, setActiveLead] = useState<LeadDto | null>(null);
-  const [compact, setCompact] = useState(true);
 
   const canEditPipeline =
     auth.tenants.find((t) => t.tenantId === auth.selectedTenantId)?.role === "OWNER" ||
@@ -246,15 +245,6 @@ export default function LeadsPipelinePage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={compact}
-              onChange={(e) => setCompact(e.target.checked)}
-              className="rounded border-slate-300 text-sky-600 focus:ring-sky-500"
-            />
-            Compact view
-          </label>
           <Link
             href="/app/leads"
             className="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
@@ -271,25 +261,29 @@ export default function LeadsPipelinePage() {
       </div>
 
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-        <div className={`flex overflow-x-auto pb-4 ${compact ? "gap-3" : "gap-4"}`}>
+        <div className="flex overflow-x-auto pb-4 gap-3">
           {LEAD_STATUSES.map((status) => (
             <PipelineColumn
               key={status}
               status={status}
               leads={leadsByStatus.get(status) ?? []}
               canEdit={canEditPipeline}
-              compact={compact}
             />
           ))}
         </div>
 
         <DragOverlay>
           {activeLead ? (
-            <div className={`bg-white rounded-lg border-2 border-sky-400 shadow-xl opacity-95 ${compact ? "p-3 w-52" : "p-4 w-64"}`}>
-              <div className="font-medium text-slate-800 truncate">{customerName(activeLead)}</div>
+            <div className="bg-white rounded-lg border-2 border-sky-400 shadow-xl opacity-95 p-3 w-52">
+              <div className="font-medium text-slate-800 text-sm truncate">{customerName(activeLead)}</div>
               <div className="text-xs text-slate-600 truncate">
                 {formatAddress(activeLead.propertyAddress)}
               </div>
+              {activeLead.customerPhone?.trim() ? (
+                <div className="text-xs text-slate-500 mt-0.5 truncate">
+                  {formatPhone(activeLead.customerPhone)}
+                </div>
+              ) : null}
             </div>
           ) : null}
         </DragOverlay>
@@ -302,53 +296,35 @@ function PipelineColumn({
   status,
   leads,
   canEdit,
-  compact,
 }: {
   status: LeadStatus;
   leads: LeadDto[];
   canEdit: boolean;
-  compact: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: status as string });
 
   return (
     <div
       ref={setNodeRef}
-      className={`flex-shrink-0 bg-slate-50 rounded-xl border-2 overflow-hidden transition-colors ${
-        compact ? "w-56" : "w-72"
-      } ${isOver ? "border-sky-400 bg-sky-50/50" : "border-slate-200"}`}
+      className={`flex-shrink-0 w-56 bg-slate-50 rounded-xl border-2 overflow-hidden transition-colors ${
+        isOver ? "border-sky-400 bg-sky-50/50" : "border-slate-200"
+      }`}
       data-testid={`pipeline-col-${status}`}
     >
-      <div className={`border-b border-slate-200 ${STATUS_COLORS[status]} rounded-t-xl ${compact ? "p-3" : "p-4"}`}>
-        <h2 className={`font-semibold text-slate-800 ${compact ? "text-sm" : ""}`}>{STATUS_LABELS[status]}</h2>
+      <div className={`border-b border-slate-200 ${STATUS_COLORS[status]} rounded-t-xl p-3`}>
+        <h2 className="font-semibold text-slate-800 text-sm">{STATUS_LABELS[status]}</h2>
         <p className="text-xs text-slate-600 mt-0.5">{leads.length} leads</p>
       </div>
-      <div className={`max-h-[calc(100vh-280px)] overflow-y-auto ${compact ? "p-2 space-y-2" : "p-3 space-y-3"}`}>
-        {leads.map((lead, index) => (
-          <PipelineLeadCard
-            key={lead.id}
-            lead={lead}
-            index={index}
-            canEdit={canEdit}
-            compact={compact}
-          />
+      <div className="max-h-[calc(100vh-280px)] overflow-y-auto p-2 space-y-2">
+        {leads.map((lead) => (
+          <PipelineLeadCard key={lead.id} lead={lead} canEdit={canEdit} />
         ))}
       </div>
     </div>
   );
 }
 
-function PipelineLeadCard({
-  lead,
-  index,
-  canEdit,
-  compact,
-}: {
-  lead: LeadDto;
-  index: number;
-  canEdit: boolean;
-  compact: boolean;
-}) {
+function PipelineLeadCard({ lead, canEdit }: { lead: LeadDto; canEdit: boolean }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `lead-${lead.id}`,
     data: { lead },
@@ -358,33 +334,27 @@ function PipelineLeadCard({
   return (
     <div
       ref={setNodeRef}
-      className={`bg-white rounded-lg border border-slate-200 shadow-sm ${
-        compact ? "p-3" : "p-4"
+      {...(canEdit ? { ...listeners, ...attributes } : {})}
+      className={`bg-white rounded-lg border border-slate-200 shadow-sm p-3 ${
+        canEdit ? "cursor-grab active:cursor-grabbing touch-manipulation" : ""
       } ${isDragging ? "opacity-50" : ""}`}
       data-testid={`pipeline-card-${lead.id}`}
     >
-      {(canEdit ? (
-        <div
-          {...listeners}
-          {...attributes}
-          className="cursor-grab active:cursor-grabbing mb-1.5 p-1 -m-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 w-fit"
-          aria-label="Drag to reorder"
-        >
-          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 16 16">
-            <path d="M4 3a1 1 0 000 2h8a1 1 0 100-2H4zm0 4a1 1 0 000 2h8a1 1 0 100-2H4zm0 4a1 1 0 100 2h8a1 1 0 100-2H4z" />
-          </svg>
-        </div>
-      ) : null)}
-      <div className={`font-medium text-slate-800 truncate ${compact ? "text-sm" : ""}`}>{customerName(lead)}</div>
+      <div className="font-medium text-slate-800 truncate text-sm">{customerName(lead)}</div>
       <div className="text-xs text-slate-600 mt-1 truncate" title={formatAddress(lead.propertyAddress)}>
         {formatAddress(lead.propertyAddress)}
       </div>
+      {lead.customerPhone?.trim() ? (
+        <div className="text-xs text-slate-500 mt-0.5 truncate" title={formatPhone(lead.customerPhone)}>
+          {formatPhone(lead.customerPhone)}
+        </div>
+      ) : null}
       {lead.source && (
         <div className="text-xs text-slate-500 mt-0.5">
           {SOURCE_LABELS[lead.source] ?? lead.source}
         </div>
       )}
-      <div className={`flex items-center justify-between gap-2 ${compact ? "mt-2" : "mt-3"}`}>
+      <div className="flex items-center justify-between gap-2 mt-2">
         <span
           className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full border ${STATUS_COLORS[lead.status]}`}
           data-testid={`pipeline-card-status-${lead.id}`}
@@ -393,7 +363,8 @@ function PipelineLeadCard({
         </span>
         <Link
           href={`/app/leads/${lead.id}`}
-          className="text-xs font-medium text-sky-600 hover:text-sky-700 px-2 py-1"
+          onPointerDown={(e) => e.stopPropagation()}
+          className="text-xs font-medium text-sky-600 hover:text-sky-700 px-2 py-1 shrink-0 relative z-10"
         >
           Open
         </Link>

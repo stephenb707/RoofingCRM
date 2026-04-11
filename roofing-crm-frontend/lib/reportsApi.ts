@@ -87,3 +87,17 @@ export async function downloadPaidInvoicesPdf(
     `paid-invoices-${year}.pdf`;
   return { blob, filename };
 }
+
+export async function downloadAccountingJobsExcel(
+  api: AxiosInstance
+): Promise<{ blob: Blob; filename: string }> {
+  const response = await api.get("/api/v1/reports/accounting/jobs.xlsx", {
+    responseType: "blob",
+  });
+  const blob = response.data as Blob;
+  const contentDisposition = response.headers["content-disposition"];
+  const filename =
+    parseFilenameFromContentDisposition(contentDisposition) ??
+    `accounting-report-${new Date().toISOString().slice(0, 10)}.xlsx`;
+  return { blob, filename };
+}

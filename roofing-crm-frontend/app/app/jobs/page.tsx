@@ -69,12 +69,24 @@ export default function JobsPage() {
             Manage roofing jobs and schedules
           </p>
         </div>
-        <Link
-          href="/app/jobs/new"
-          className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
-        >
-          + New Job
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            href={
+              customerIdFromQuery
+                ? `/app/jobs/pipeline?customerId=${encodeURIComponent(customerIdFromQuery)}`
+                : "/app/jobs/pipeline"
+            }
+            className="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+          >
+            Pipeline View
+          </Link>
+          <Link
+            href="/app/jobs/new"
+            className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+          >
+            + New Job
+          </Link>
+        </div>
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 p-4 mb-6">

@@ -48,7 +48,7 @@ export default function AcceptInvitePage() {
 
         selectTenant(response.tenantId);
         setStatus("success");
-        router.replace("/app/customers");
+        router.replace("/app");
       } catch (err) {
         if (cancelled) return;
         setStatus("error");
@@ -86,7 +86,7 @@ export default function AcceptInvitePage() {
           </h2>
           <p className="text-sm text-slate-500 mb-6">{errorMessage}</p>
           <button
-            onClick={() => router.push("/app/customers")}
+            onClick={() => router.push("/app")}
             className="px-6 py-2.5 bg-sky-600 text-white text-sm font-medium rounded-lg hover:bg-sky-700"
           >
             Go to Dashboard

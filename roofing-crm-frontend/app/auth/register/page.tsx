@@ -29,7 +29,7 @@ export default function RegisterPage() {
 
   useEffect(() => {
     if (!auth.token) return;
-    if (auth.selectedTenantId) router.replace("/app/customers");
+    if (auth.selectedTenantId) router.replace("/app");
     else router.replace("/auth/select-tenant");
   }, [auth.token, auth.selectedTenantId, router]);
 
@@ -57,7 +57,7 @@ export default function RegisterPage() {
 
       const tenants = res.data.tenants ?? [];
       if (tenants.length === 1) {
-        router.push("/app/customers");
+        router.push("/app");
       } else {
         router.push("/auth/select-tenant");
       }

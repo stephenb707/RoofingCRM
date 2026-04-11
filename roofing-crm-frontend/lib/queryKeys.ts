@@ -4,6 +4,9 @@
  */
 
 export const queryKeys = {
+  dashboardSummary: (tenantId: string | null) =>
+    ["dashboardSummary", tenantId] as const,
+
   customers: (tenantId: string | null) => ["customers", tenantId] as const,
   customersList: (tenantId: string | null, q: string | null, page: number) =>
     ["customers", tenantId, q ?? "", page] as const,
@@ -28,6 +31,9 @@ export const queryKeys = {
 
   jobsList: (tenantId: string | null, status: string | null, customerId: string | null, page: number) =>
     ["jobs", tenantId, status ?? "", customerId ?? "", page] as const,
+
+  jobsPipeline: (tenantId: string | null, customerId: string | null) =>
+    ["jobsPipeline", tenantId, customerId ?? ""] as const,
 
   job: (tenantId: string | null, jobId: string) =>
     ["job", tenantId, jobId] as const,

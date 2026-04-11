@@ -1,6 +1,5 @@
 import React from "react";
 import { render, screen, waitFor } from "./test-utils";
-import userEvent from "@testing-library/user-event";
 import LeadsPipelinePage from "@/app/app/leads/pipeline/page";
 import * as leadsApi from "@/lib/leadsApi";
 import { LeadDto } from "@/lib/types";
@@ -27,6 +26,7 @@ const mockLeadNew: LeadDto = {
   updatedAt: "2024-01-01T00:00:00Z",
   customerFirstName: "Alice",
   customerLastName: "Smith",
+  customerPhone: "5551234567",
 };
 
 const mockLeadContacted: LeadDto = {
@@ -37,6 +37,7 @@ const mockLeadContacted: LeadDto = {
   customerFirstName: "Bob",
   customerLastName: "Jones",
   propertyAddress: { line1: "456 Oak Ave", city: "Boulder", state: "CO" },
+  customerPhone: "3035550100",
 };
 
 describe("LeadsPipelinePage", () => {
@@ -73,6 +74,47 @@ describe("LeadsPipelinePage", () => {
     expect(screen.getByText("Bob Jones")).toBeInTheDocument();
     expect(screen.getByText("123 Main St, Denver, CO")).toBeInTheDocument();
     expect(screen.getByText("456 Oak Ave, Boulder, CO")).toBeInTheDocument();
+  });
+
+  it("shows customer phone on cards when present", async () => {
+    render(<LeadsPipelinePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Alice Smith")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("(555) 123-4567")).toBeInTheDocument();
+    expect(screen.getByText("(303) 555-0100")).toBeInTheDocument();
+  });
+
+  it("does not render compact view toggle", async () => {
+    render(<LeadsPipelinePage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Pipeline");
+    });
+
+    expect(screen.queryByRole("checkbox", { name: /compact view/i })).not.toBeInTheDocument();
+  });
+
+  it("does not render a dedicated drag handle control", async () => {
+    render(<LeadsPipelinePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Alice Smith")).toBeInTheDocument();
+    });
+
+    expect(screen.queryByLabelText(/Drag to reorder/i)).not.toBeInTheDocument();
+  });
+
+  it("whole card is the drag target when editable (grab cursor)", async () => {
+    render(<LeadsPipelinePage />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("pipeline-card-lead-1")).toBeInTheDocument();
+    });
+
+    expect(screen.getByTestId("pipeline-card-lead-1")).toHaveClass("cursor-grab");
   });
 
   it("does not have a status dropdown on cards", async () => {

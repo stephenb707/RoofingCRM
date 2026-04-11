@@ -81,6 +81,7 @@ describe("JobsPage", () => {
     });
     expect(screen.getByText("Manage roofing jobs and schedules")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /\+ New Job/i })).toHaveAttribute("href", "/app/jobs/new");
+    expect(screen.getByRole("link", { name: /pipeline view/i })).toHaveAttribute("href", "/app/jobs/pipeline");
   });
 
   it("renders job rows when data exists", async () => {

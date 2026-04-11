@@ -17,6 +17,13 @@ import java.util.UUID;
 
 public interface LeadRepository extends JpaRepository<Lead, UUID> {
 
+    long countByTenantAndArchivedFalse(Tenant tenant);
+
+    long countByTenantAndStatusAndArchivedFalse(Tenant tenant, LeadStatus status);
+
+    @Query("select count(l) from Lead l where l.tenant = :tenant and l.archived = false and l.status not in (com.roofingcrm.domain.enums.LeadStatus.WON, com.roofingcrm.domain.enums.LeadStatus.LOST)")
+    long countActivePipelineByTenant(@Param("tenant") Tenant tenant);
+
     @EntityGraph(attributePaths = {"customer"})
     Page<Lead> findByTenantAndArchivedFalse(Tenant tenant, Pageable pageable);
 
