@@ -2,6 +2,7 @@ import React from "react";
 import { render, screen, waitFor, fireEvent } from "./test-utils";
 import JobsPage from "@/app/app/jobs/page";
 import * as jobsApi from "@/lib/jobsApi";
+import * as pipelineStatusesApi from "@/lib/pipelineStatusesApi";
 import { JobDto, PageResponse } from "@/lib/types";
 import { __setPathname } from "./pathnameState";
 
@@ -27,11 +28,46 @@ jest.mock("next/navigation", () => {
 jest.mock("@/lib/jobsApi");
 const mockedJobsApi = jobsApi as jest.Mocked<typeof jobsApi>;
 
+jest.mock("@/lib/pipelineStatusesApi");
+const mockedPipelineApi = pipelineStatusesApi as jest.Mocked<typeof pipelineStatusesApi>;
+
+const defScheduled = {
+  id: "def-scheduled",
+  pipelineType: "JOB" as const,
+  systemKey: "SCHEDULED",
+  label: "Scheduled",
+  sortOrder: 0,
+  builtIn: true,
+  active: true,
+};
+
+const defInProgress = {
+  id: "def-in-progress",
+  pipelineType: "JOB" as const,
+  systemKey: "IN_PROGRESS",
+  label: "In Progress",
+  sortOrder: 1,
+  builtIn: true,
+  active: true,
+};
+
+const defCompleted = {
+  id: "def-completed",
+  pipelineType: "JOB" as const,
+  systemKey: "COMPLETED",
+  label: "Completed",
+  sortOrder: 2,
+  builtIn: true,
+  active: true,
+};
+
 const mockJob: JobDto = {
   id: "job-1",
   customerId: "cust-1",
   leadId: null,
-  status: "SCHEDULED",
+  statusDefinitionId: defScheduled.id,
+  statusKey: "SCHEDULED",
+  statusLabel: "Scheduled",
   type: "REPLACEMENT",
   propertyAddress: { line1: "123 Main St", city: "Denver", state: "CO" },
   scheduledStartDate: "2024-06-01",
@@ -45,7 +81,9 @@ const mockJob: JobDto = {
 const mockJob2: JobDto = {
   ...mockJob,
   id: "job-2",
-  status: "IN_PROGRESS",
+  statusDefinitionId: defInProgress.id,
+  statusKey: "IN_PROGRESS",
+  statusLabel: "In Progress",
   type: "REPAIR",
   propertyAddress: { line1: "456 Oak Ave", city: "Boulder", state: "CO" },
 };
@@ -65,6 +103,11 @@ describe("JobsPage", () => {
     jest.clearAllMocks();
     mockPush.mockClear();
     __setPathname("/app/jobs");
+    mockedPipelineApi.listPipelineStatuses.mockResolvedValue([
+      defScheduled,
+      defInProgress,
+      defCompleted,
+    ]);
   });
 
   afterEach(() => {
@@ -110,12 +153,12 @@ describe("JobsPage", () => {
     mockedJobsApi.listJobs.mockClear();
 
     const statusSelect = screen.getByLabelText("Status:");
-    fireEvent.change(statusSelect, { target: { value: "COMPLETED" } });
+    fireEvent.change(statusSelect, { target: { value: defCompleted.id } });
 
     await waitFor(() => {
       expect(mockedJobsApi.listJobs).toHaveBeenCalledWith(
         expect.anything(),
-        expect.objectContaining({ status: "COMPLETED" })
+        expect.objectContaining({ statusDefinitionId: defCompleted.id })
       );
     });
   });

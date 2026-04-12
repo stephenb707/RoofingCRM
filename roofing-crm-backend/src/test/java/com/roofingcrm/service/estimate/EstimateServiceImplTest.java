@@ -8,18 +8,21 @@ import com.roofingcrm.api.v1.estimate.EstimateSummaryDto;
 import com.roofingcrm.api.v1.estimate.EstimateItemRequest;
 import com.roofingcrm.domain.entity.Customer;
 import com.roofingcrm.domain.entity.Job;
+import com.roofingcrm.domain.entity.PipelineStatusDefinition;
 import com.roofingcrm.domain.entity.Tenant;
 import com.roofingcrm.domain.entity.TenantUserMembership;
 import com.roofingcrm.domain.entity.User;
 import com.roofingcrm.domain.enums.EstimateStatus;
-import com.roofingcrm.domain.enums.JobStatus;
 import com.roofingcrm.domain.enums.JobType;
+import com.roofingcrm.domain.enums.PipelineType;
 import com.roofingcrm.domain.enums.UserRole;
 import com.roofingcrm.domain.repository.CustomerRepository;
 import com.roofingcrm.domain.repository.JobRepository;
+import com.roofingcrm.domain.repository.PipelineStatusDefinitionRepository;
 import com.roofingcrm.domain.repository.TenantRepository;
 import com.roofingcrm.domain.repository.TenantUserMembershipRepository;
 import com.roofingcrm.domain.repository.UserRepository;
+import com.roofingcrm.service.pipeline.PipelineStatusAdminService;
 import com.roofingcrm.domain.value.Address;
 import com.roofingcrm.service.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
@@ -58,11 +61,18 @@ class EstimateServiceImplTest extends AbstractIntegrationTest {
     @Autowired
     private TestDatabaseCleaner dbCleaner;
 
+    @Autowired
+    private PipelineStatusAdminService pipelineStatusAdminService;
+
+    @Autowired
+    private PipelineStatusDefinitionRepository pipelineStatusDefinitionRepository;
+
     @NonNull
     private UUID tenantId = Objects.requireNonNull(UUID.randomUUID());
     @NonNull
     private UUID userId = Objects.requireNonNull(UUID.randomUUID());
     private UUID jobId;
+    private PipelineStatusDefinition scheduledJob;
     @NonNull
     private UUID customerId = Objects.requireNonNull(UUID.randomUUID());
 
@@ -91,6 +101,8 @@ class EstimateServiceImplTest extends AbstractIntegrationTest {
         this.tenantId = Objects.requireNonNull(tenant.getId());
         this.userId = Objects.requireNonNull(user.getId());
 
+        pipelineStatusAdminService.seedDefaultsForNewTenant(tenant);
+
         Customer customer = new Customer();
         customer.setTenant(tenant);
         customer.setFirstName("John");
@@ -99,11 +111,14 @@ class EstimateServiceImplTest extends AbstractIntegrationTest {
         customer = customerRepository.save(customer);
         this.customerId = Objects.requireNonNull(customer.getId());
 
+        scheduledJob = pipelineStatusDefinitionRepository
+                .findByTenantAndPipelineTypeAndSystemKeyAndArchivedFalse(tenant, PipelineType.JOB, "SCHEDULED")
+                .orElseThrow();
         Job job = new Job();
         job.setTenant(tenant);
         job.setCustomer(customer);
         job.setJobType(JobType.REPLACEMENT);
-        job.setStatus(JobStatus.SCHEDULED);
+        job.setStatusDefinition(scheduledJob);
         Address address = new Address();
         address.setLine1("123 Main St");
         address.setCity("Chicago");
@@ -191,7 +206,7 @@ class EstimateServiceImplTest extends AbstractIntegrationTest {
         otherJob.setTenant(tenant);
         otherJob.setCustomer(customer);
         otherJob.setJobType(JobType.REPAIR);
-        otherJob.setStatus(JobStatus.SCHEDULED);
+        otherJob.setStatusDefinition(scheduledJob);
         otherJob = jobRepository.save(otherJob);
 
         CreateEstimateRequest request2 = new CreateEstimateRequest();

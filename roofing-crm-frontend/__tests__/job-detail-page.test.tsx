@@ -10,6 +10,7 @@ import * as tasksApi from "@/lib/tasksApi";
 import * as activityApi from "@/lib/activityApi";
 import * as invoicesApi from "@/lib/invoicesApi";
 import * as accountingApi from "@/lib/accountingApi";
+import * as pipelineStatusesApi from "@/lib/pipelineStatusesApi";
 import { JobDto } from "@/lib/types";
 
 jest.mock("@/lib/jobsApi");
@@ -20,6 +21,7 @@ jest.mock("@/lib/attachmentsApi");
 jest.mock("@/lib/communicationLogsApi");
 jest.mock("@/lib/tasksApi");
 jest.mock("@/lib/activityApi");
+jest.mock("@/lib/pipelineStatusesApi");
 const mockPush = jest.fn();
 jest.mock("next/navigation", () => ({
   useRouter: () => ({ push: mockPush, replace: jest.fn(), back: jest.fn() }),
@@ -36,12 +38,35 @@ const mockedTasksApi = tasksApi as jest.Mocked<typeof tasksApi>;
 const mockedActivityApi = activityApi as jest.Mocked<typeof activityApi>;
 const mockedInvoicesApi = invoicesApi as jest.Mocked<typeof invoicesApi>;
 const mockedAccountingApi = accountingApi as jest.Mocked<typeof accountingApi>;
+const mockedPipelineApi = pipelineStatusesApi as jest.Mocked<typeof pipelineStatusesApi>;
+
+const defScheduled = {
+  id: "def-scheduled",
+  pipelineType: "JOB" as const,
+  systemKey: "SCHEDULED",
+  label: "Scheduled",
+  sortOrder: 1,
+  builtIn: true,
+  active: true,
+};
+
+const defInProgress = {
+  id: "def-in-progress",
+  pipelineType: "JOB" as const,
+  systemKey: "IN_PROGRESS",
+  label: "In Progress",
+  sortOrder: 2,
+  builtIn: true,
+  active: true,
+};
 
 const mockJob: JobDto = {
   id: "job-1",
   customerId: "cust-1",
   leadId: null,
-  status: "SCHEDULED",
+  statusDefinitionId: defScheduled.id,
+  statusKey: "SCHEDULED",
+  statusLabel: "Scheduled",
   type: "REPLACEMENT",
   propertyAddress: { line1: "123 Main St", city: "Denver", state: "CO", zip: "80202" },
   scheduledStartDate: "2024-06-01",
@@ -58,6 +83,7 @@ describe("JobDetailPage", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockPush.mockClear();
+    mockedPipelineApi.listPipelineStatuses.mockResolvedValue([defScheduled, defInProgress]);
     mockedJobsApi.getJob.mockResolvedValue(mockJob);
     mockedEstimatesApi.listEstimatesForJob.mockResolvedValue([]);
     mockedAttachmentsApi.listJobAttachments.mockResolvedValue([]);
@@ -260,7 +286,12 @@ describe("JobDetailPage", () => {
   });
 
   it("calls updateJobStatus when clicking a status button", async () => {
-    mockedJobsApi.updateJobStatus.mockResolvedValue({ ...mockJob, status: "IN_PROGRESS" });
+    mockedJobsApi.updateJobStatus.mockResolvedValue({
+      ...mockJob,
+      statusDefinitionId: defInProgress.id,
+      statusKey: "IN_PROGRESS",
+      statusLabel: "In Progress",
+    });
 
     render(<JobDetailPage />);
 
@@ -275,7 +306,7 @@ describe("JobDetailPage", () => {
       expect(mockedJobsApi.updateJobStatus).toHaveBeenCalledWith(
         expect.anything(),
         "job-1",
-        "IN_PROGRESS"
+        defInProgress.id
       );
     });
   });

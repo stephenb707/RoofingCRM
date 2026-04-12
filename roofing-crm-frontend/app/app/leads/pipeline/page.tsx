@@ -16,16 +16,14 @@ import {
 } from "@dnd-kit/core";
 import { useAuthReady } from "@/lib/AuthContext";
 import { listLeads, updateLeadStatus } from "@/lib/leadsApi";
+import { listPipelineStatuses } from "@/lib/pipelineStatusesApi";
+import type { PipelineStatusDefinitionDto } from "@/lib/pipelineStatusesApi";
+import { leadStatusBadgeClass } from "@/lib/pipelineStatusVisuals";
 import { getApiErrorMessage } from "@/lib/apiError";
-import {
-  LEAD_STATUSES,
-  STATUS_LABELS,
-  STATUS_COLORS,
-  SOURCE_LABELS,
-} from "@/lib/leadsConstants";
+import { SOURCE_LABELS } from "@/lib/leadsConstants";
 import { queryKeys } from "@/lib/queryKeys";
 import { formatAddress, formatPhone } from "@/lib/format";
-import type { LeadDto, LeadStatus } from "@/lib/types";
+import type { LeadDto } from "@/lib/types";
 
 function customerName(lead: LeadDto): string {
   const parts = [lead.customerFirstName, lead.customerLastName].filter(Boolean);
@@ -41,6 +39,10 @@ function sortLeadsByPosition(leads: LeadDto[]): LeadDto[] {
   });
 }
 
+function sortActiveLeadColumns(defs: PipelineStatusDefinitionDto[]): PipelineStatusDefinitionDto[] {
+  return [...defs].filter((d) => d.active).sort((a, b) => a.sortOrder - b.sortOrder);
+}
+
 export default function LeadsPipelinePage() {
   const { api, auth, ready } = useAuthReady();
   const queryClient = useQueryClient();
@@ -52,12 +54,27 @@ export default function LeadsPipelinePage() {
     auth.tenants.find((t) => t.tenantId === auth.selectedTenantId)?.role === "SALES";
 
   const pipelineKey = queryKeys.leadsPipeline(auth.selectedTenantId);
+  const pipelineDefsKey = queryKeys.pipelineStatuses(auth.selectedTenantId, "LEAD");
+
+  const { data: leadDefs = [], isLoading: defsLoading } = useQuery({
+    queryKey: pipelineDefsKey,
+    queryFn: () => listPipelineStatuses(api, "LEAD"),
+    enabled: ready,
+  });
+
+  const columnDefs = useMemo(() => sortActiveLeadColumns(leadDefs), [leadDefs]);
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: pipelineKey,
     queryFn: () => listLeads(api, { page: 0, size: 200 }),
     enabled: ready,
   });
+
+  const defById = useMemo(() => {
+    const m = new Map<string, PipelineStatusDefinitionDto>();
+    for (const d of leadDefs) m.set(d.id, d);
+    return m;
+  }, [leadDefs]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -68,39 +85,48 @@ export default function LeadsPipelinePage() {
   const updateStatusMutation = useMutation({
     mutationFn: ({
       leadId,
-      status,
+      statusDefinitionId,
       position,
     }: {
       leadId: string;
-      status: LeadStatus;
+      statusDefinitionId: string;
       position?: number;
-    }) => updateLeadStatus(api, leadId, status, position),
-    onMutate: async ({ leadId, status, position }) => {
+    }) => updateLeadStatus(api, leadId, statusDefinitionId, position),
+    onMutate: async ({ leadId, statusDefinitionId, position }) => {
       await queryClient.cancelQueries({ queryKey: pipelineKey });
       const previous = queryClient.getQueryData<typeof data>(pipelineKey);
+      const targetDef = defById.get(statusDefinitionId);
       queryClient.setQueryData(pipelineKey, (old: typeof data) => {
-        if (!old) return old;
+        if (!old || !targetDef) return old;
         const lead = old.content.find((l) => l.id === leadId);
         if (!lead) return old;
-        const oldStatus = lead.status;
+        const oldDefId = lead.statusDefinitionId;
         const withoutMoved = old.content.filter((l) => l.id !== leadId);
-        const targetCol = withoutMoved.filter((l) => l.status === status);
+        const targetCol = withoutMoved.filter((l) => l.statusDefinitionId === statusDefinitionId);
         const insertIdx =
           position !== undefined && position >= 0 && position <= targetCol.length
             ? position
             : targetCol.length;
-        const moved: LeadDto = { ...lead, status, pipelinePosition: insertIdx };
+        const moved: LeadDto = {
+          ...lead,
+          statusDefinitionId,
+          statusKey: targetDef.systemKey,
+          statusLabel: targetDef.label,
+          pipelinePosition: insertIdx,
+        };
         const targetWithMoved = [...targetCol];
         targetWithMoved.splice(insertIdx, 0, moved);
         const reseqTarget = targetWithMoved.map((l, i) => ({ ...l, pipelinePosition: i }));
-        const isSameColumn = oldStatus === status;
+        const isSameColumn = oldDefId === statusDefinitionId;
         const oldColReseq = isSameColumn
           ? []
           : withoutMoved
-              .filter((l) => l.status === oldStatus)
+              .filter((l) => l.statusDefinitionId === oldDefId)
               .sort((a, b) => (a.pipelinePosition ?? 0) - (b.pipelinePosition ?? 0))
               .map((l, i) => ({ ...l, pipelinePosition: i }));
-        const otherCols = withoutMoved.filter((l) => l.status !== oldStatus && l.status !== status);
+        const otherCols = withoutMoved.filter(
+          (l) => l.statusDefinitionId !== oldDefId && l.statusDefinitionId !== statusDefinitionId
+        );
         const newContent = [...otherCols, ...oldColReseq, ...reseqTarget];
         return { ...old, content: newContent };
       });
@@ -116,26 +142,26 @@ export default function LeadsPipelinePage() {
     },
   });
 
-  const leadsByStatus = useMemo(() => {
+  const leadsByDefinitionId = useMemo(() => {
     const leads = data?.content ?? [];
-    const byStatus = new Map<LeadStatus, LeadDto[]>();
-    for (const s of LEAD_STATUSES) {
-      byStatus.set(s, []);
+    const byId = new Map<string, LeadDto[]>();
+    for (const d of columnDefs) {
+      byId.set(d.id, []);
     }
     for (const lead of leads) {
-      const list = byStatus.get(lead.status) ?? [];
+      const list = byId.get(lead.statusDefinitionId) ?? [];
       list.push(lead);
-      byStatus.set(lead.status, list);
+      byId.set(lead.statusDefinitionId, list);
     }
-    for (const s of LEAD_STATUSES) {
-      const list = byStatus.get(s) ?? [];
-      byStatus.set(s, sortLeadsByPosition(list));
+    for (const d of columnDefs) {
+      const list = byId.get(d.id) ?? [];
+      byId.set(d.id, sortLeadsByPosition(list));
     }
-    return byStatus;
-  }, [data?.content]);
+    return byId;
+  }, [data?.content, columnDefs]);
 
-  const handleStatusChange = (leadId: string, newStatus: LeadStatus, position?: number) => {
-    updateStatusMutation.mutate({ leadId, status: newStatus, position });
+  const handleStatusChange = (leadId: string, statusDefinitionId: string, position?: number) => {
+    updateStatusMutation.mutate({ leadId, statusDefinitionId, position });
   };
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -153,37 +179,39 @@ export default function LeadsPipelinePage() {
     if (!lead) return;
 
     const overId = String(over.id);
-    let newStatus: LeadStatus;
+    let newDefId: string;
     let newIndex: number;
 
-    if (LEAD_STATUSES.includes(overId as LeadStatus)) {
-      newStatus = overId as LeadStatus;
-      const targetCol = leadsByStatus.get(newStatus) ?? [];
-      newIndex = lead.status === newStatus
-        ? Math.max(0, targetCol.findIndex((l) => l.id === leadId))
-        : targetCol.length;
+    const colIds = new Set(columnDefs.map((c) => c.id));
+    if (colIds.has(overId)) {
+      newDefId = overId;
+      const targetCol = leadsByDefinitionId.get(newDefId) ?? [];
+      newIndex =
+        lead.statusDefinitionId === newDefId
+          ? Math.max(0, targetCol.findIndex((l) => l.id === leadId))
+          : targetCol.length;
     } else if (overId.startsWith("lead-")) {
       const overLeadId = overId.replace("lead-", "");
       const overLead = (data?.content ?? []).find((l) => l.id === overLeadId);
       if (!overLead) return;
-      newStatus = overLead.status;
-      const targetCol = leadsByStatus.get(newStatus) ?? [];
+      newDefId = overLead.statusDefinitionId;
+      const targetCol = leadsByDefinitionId.get(newDefId) ?? [];
       const overIdx = targetCol.findIndex((l) => l.id === overLeadId);
       newIndex = overIdx >= 0 ? overIdx : targetCol.length;
     } else {
       return;
     }
 
-    if (lead.status === newStatus) {
-      const currentCol = leadsByStatus.get(lead.status) ?? [];
+    if (lead.statusDefinitionId === newDefId) {
+      const currentCol = leadsByDefinitionId.get(lead.statusDefinitionId) ?? [];
       const fromIdx = currentCol.findIndex((l) => l.id === leadId);
       if (fromIdx === newIndex) return;
     }
 
-    handleStatusChange(leadId, newStatus, newIndex);
+    handleStatusChange(leadId, newDefId, newIndex);
   };
 
-  if (isLoading) {
+  if (defsLoading || isLoading) {
     return (
       <div className="max-w-7xl mx-auto">
         <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
@@ -262,11 +290,11 @@ export default function LeadsPipelinePage() {
 
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <div className="flex overflow-x-auto pb-4 gap-3">
-          {LEAD_STATUSES.map((status) => (
+          {columnDefs.map((def) => (
             <PipelineColumn
-              key={status}
-              status={status}
-              leads={leadsByStatus.get(status) ?? []}
+              key={def.id}
+              definition={def}
+              leads={leadsByDefinitionId.get(def.id) ?? []}
               canEdit={canEditPipeline}
             />
           ))}
@@ -293,15 +321,15 @@ export default function LeadsPipelinePage() {
 }
 
 function PipelineColumn({
-  status,
+  definition,
   leads,
   canEdit,
 }: {
-  status: LeadStatus;
+  definition: PipelineStatusDefinitionDto;
   leads: LeadDto[];
   canEdit: boolean;
 }) {
-  const { setNodeRef, isOver } = useDroppable({ id: status as string });
+  const { setNodeRef, isOver } = useDroppable({ id: definition.id });
 
   return (
     <div
@@ -309,10 +337,10 @@ function PipelineColumn({
       className={`flex-shrink-0 w-56 bg-slate-50 rounded-xl border-2 overflow-hidden transition-colors ${
         isOver ? "border-sky-400 bg-sky-50/50" : "border-slate-200"
       }`}
-      data-testid={`pipeline-col-${status}`}
+      data-testid={`pipeline-col-${definition.id}`}
     >
-      <div className={`border-b border-slate-200 ${STATUS_COLORS[status]} rounded-t-xl p-3`}>
-        <h2 className="font-semibold text-slate-800 text-sm">{STATUS_LABELS[status]}</h2>
+      <div className={`border-b border-slate-200 ${leadStatusBadgeClass(definition.systemKey)} rounded-t-xl p-3`}>
+        <h2 className="font-semibold text-slate-800 text-sm">{definition.label}</h2>
         <p className="text-xs text-slate-600 mt-0.5">{leads.length} leads</p>
       </div>
       <div className="max-h-[calc(100vh-280px)] overflow-y-auto p-2 space-y-2">
@@ -356,10 +384,10 @@ function PipelineLeadCard({ lead, canEdit }: { lead: LeadDto; canEdit: boolean }
       )}
       <div className="flex items-center justify-between gap-2 mt-2">
         <span
-          className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full border ${STATUS_COLORS[lead.status]}`}
+          className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full border ${leadStatusBadgeClass(lead.statusKey)}`}
           data-testid={`pipeline-card-status-${lead.id}`}
         >
-          {STATUS_LABELS[lead.status]}
+          {lead.statusLabel}
         </span>
         <Link
           href={`/app/leads/${lead.id}`}

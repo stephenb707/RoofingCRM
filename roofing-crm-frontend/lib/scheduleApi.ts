@@ -1,10 +1,10 @@
 import type { AxiosInstance } from "axios";
-import type { JobDto, JobStatus, PageResponse } from "./types";
+import type { JobDto, PageResponse } from "./types";
 
 export interface ListScheduleJobsParams {
   startDate: string;
   endDate: string;
-  status?: JobStatus | null;
+  statusDefinitionId?: string | null;
   crewName?: string | null;
   includeUnscheduled?: boolean;
   page?: number;
@@ -19,8 +19,8 @@ export async function listScheduleJobs(
     startDate: params.startDate,
     endDate: params.endDate,
   };
-  if (params.status != null && String(params.status) !== "") {
-    queryParams.status = params.status;
+  if (params.statusDefinitionId != null && String(params.statusDefinitionId) !== "") {
+    queryParams.statusDefinitionId = params.statusDefinitionId;
   }
   if (params.crewName != null && params.crewName !== "") {
     queryParams.crewName = params.crewName;

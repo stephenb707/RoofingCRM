@@ -102,7 +102,12 @@ export interface AddressDto {
 export interface LeadDto {
   id: string;
   customerId: string | null;
-  status: LeadStatus;
+  /** Target pipeline column / persisted FK. */
+  statusDefinitionId: string;
+  /** Stable key: built-in enum name or custom id from backend. */
+  statusKey: string;
+  /** Tenant-configured display label. */
+  statusLabel: string;
   source: LeadSource | null;
   leadNotes: string | null;
   propertyAddress: AddressDto | null;
@@ -136,7 +141,7 @@ export interface CreateLeadRequest {
 }
 
 export interface UpdateLeadStatusRequest {
-  status: LeadStatus;
+  statusDefinitionId: string;
   position?: number;
 }
 
@@ -178,7 +183,9 @@ export interface JobDto {
   id: string;
   customerId: string | null;
   leadId: string | null;
-  status: JobStatus;
+  statusDefinitionId: string;
+  statusKey: string;
+  statusLabel: string;
   type: JobType;
   propertyAddress: AddressDto | null;
   scheduledStartDate: string | null;
@@ -215,7 +222,7 @@ export interface CreateJobRequest {
 }
 
 export interface UpdateJobStatusRequest {
-  status: JobStatus;
+  statusDefinitionId: string;
 }
 
 // Estimate-related types
@@ -712,7 +719,8 @@ export interface CreateNoteRequest {
 // Dashboard (GET /api/v1/dashboard/summary)
 export interface DashboardLeadSnippetDto {
   id: string;
-  status: LeadStatus;
+  statusKey: string;
+  statusLabel: string;
   customerLabel: string;
   propertyLine1?: string | null;
   updatedAt: string;
@@ -720,7 +728,8 @@ export interface DashboardLeadSnippetDto {
 
 export interface DashboardJobSnippetDto {
   id: string;
-  status: JobStatus;
+  statusKey: string;
+  statusLabel: string;
   scheduledStartDate?: string | null;
   propertyLine1?: string | null;
   customerLabel: string;

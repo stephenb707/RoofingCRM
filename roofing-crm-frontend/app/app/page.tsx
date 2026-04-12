@@ -2,35 +2,18 @@
 
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { useAuthReady } from "@/lib/AuthContext";
 import { queryKeys } from "@/lib/queryKeys";
 import { getDashboardSummary } from "@/lib/dashboardApi";
+import { listPipelineStatuses } from "@/lib/pipelineStatusesApi";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { formatDate, formatDateShortWeekday, formatDateTime } from "@/lib/format";
 import type {
   DashboardJobSnippetDto,
   DashboardLeadSnippetDto,
   DashboardTaskSnippetDto,
-  LeadStatus,
 } from "@/lib/types";
-
-const LEAD_STATUS_ORDER: LeadStatus[] = [
-  "NEW",
-  "CONTACTED",
-  "INSPECTION_SCHEDULED",
-  "QUOTE_SENT",
-  "WON",
-  "LOST",
-];
-
-const LEAD_STATUS_LABEL: Record<LeadStatus, string> = {
-  NEW: "New",
-  CONTACTED: "Contacted",
-  INSPECTION_SCHEDULED: "Inspection",
-  QUOTE_SENT: "Quote sent",
-  WON: "Won",
-  LOST: "Lost",
-};
 
 function taskDetailHref(t: DashboardTaskSnippetDto): string {
   return `/app/tasks/${t.taskId}`;
@@ -69,6 +52,18 @@ export default function DashboardPage() {
     queryFn: () => getDashboardSummary(api),
     enabled: ready && Boolean(auth.selectedTenantId),
   });
+
+  const { data: leadPipelineDefs = [] } = useQuery({
+    queryKey: queryKeys.pipelineStatuses(auth.selectedTenantId, "LEAD"),
+    queryFn: () => listPipelineStatuses(api, "LEAD"),
+    enabled: ready && Boolean(auth.selectedTenantId),
+  });
+
+  const sortedLeadPipeline = useMemo(
+    () =>
+      [...leadPipelineDefs].filter((d) => d.active).sort((a, b) => a.sortOrder - b.sortOrder),
+    [leadPipelineDefs]
+  );
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -162,11 +157,11 @@ export default function DashboardPage() {
                 </Link>
               </div>
               <div className="space-y-2">
-                {LEAD_STATUS_ORDER.map((st) => {
-                  const n = data.leadCountByStatus[st] ?? 0;
+                {sortedLeadPipeline.map((def) => {
+                  const n = data.leadCountByStatus[def.systemKey] ?? 0;
                   return (
-                    <div key={st} className="flex items-center gap-3 text-sm">
-                      <span className="text-slate-600 w-36 shrink-0">{LEAD_STATUS_LABEL[st]}</span>
+                    <div key={def.id} className="flex items-center gap-3 text-sm">
+                      <span className="text-slate-600 w-36 shrink-0">{def.label}</span>
                       <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
                         <div
                           className="h-full bg-sky-500 rounded-full transition-all"
@@ -276,7 +271,7 @@ export default function DashboardPage() {
                     >
                       <div className="font-medium text-slate-800 text-sm">{l.customerLabel}</div>
                       <div className="text-xs text-slate-500 mt-0.5">
-                        {LEAD_STATUS_LABEL[l.status]}
+                        {l.statusLabel}
                         {l.propertyLine1 ? ` · ${l.propertyLine1}` : ""}
                       </div>
                       <div className="text-xs text-slate-400 mt-1">Updated {formatDate(l.updatedAt)}</div>

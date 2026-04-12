@@ -2,8 +2,10 @@ import React from "react";
 import { render, screen, waitFor, fireEvent, within } from "./test-utils";
 import SchedulePage from "@/app/app/schedule/page";
 import * as jobsApi from "@/lib/jobsApi";
+import * as pipelineStatusesApi from "@/lib/pipelineStatusesApi";
 
 jest.mock("@/lib/jobsApi");
+jest.mock("@/lib/pipelineStatusesApi");
 
 const mockSearchParamsGet = jest.fn();
 jest.mock("next/navigation", () => ({
@@ -13,6 +15,7 @@ jest.mock("next/navigation", () => ({
 }));
 
 const mockedJobsApi = jobsApi as jest.Mocked<typeof jobsApi>;
+const mockedPipelineApi = pipelineStatusesApi as jest.Mocked<typeof pipelineStatusesApi>;
 
 /** January 2026 calendar grid (Sun start): 2025-12-28 … 2026-01-31 */
 const JAN_2026_GRID_FROM = "2025-12-28";
@@ -22,7 +25,9 @@ const job1 = {
   id: "job-1",
   customerId: "cust-1",
   leadId: null,
-  status: "SCHEDULED" as const,
+  statusDefinitionId: "def-sched",
+  statusKey: "SCHEDULED" as const,
+  statusLabel: "Scheduled",
   type: "REPLACEMENT" as const,
   propertyAddress: { line1: "123 Main St", city: "Chicago", state: "IL", zip: "60601" },
   scheduledStartDate: "2026-01-15",
@@ -46,6 +51,9 @@ const job2 = {
 const unscheduledJob = {
   ...job1,
   id: "job-3",
+  statusDefinitionId: "def-unsched",
+  statusKey: "UNSCHEDULED" as const,
+  statusLabel: "Unscheduled",
   scheduledStartDate: null,
   scheduledEndDate: null,
   crewName: null,
@@ -57,6 +65,26 @@ describe("SchedulePage", () => {
     jest.setSystemTime(new Date(2026, 0, 10, 12, 0, 0));
     jest.clearAllMocks();
     mockSearchParamsGet.mockReturnValue(null);
+    mockedPipelineApi.listPipelineStatuses.mockResolvedValue([
+      {
+        id: "def-unsched",
+        pipelineType: "JOB",
+        systemKey: "UNSCHEDULED",
+        label: "Unscheduled",
+        sortOrder: 0,
+        builtIn: true,
+        active: true,
+      },
+      {
+        id: "def-sched",
+        pipelineType: "JOB",
+        systemKey: "SCHEDULED",
+        label: "Scheduled",
+        sortOrder: 1,
+        builtIn: true,
+        active: true,
+      },
+    ]);
     mockedJobsApi.listJobSchedule.mockResolvedValue([job1, job2]);
   });
 

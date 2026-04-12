@@ -8,7 +8,6 @@ import {
 } from "./jobsApi";
 import {
   JobDto,
-  JobStatus,
   JobType,
   CreateJobRequest,
   UpdateJobRequest,
@@ -26,7 +25,9 @@ const mockJob: JobDto = {
   id: "job-1",
   customerId: "cust-1",
   leadId: null,
-  status: "SCHEDULED",
+  statusDefinitionId: "sched-def",
+  statusKey: "SCHEDULED",
+  statusLabel: "Scheduled",
   type: "REPLACEMENT",
   propertyAddress: {
     line1: "123 Main St",
@@ -54,23 +55,24 @@ const mockPage: PageResponse<JobDto> = {
 
 describe("jobsApi", () => {
   describe("listJobs", () => {
-    it("calls GET /api/v1/jobs with status and pagination", async () => {
+    it("calls GET /api/v1/jobs with statusDefinitionId and pagination", async () => {
       const mockApi = createMockApi();
       (mockApi.get as jest.Mock).mockResolvedValue({ data: mockPage });
 
+      const inProgDef = "660e8400-e29b-41d4-a716-446655440002";
       const result = await listJobs(mockApi as unknown as AxiosInstance, {
-        status: "IN_PROGRESS",
+        statusDefinitionId: inProgDef,
         page: 1,
         size: 20,
       });
 
       expect(mockApi.get).toHaveBeenCalledWith("/api/v1/jobs", {
-        params: { status: "IN_PROGRESS", page: 1, size: 20 },
+        params: { statusDefinitionId: inProgDef, page: 1, size: 20 },
       });
       expect(result).toEqual(mockPage);
     });
 
-    it("calls GET /api/v1/jobs without status when not provided", async () => {
+    it("calls GET /api/v1/jobs without statusDefinitionId when not provided", async () => {
       const mockApi = createMockApi();
       (mockApi.get as jest.Mock).mockResolvedValue({ data: mockPage });
 
@@ -143,21 +145,27 @@ describe("jobsApi", () => {
   });
 
   describe("updateJobStatus", () => {
-    it("calls POST /api/v1/jobs/{id}/status with { status }", async () => {
+    it("calls POST /api/v1/jobs/{id}/status with { statusDefinitionId }", async () => {
       const mockApi = createMockApi();
-      const updated = { ...mockJob, status: "IN_PROGRESS" as JobStatus };
+      const inProgDef = "770e8400-e29b-41d4-a716-446655440003";
+      const updated = {
+        ...mockJob,
+        statusDefinitionId: inProgDef,
+        statusKey: "IN_PROGRESS",
+        statusLabel: "In progress",
+      };
       (mockApi.post as jest.Mock).mockResolvedValue({ data: updated });
 
       const result = await updateJobStatus(
         mockApi as unknown as AxiosInstance,
         "job-1",
-        "IN_PROGRESS"
+        inProgDef
       );
 
       expect(mockApi.post).toHaveBeenCalledWith("/api/v1/jobs/job-1/status", {
-        status: "IN_PROGRESS",
+        statusDefinitionId: inProgDef,
       });
-      expect(result.status).toBe("IN_PROGRESS");
+      expect(result.statusKey).toBe("IN_PROGRESS");
     });
   });
 });

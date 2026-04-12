@@ -2,9 +2,11 @@ import React from "react";
 import { render, screen, waitFor } from "./test-utils";
 import LeadsPipelinePage from "@/app/app/leads/pipeline/page";
 import * as leadsApi from "@/lib/leadsApi";
+import * as pipelineStatusesApi from "@/lib/pipelineStatusesApi";
 import { LeadDto } from "@/lib/types";
 
 jest.mock("@/lib/leadsApi");
+jest.mock("@/lib/pipelineStatusesApi");
 jest.mock("next/navigation", () => ({
   useRouter: () => ({ push: jest.fn(), replace: jest.fn(), back: jest.fn() }),
   usePathname: () => "/app/leads/pipeline",
@@ -13,11 +15,34 @@ jest.mock("next/navigation", () => ({
 }));
 
 const mockedLeadsApi = leadsApi as jest.Mocked<typeof leadsApi>;
+const mockedPipelineApi = pipelineStatusesApi as jest.Mocked<typeof pipelineStatusesApi>;
+
+const defNew = {
+  id: "def-new",
+  pipelineType: "LEAD" as const,
+  systemKey: "NEW",
+  label: "New",
+  sortOrder: 0,
+  builtIn: true,
+  active: true,
+};
+
+const defContacted = {
+  id: "def-contacted",
+  pipelineType: "LEAD" as const,
+  systemKey: "CONTACTED",
+  label: "Contacted",
+  sortOrder: 1,
+  builtIn: true,
+  active: true,
+};
 
 const mockLeadNew: LeadDto = {
   id: "lead-1",
   customerId: "cust-1",
-  status: "NEW",
+  statusDefinitionId: defNew.id,
+  statusKey: "NEW",
+  statusLabel: "New",
   source: "WEBSITE",
   leadNotes: "",
   propertyAddress: { line1: "123 Main St", city: "Denver", state: "CO" },
@@ -32,7 +57,9 @@ const mockLeadNew: LeadDto = {
 const mockLeadContacted: LeadDto = {
   ...mockLeadNew,
   id: "lead-2",
-  status: "CONTACTED",
+  statusDefinitionId: defContacted.id,
+  statusKey: "CONTACTED",
+  statusLabel: "Contacted",
   pipelinePosition: 0,
   customerFirstName: "Bob",
   customerLastName: "Jones",
@@ -54,15 +81,17 @@ describe("LeadsPipelinePage", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockedLeadsApi.listLeads.mockImplementation(() => Promise.resolve(pipelineResponse));
+    mockedPipelineApi.listPipelineStatuses.mockResolvedValue([defNew, defContacted]);
   });
 
-  it("renders grouped columns and lead cards when listLeads returns leads across multiple statuses", async () => {
+  it("renders columns from pipeline status definitions and groups leads by statusDefinitionId", async () => {
     render(<LeadsPipelinePage />);
 
     await waitFor(() => {
       expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Pipeline");
     });
 
+    expect(mockedPipelineApi.listPipelineStatuses).toHaveBeenCalledWith(expect.anything(), "LEAD");
     expect(mockedLeadsApi.listLeads).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ page: 0, size: 200 })
@@ -70,10 +99,25 @@ describe("LeadsPipelinePage", () => {
 
     expect(screen.getByRole("heading", { name: "New" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Contacted" })).toBeInTheDocument();
+    expect(screen.getByTestId(`pipeline-col-${defNew.id}`)).toBeInTheDocument();
+    expect(screen.getByTestId(`pipeline-col-${defContacted.id}`)).toBeInTheDocument();
     expect(screen.getByText("Alice Smith")).toBeInTheDocument();
     expect(screen.getByText("Bob Jones")).toBeInTheDocument();
     expect(screen.getByText("123 Main St, Denver, CO")).toBeInTheDocument();
     expect(screen.getByText("456 Oak Ave, Boulder, CO")).toBeInTheDocument();
+  });
+
+  it("uses backend column labels when tenant renames a stage", async () => {
+    mockedPipelineApi.listPipelineStatuses.mockResolvedValue([
+      { ...defNew, label: "Intake (renamed)" },
+      defContacted,
+    ]);
+
+    render(<LeadsPipelinePage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Intake (renamed)" })).toBeInTheDocument();
+    });
   });
 
   it("shows customer phone on cards when present", async () => {
@@ -127,7 +171,7 @@ describe("LeadsPipelinePage", () => {
     expect(screen.queryByLabelText(/Status for Alice Smith/i)).not.toBeInTheDocument();
   });
 
-  it("shows status badge on each card", async () => {
+  it("shows statusLabel from API on each card", async () => {
     render(<LeadsPipelinePage />);
 
     await waitFor(() => {

@@ -63,7 +63,10 @@ const mockCustomerWithAddress: CustomerDto = {
 const mockLead: LeadDto = {
   id: "lead-1",
   customerId: "cust-1",
-  status: "NEW",
+  statusDefinitionId: "def-new",
+  statusKey: "NEW",
+  statusLabel: "New",
+  pipelinePosition: 0,
   source: "WEBSITE",
   leadNotes: null,
   propertyAddress: {
@@ -80,7 +83,9 @@ const mockCreatedJob: JobDto = {
   id: "job-new-1",
   customerId: "cust-1",
   leadId: null,
-  status: "UNSCHEDULED",
+  statusDefinitionId: "def-unsched",
+  statusKey: "UNSCHEDULED",
+  statusLabel: "Unscheduled",
   type: "REPAIR",
   propertyAddress: { line1: "123 Test Ave", city: "Denver", state: "CO" },
   scheduledStartDate: null,

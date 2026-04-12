@@ -27,7 +27,9 @@ describe("leadsApi", () => {
         id: "job-1",
         customerId: "cust-1",
         leadId: "lead-1",
-        status: "SCHEDULED",
+        statusDefinitionId: "sched-def",
+        statusKey: "SCHEDULED",
+        statusLabel: "Scheduled",
         type: "REPLACEMENT",
         propertyAddress: null,
         scheduledStartDate: null,
@@ -55,30 +57,36 @@ describe("leadsApi", () => {
   });
 
   describe("updateLeadStatus", () => {
-    it("sends status and position when position provided", async () => {
+    const contactedDef = "550e8400-e29b-41d4-a716-446655440001";
+
+    it("sends statusDefinitionId and position when position provided", async () => {
       mockApi.post.mockResolvedValue({
-        data: { id: "lead-1", status: "CONTACTED", pipelinePosition: 2 },
+        data: {
+          id: "lead-1",
+          statusDefinitionId: contactedDef,
+          statusKey: "CONTACTED",
+          pipelinePosition: 2,
+        },
       });
 
-      await updateLeadStatus(mockApi, "lead-1", "CONTACTED", 2);
+      await updateLeadStatus(mockApi, "lead-1", contactedDef, 2);
 
       expect(mockApi.post).toHaveBeenCalledWith(
         "/api/v1/leads/lead-1/status",
-        expect.objectContaining({ status: "CONTACTED", position: 2 })
+        expect.objectContaining({ statusDefinitionId: contactedDef, position: 2 })
       );
     });
 
-    it("sends only status when position omitted", async () => {
+    it("sends only statusDefinitionId when position omitted", async () => {
       mockApi.post.mockResolvedValue({
-        data: { id: "lead-1", status: "CONTACTED" },
+        data: { id: "lead-1", statusDefinitionId: contactedDef, statusKey: "CONTACTED" },
       });
 
-      await updateLeadStatus(mockApi, "lead-1", "CONTACTED");
+      await updateLeadStatus(mockApi, "lead-1", contactedDef);
 
-      expect(mockApi.post).toHaveBeenCalledWith(
-        "/api/v1/leads/lead-1/status",
-        { status: "CONTACTED" }
-      );
+      expect(mockApi.post).toHaveBeenCalledWith("/api/v1/leads/lead-1/status", {
+        statusDefinitionId: contactedDef,
+      });
     });
   });
 });

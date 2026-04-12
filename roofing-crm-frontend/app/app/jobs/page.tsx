@@ -8,21 +8,17 @@ import { ClickableTableRow } from "@/components/ClickableTableRow";
 import { useAuthReady } from "@/lib/AuthContext";
 import { listJobs } from "@/lib/jobsApi";
 import { getApiErrorMessage } from "@/lib/apiError";
-import {
-  JOB_STATUSES,
-  JOB_STATUS_LABELS,
-  JOB_STATUS_COLORS,
-  JOB_TYPE_LABELS,
-} from "@/lib/jobsConstants";
+import { JOB_TYPE_LABELS } from "@/lib/jobsConstants";
+import { listPipelineStatuses } from "@/lib/pipelineStatusesApi";
+import { jobStatusBadgeClass } from "@/lib/pipelineStatusVisuals";
 import { queryKeys } from "@/lib/queryKeys";
 import { formatAddress, formatDate } from "@/lib/format";
-import type { JobStatus } from "@/lib/types";
 
 export default function JobsPage() {
   const { api, auth, ready } = useAuthReady();
   const searchParams = useSearchParams();
   const customerIdFromQuery = searchParams.get("customerId");
-  const [statusFilter, setStatusFilter] = useState<JobStatus | "">("");
+  const [statusFilter, setStatusFilter] = useState<string>("");
   const [page, setPage] = useState(0);
   const pageSize = 20;
 
@@ -31,11 +27,18 @@ export default function JobsPage() {
     [auth.selectedTenantId, statusFilter, customerIdFromQuery, page]
   );
 
+  const pipelineDefsKey = queryKeys.pipelineStatuses(auth.selectedTenantId, "JOB");
+  const { data: jobDefs = [] } = useQuery({
+    queryKey: pipelineDefsKey,
+    queryFn: () => listPipelineStatuses(api, "JOB"),
+    enabled: ready,
+  });
+
   const { data, isLoading, isError, error, isFetching } = useQuery({
     queryKey,
     queryFn: () =>
       listJobs(api, {
-        status: statusFilter || null,
+        statusDefinitionId: statusFilter || null,
         customerId: customerIdFromQuery || null,
         page,
         size: pageSize,
@@ -46,7 +49,7 @@ export default function JobsPage() {
 
   const handleStatusChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
-      setStatusFilter(e.target.value as JobStatus | "");
+      setStatusFilter(e.target.value);
       setPage(0);
     },
     []
@@ -105,11 +108,14 @@ export default function JobsPage() {
               className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
             >
               <option value="">All Statuses</option>
-              {JOB_STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {JOB_STATUS_LABELS[s]}
-                </option>
-              ))}
+              {jobDefs
+                .filter((d) => d.active)
+                .sort((a, b) => a.sortOrder - b.sortOrder)
+                .map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.label}
+                  </option>
+                ))}
             </select>
           </div>
           {statusFilter && (
@@ -228,9 +234,9 @@ export default function JobsPage() {
                     </td>
                     <td className="px-6 py-4">
                       <span
-                        className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full border ${JOB_STATUS_COLORS[job.status]}`}
+                        className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full border ${jobStatusBadgeClass(job.statusKey)}`}
                       >
-                        {JOB_STATUS_LABELS[job.status]}
+                        {job.statusLabel}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-600">

@@ -1,3 +1,4 @@
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\settings\SettingsPipelineStatusController.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\enums\JobStatus.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\report\PaidInvoicesReportService.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\invoice\CreateInvoiceFromEstimateRequest.java
@@ -7,9 +8,11 @@ C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\c
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\entity\TenantInvite.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\job\UpdateJobRequest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\enums\ReceiptTotalSource.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\settings\PipelineStatusDefinitionDto.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\team\TenantInviteDto.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\customer\UpdateCustomerRequest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\accounting\ConfirmReceiptCostRequest.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\repository\PipelineStatusDefinitionRepository.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\realtime\JwtHandshakeInterceptor.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\invoice\SendInvoiceEmailResponse.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\accounting\ReceiptExtractionProviderException.java
@@ -45,6 +48,7 @@ C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\c
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\entity\Task.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\enums\ReceiptExtractionStatus.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\realtime\ActivityEventCreatedListener.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\pipeline\PipelineStatusDefaults.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\config\CorsProperties.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\attachment\AttachmentDto.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\enums\TaskStatus.java
@@ -57,12 +61,14 @@ C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\c
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\value\Address.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\entity\Invoice.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\accounting\JobAccountingController.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\settings\ReorderPipelineStatusesRequest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\estimate\EstimateItemRequest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\task\TaskServiceImpl.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\enums\PreferredContactMethod.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\repository\EstimateRepository.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\estimate\ShareEstimateResponse.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\entity\ActivityEvent.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\settings\CreatePipelineStatusRequest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\publicapi\estimate\PublicEstimateItemDto.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\entity\BaseEntity.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\enums\LeadSource.java
@@ -122,6 +128,7 @@ C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\c
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\communication\CommunicationLogDto.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\enums\AttachmentTag.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\accounting\ReceiptExtractionUnavailableException.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\pipeline\PipelineStatusAdminServiceImpl.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\config\SecurityConfig.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\customer\CustomerService.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\ApiErrorResponse.java
@@ -158,6 +165,7 @@ C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\c
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\report\ReportServiceImpl.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\job\JobService.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\task\TaskService.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\pipeline\PipelineStatusAdminService.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\entity\TenantAuditedEntity.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\accounting\JobAccountingReceiptService.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\exception\InviteConflictException.java
@@ -176,7 +184,9 @@ C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\c
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\mail\InviteEmailTemplateBuilder.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\invoice\SendInvoiceEmailRequest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\task\UpdateTaskRequest.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\settings\UpdatePipelineStatusRequest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\activity\ActivityEventService.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\entity\PipelineStatusDefinition.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\exception\MailDeliveryException.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\invoice\InvoiceSummaryDto.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\realtime\WebSocketConfig.java
@@ -186,6 +196,7 @@ C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\c
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\invoice\PublicInvoiceService.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\estimate\EstimateService.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\customer\CreateCustomerRequest.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\enums\PipelineType.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\job\JobController.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\entity\Estimate.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\mail\EmailService.java
@@ -197,6 +208,7 @@ C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\c
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\publicapi\estimate\PublicEstimateDto.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\activity\ActivityController.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\report\InvoiceReportsController.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\pipeline\PipelineStatusReadService.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\common\PickerItemDto.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\lead\UpdateLeadRequest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\accounting\SummaryFieldConsensusService.java
@@ -239,6 +251,7 @@ C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\c
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\lead\LeadServiceImpl.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\accounting\NoopReceiptExtractionClient.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\team\AcceptInviteRequest.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\settings\PipelineStatusController.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\task\TaskController.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\task\CreateTaskRequest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\exception\MailConfigurationException.java

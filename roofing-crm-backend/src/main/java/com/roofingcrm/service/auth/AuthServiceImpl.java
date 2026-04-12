@@ -18,6 +18,7 @@ import com.roofingcrm.domain.repository.UserRepository;
 import com.roofingcrm.security.JwtService;
 import com.roofingcrm.service.exception.InviteConflictException;
 import com.roofingcrm.service.exception.ResourceNotFoundException;
+import com.roofingcrm.service.pipeline.PipelineStatusAdminService;
 import com.roofingcrm.service.team.TeamService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -35,6 +36,7 @@ public class AuthServiceImpl implements AuthService {
     private final TenantInviteRepository inviteRepository;
     private final TeamService teamService;
     private final JwtService jwtService;
+    private final PipelineStatusAdminService pipelineStatusAdminService;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     public AuthServiceImpl(UserRepository userRepository,
@@ -42,13 +44,15 @@ public class AuthServiceImpl implements AuthService {
                            TenantUserMembershipRepository membershipRepository,
                            TenantInviteRepository inviteRepository,
                            TeamService teamService,
-                           JwtService jwtService) {
+                           JwtService jwtService,
+                           PipelineStatusAdminService pipelineStatusAdminService) {
         this.userRepository = userRepository;
         this.tenantRepository = tenantRepository;
         this.membershipRepository = membershipRepository;
         this.inviteRepository = inviteRepository;
         this.teamService = teamService;
         this.jwtService = jwtService;
+        this.pipelineStatusAdminService = pipelineStatusAdminService;
     }
 
     @Override
@@ -71,6 +75,7 @@ public class AuthServiceImpl implements AuthService {
         // naive slug; in a real system ensure uniqueness and nicer slugging
         tenant.setSlug(request.getTenantName().toLowerCase().replace(" ", "-"));
         tenant = tenantRepository.save(tenant);
+        pipelineStatusAdminService.seedDefaultsForNewTenant(tenant);
 
         TenantUserMembership membership = new TenantUserMembership();
         membership.setTenant(tenant);

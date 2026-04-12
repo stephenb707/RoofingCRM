@@ -8,21 +8,17 @@ import { ClickableTableRow } from "@/components/ClickableTableRow";
 import { useAuthReady } from "@/lib/AuthContext";
 import { listLeads } from "@/lib/leadsApi";
 import { getApiErrorMessage } from "@/lib/apiError";
-import {
-  LEAD_STATUSES,
-  STATUS_LABELS,
-  STATUS_COLORS,
-  SOURCE_LABELS,
-} from "@/lib/leadsConstants";
+import { SOURCE_LABELS } from "@/lib/leadsConstants";
+import { listPipelineStatuses } from "@/lib/pipelineStatusesApi";
+import { leadStatusBadgeClass } from "@/lib/pipelineStatusVisuals";
 import { queryKeys } from "@/lib/queryKeys";
 import { formatAddress, formatDate, formatPhone } from "@/lib/format";
-import { LeadStatus } from "@/lib/types";
 
 export default function LeadsPage() {
   const { api, auth, ready } = useAuthReady();
   const searchParams = useSearchParams();
   const customerIdFromQuery = searchParams.get("customerId");
-  const [statusFilter, setStatusFilter] = useState<LeadStatus | "">("");
+  const [statusFilter, setStatusFilter] = useState<string>("");
   const [page, setPage] = useState(0);
   const pageSize = 20;
 
@@ -31,11 +27,18 @@ export default function LeadsPage() {
     [auth.selectedTenantId, statusFilter, customerIdFromQuery, page]
   );
 
+  const pipelineDefsKey = queryKeys.pipelineStatuses(auth.selectedTenantId, "LEAD");
+  const { data: leadDefs = [] } = useQuery({
+    queryKey: pipelineDefsKey,
+    queryFn: () => listPipelineStatuses(api, "LEAD"),
+    enabled: ready,
+  });
+
   const { data, isLoading, isError, error, isFetching } = useQuery({
     queryKey,
     queryFn: async () => {
       return listLeads(api, {
-        status: statusFilter || null,
+        statusDefinitionId: statusFilter || null,
         customerId: customerIdFromQuery || null,
         page,
         size: pageSize,
@@ -47,7 +50,7 @@ export default function LeadsPage() {
 
   const handleStatusChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
-      setStatusFilter(e.target.value as LeadStatus | "");
+      setStatusFilter(e.target.value);
       setPage(0);
     },
     []
@@ -104,11 +107,14 @@ export default function LeadsPage() {
               className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
             >
               <option value="">All Statuses</option>
-              {LEAD_STATUSES.map((status) => (
-                <option key={status} value={status}>
-                  {STATUS_LABELS[status]}
-                </option>
-              ))}
+              {leadDefs
+                .filter((d) => d.active)
+                .sort((a, b) => a.sortOrder - b.sortOrder)
+                .map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.label}
+                  </option>
+                ))}
             </select>
           </div>
 
@@ -250,9 +256,9 @@ export default function LeadsPage() {
                     </td>
                     <td className="px-6 py-4">
                       <span
-                        className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full ${STATUS_COLORS[lead.status]}`}
+                        className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full border ${leadStatusBadgeClass(lead.statusKey)}`}
                       >
-                        {STATUS_LABELS[lead.status]}
+                        {lead.statusLabel}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-600">

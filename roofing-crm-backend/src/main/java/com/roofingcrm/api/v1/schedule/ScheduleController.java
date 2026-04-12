@@ -1,7 +1,6 @@
 package com.roofingcrm.api.v1.schedule;
 
 import com.roofingcrm.api.v1.job.JobDto;
-import com.roofingcrm.domain.enums.JobStatus;
 import com.roofingcrm.security.SecurityUtils;
 import com.roofingcrm.service.job.JobService;
 import com.roofingcrm.service.tenant.TenantAccessService;
@@ -37,7 +36,7 @@ public class ScheduleController {
             @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
             @RequestParam("startDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) @NonNull LocalDate startDate,
             @RequestParam("endDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) @NonNull LocalDate endDate,
-            @RequestParam(value = "status", required = false) JobStatus status,
+            @RequestParam(value = "statusDefinitionId", required = false) UUID statusDefinitionId,
             @RequestParam(value = "crewName", required = false) String crewName,
             @RequestParam(value = "includeUnscheduled", defaultValue = "false") boolean includeUnscheduled,
             @PageableDefault(size = 200) @NonNull Pageable pageable) {
@@ -50,7 +49,7 @@ public class ScheduleController {
         tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
 
         Page<JobDto> page = jobService.listScheduleJobs(
-                tenantId, userId, startDate, endDate, status, crewName, includeUnscheduled, pageable);
+                tenantId, userId, startDate, endDate, statusDefinitionId, crewName, includeUnscheduled, pageable);
         return ResponseEntity.ok(page);
     }
 }

@@ -1,14 +1,13 @@
 import type { AxiosInstance } from "axios";
 import type {
   JobDto,
-  JobStatus,
   CreateJobRequest,
   UpdateJobRequest,
   PageResponse,
 } from "./types";
 
 export interface ListJobsParams {
-  status?: JobStatus | null;
+  statusDefinitionId?: string | null;
   customerId?: string | null;
   page?: number;
   size?: number;
@@ -22,8 +21,8 @@ export async function listJobs(
   params: ListJobsParams = {}
 ): Promise<PageResponse<JobDto>> {
   const queryParams: Record<string, string | number> = {};
-  if (params.status != null) {
-    queryParams.status = params.status;
+  if (params.statusDefinitionId != null && params.statusDefinitionId !== "") {
+    queryParams.statusDefinitionId = params.statusDefinitionId;
   }
   if (params.customerId != null && params.customerId !== "") {
     queryParams.customerId = params.customerId;
@@ -110,7 +109,7 @@ export async function listJobSchedule(
   params: {
     from: string;
     to: string;
-    status?: JobStatus | null;
+    statusDefinitionId?: string | null;
     crewName?: string | null;
     includeUnscheduled?: boolean;
   }
@@ -119,8 +118,8 @@ export async function listJobSchedule(
     from: params.from,
     to: params.to,
   };
-  if (params.status != null && String(params.status) !== "") {
-    queryParams.status = params.status;
+  if (params.statusDefinitionId != null && String(params.statusDefinitionId) !== "") {
+    queryParams.statusDefinitionId = params.statusDefinitionId;
   }
   if (params.crewName != null && params.crewName !== "") {
     queryParams.crewName = params.crewName;
@@ -141,10 +140,10 @@ export async function listJobSchedule(
 export async function updateJobStatus(
   api: AxiosInstance,
   jobId: string,
-  status: JobStatus
+  statusDefinitionId: string
 ): Promise<JobDto> {
   const res = await api.post<JobDto>(`/api/v1/jobs/${jobId}/status`, {
-    status,
+    statusDefinitionId,
   });
   return res.data;
 }

@@ -1,6 +1,5 @@
 package com.roofingcrm.api.v1.dashboard;
 
-import com.roofingcrm.domain.enums.LeadStatus;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -13,7 +12,9 @@ public class DashboardLeadSnippetDto {
 
     private UUID id;
 
-    private LeadStatus status;
+    private String statusKey;
+
+    private String statusLabel;
 
     private String customerLabel;
 

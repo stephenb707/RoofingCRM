@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -8,12 +8,10 @@ import { useAuthReady } from "@/lib/AuthContext";
 import { getLead, updateLeadStatus, convertLeadToJob } from "@/lib/leadsApi";
 import { getCustomer } from "@/lib/customersApi";
 import { getApiErrorMessage } from "@/lib/apiError";
-import {
-  LEAD_STATUSES,
-  STATUS_LABELS,
-  STATUS_COLORS,
-  SOURCE_LABELS,
-} from "@/lib/leadsConstants";
+import { SOURCE_LABELS } from "@/lib/leadsConstants";
+import { listPipelineStatuses } from "@/lib/pipelineStatusesApi";
+import type { PipelineStatusDefinitionDto } from "@/lib/pipelineStatusesApi";
+import { leadStatusBadgeClass } from "@/lib/pipelineStatusVisuals";
 import { queryKeys } from "@/lib/queryKeys";
 import { formatAddress, formatDateTime, formatPhone } from "@/lib/format";
 import { listLeadAttachments, uploadLeadAttachment, downloadAttachment } from "@/lib/attachmentsApi";
@@ -29,7 +27,6 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { NextBestActions } from "@/components/NextBestActions";
 import { JOB_TYPES, JOB_TYPE_LABELS } from "@/lib/jobsConstants";
 import {
-  LeadStatus,
   CreateCommunicationLogRequest,
   ConvertLeadToJobRequest,
   JobType,
@@ -44,7 +41,7 @@ export default function LeadDetailPage() {
   const { api, auth, ready } = useAuthReady();
   const queryClient = useQueryClient();
 
-  const [selectedStatus, setSelectedStatus] = useState<LeadStatus | null>(null);
+  const [selectedStatusId, setSelectedStatusId] = useState<string | null>(null);
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [commLogError, setCommLogError] = useState<string | null>(null);
@@ -59,6 +56,18 @@ export default function LeadDetailPage() {
     queryFn: () => getLead(api, leadId),
     enabled: ready && !!leadId,
   });
+
+  const pipelineDefsKey = queryKeys.pipelineStatuses(auth.selectedTenantId, "LEAD");
+  const { data: leadDefs = [] } = useQuery({
+    queryKey: pipelineDefsKey,
+    queryFn: () => listPipelineStatuses(api, "LEAD"),
+    enabled: ready,
+  });
+
+  const sortedLeadDefs = useMemo(
+    () => [...leadDefs].filter((d) => d.active).sort((a, b) => a.sortOrder - b.sortOrder),
+    [leadDefs]
+  );
 
   const { data: customer } = useQuery({
     queryKey: queryKeys.customer(auth.selectedTenantId, lead?.customerId ?? ""),
@@ -89,13 +98,13 @@ export default function LeadDetailPage() {
   };
 
   useEffect(() => {
-    if (lead) setSelectedStatus(lead.status);
+    if (lead) setSelectedStatusId(lead.statusDefinitionId);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sync only when server status changes
-  }, [lead?.status]);
+  }, [lead?.statusDefinitionId]);
 
   const statusMutation = useMutation({
-    mutationFn: async (newStatus: LeadStatus) => {
-      return updateLeadStatus(api, leadId, newStatus);
+    mutationFn: async (statusDefinitionId: string) => {
+      return updateLeadStatus(api, leadId, statusDefinitionId);
     },
     onSuccess: () => {
       setUpdateError(null);
@@ -105,14 +114,14 @@ export default function LeadDetailPage() {
     onError: (err: unknown) => {
       console.error("Failed to update lead status:", err);
       setUpdateError(getApiErrorMessage(err, "Failed to update status. Please try again."));
-      if (lead) setSelectedStatus(lead.status);
+      if (lead) setSelectedStatusId(lead.statusDefinitionId);
     },
   });
 
-  const handleStatusChange = (newStatus: LeadStatus) => {
-    if (newStatus !== lead?.status) {
-      setSelectedStatus(newStatus);
-      statusMutation.mutate(newStatus);
+  const handleStatusChange = (statusDefinitionId: string) => {
+    if (statusDefinitionId !== lead?.statusDefinitionId) {
+      setSelectedStatusId(statusDefinitionId);
+      statusMutation.mutate(statusDefinitionId);
     }
   };
 
@@ -280,9 +289,9 @@ export default function LeadDetailPage() {
             <p className="text-sm text-slate-500 mt-1">Lead Details</p>
           </div>
           <span
-            className={`inline-flex px-3 py-1.5 text-sm font-medium rounded-full border ${STATUS_COLORS[lead.status]}`}
+            className={`inline-flex px-3 py-1.5 text-sm font-medium rounded-full border ${leadStatusBadgeClass(lead.statusKey)}`}
           >
-            {STATUS_LABELS[lead.status]}
+            {lead.statusLabel}
           </span>
         </div>
       </div>
@@ -457,7 +466,7 @@ export default function LeadDetailPage() {
         <div className="space-y-6">
           <NextBestActions
             entityType="lead"
-            status={lead.status}
+            status={lead.statusKey}
             leadId={leadId}
             leadConvertedJobId={lead.convertedJobId ?? null}
             customerId={lead.customerId ?? null}
@@ -476,20 +485,20 @@ export default function LeadDetailPage() {
             )}
 
             <div className="space-y-2">
-              {LEAD_STATUSES.map((status) => (
+              {sortedLeadDefs.map((def: PipelineStatusDefinitionDto) => (
                 <button
-                  key={status}
-                  onClick={() => handleStatusChange(status)}
+                  key={def.id}
+                  onClick={() => handleStatusChange(def.id)}
                   disabled={statusMutation.isPending}
                   className={`w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                    selectedStatus === status
-                      ? STATUS_COLORS[status] + " border"
+                    selectedStatusId === def.id
+                      ? leadStatusBadgeClass(def.systemKey) + " border"
                       : "bg-slate-50 text-slate-700 hover:bg-slate-100 border border-transparent"
                   } ${statusMutation.isPending ? "opacity-60 cursor-not-allowed" : ""}`}
                 >
                   <div className="flex items-center justify-between">
-                    <span>{STATUS_LABELS[status]}</span>
-                    {selectedStatus === status && (
+                    <span>{def.label}</span>
+                    {selectedStatusId === def.id && (
                       <svg
                         className="w-4 h-4"
                         fill="currentColor"
@@ -593,7 +602,7 @@ export default function LeadDetailPage() {
                     View Job
                   </Link>
                 </>
-              ) : lead.status !== "LOST" ? (
+              ) : lead.statusKey !== "LOST" ? (
                 <button
                   type="button"
                   onClick={() => setShowConvertModal(true)}

@@ -1,7 +1,6 @@
 package com.roofingcrm.api.v1.job;
 
 import com.roofingcrm.api.v1.common.AddressDto;
-import com.roofingcrm.domain.enums.JobStatus;
 import com.roofingcrm.domain.enums.JobType;
 import lombok.Getter;
 import lombok.Setter;
@@ -24,7 +23,9 @@ public class JobDto {
     private String customerEmail;
     private String customerPhone;
 
-    private JobStatus status;
+    private UUID statusDefinitionId;
+    private String statusKey;
+    private String statusLabel;
     private JobType type;
 
     private AddressDto propertyAddress;

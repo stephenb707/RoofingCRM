@@ -1,6 +1,5 @@
 package com.roofingcrm.api.v1.dashboard;
 
-import com.roofingcrm.domain.enums.JobStatus;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -13,7 +12,9 @@ public class DashboardJobSnippetDto {
 
     private UUID id;
 
-    private JobStatus status;
+    private String statusKey;
+
+    private String statusLabel;
 
     private LocalDate scheduledStartDate;
 

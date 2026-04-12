@@ -2,7 +2,6 @@ package com.roofingcrm.api.v1.lead;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.roofingcrm.api.v1.common.AddressDto;
-import com.roofingcrm.domain.enums.LeadStatus;
 import com.roofingcrm.security.AuthenticatedUser;
 import com.roofingcrm.service.lead.LeadService;
 import org.junit.jupiter.api.BeforeEach;
@@ -69,9 +68,12 @@ class LeadControllerTest {
         address.setLine1("456 Roof St");
         req.setPropertyAddress(address);
 
+        UUID newStatusId = UUID.randomUUID();
         LeadDto responseDto = new LeadDto();
         responseDto.setId(UUID.randomUUID());
-        responseDto.setStatus(LeadStatus.NEW);
+        responseDto.setStatusDefinitionId(newStatusId);
+        responseDto.setStatusKey("NEW");
+        responseDto.setStatusLabel("New");
         responseDto.setCreatedAt(Instant.now());
 
         when(leadService.createLead(eq(tenantId), eq(userId), any(CreateLeadRequest.class)))
@@ -82,7 +84,7 @@ class LeadControllerTest {
                         .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
                         .content(Objects.requireNonNull(objectMapper.writeValueAsString(req))))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.status", is("NEW")));
+                .andExpect(jsonPath("$.statusKey", is("NEW")));
     }
 
     @Test
@@ -93,7 +95,9 @@ class LeadControllerTest {
 
         LeadDto dto = new LeadDto();
         dto.setId(leadId);
-        dto.setStatus(LeadStatus.NEW);
+        dto.setStatusDefinitionId(UUID.randomUUID());
+        dto.setStatusKey("NEW");
+        dto.setStatusLabel("New");
         dto.setCreatedAt(Instant.now());
         dto.setCustomerFirstName("Jane");
         dto.setCustomerLastName("Doe");
@@ -105,7 +109,7 @@ class LeadControllerTest {
                         .header("X-Tenant-Id", tenantId.toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id", is(leadId.toString())))
-                .andExpect(jsonPath("$.status", is("NEW")))
+                .andExpect(jsonPath("$.statusKey", is("NEW")))
                 .andExpect(jsonPath("$.customerFirstName", is("Jane")))
                 .andExpect(jsonPath("$.customerLastName", is("Doe")))
                 .andExpect(jsonPath("$.convertedJobId", is(convertedJobId.toString())));
@@ -115,23 +119,26 @@ class LeadControllerTest {
     void updateLeadStatus_withPosition_passesToService() throws Exception {
         UUID tenantId = UUID.randomUUID();
         UUID leadId = UUID.randomUUID();
+        UUID contactedDefId = UUID.randomUUID();
 
         LeadDto dto = new LeadDto();
         dto.setId(leadId);
-        dto.setStatus(LeadStatus.CONTACTED);
+        dto.setStatusDefinitionId(contactedDefId);
+        dto.setStatusKey("CONTACTED");
+        dto.setStatusLabel("Contacted");
         dto.setCreatedAt(Instant.now());
 
-        when(leadService.updateLeadStatus(eq(tenantId), eq(userId), eq(leadId), eq(LeadStatus.CONTACTED), eq(1)))
+        when(leadService.updateLeadStatus(eq(tenantId), eq(userId), eq(leadId), eq(contactedDefId), eq(1)))
                 .thenReturn(dto);
 
-        String body = "{\"status\":\"CONTACTED\",\"position\":1}";
+        String body = "{\"statusDefinitionId\":\"" + contactedDefId + "\",\"position\":1}";
         mockMvc.perform(post("/api/v1/leads/{id}/status", leadId)
                         .header("X-Tenant-Id", tenantId.toString())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status", is("CONTACTED")));
+                .andExpect(jsonPath("$.statusKey", is("CONTACTED")));
 
-        verify(leadService).updateLeadStatus(eq(tenantId), eq(userId), eq(leadId), eq(LeadStatus.CONTACTED), eq(1));
+        verify(leadService).updateLeadStatus(eq(tenantId), eq(userId), eq(leadId), eq(contactedDefId), eq(1));
     }
 }

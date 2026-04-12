@@ -4,7 +4,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.roofingcrm.api.v1.common.PickerItemDto;
-import com.roofingcrm.domain.enums.JobStatus;
 import com.roofingcrm.security.SecurityUtils;
 import com.roofingcrm.service.job.JobService;
 import jakarta.validation.Valid;
@@ -73,13 +72,13 @@ public class JobController {
             @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
             @RequestParam("from") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) @NonNull LocalDate from,
             @RequestParam("to") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) @NonNull LocalDate to,
-            @RequestParam(value = "status", required = false) JobStatus status,
+            @RequestParam(value = "statusDefinitionId", required = false) UUID statusDefinitionId,
             @RequestParam(value = "crewName", required = false) String crewName,
             @RequestParam(value = "includeUnscheduled", defaultValue = "true") boolean includeUnscheduled) {
 
         UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
         log.debug("listSchedule: tenantId={} from={} to={} userId={}", tenantId, from, to, userId);
-        List<JobDto> jobs = jobService.listSchedule(tenantId, userId, from, to, status, crewName, includeUnscheduled);
+        List<JobDto> jobs = jobService.listSchedule(tenantId, userId, from, to, statusDefinitionId, crewName, includeUnscheduled);
         return ResponseEntity.ok(jobs);
     }
 
@@ -97,12 +96,12 @@ public class JobController {
     @GetMapping
     public ResponseEntity<Page<JobDto>> listJobs(
             @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
-            @RequestParam(value = "status", required = false) JobStatus status,
+            @RequestParam(value = "statusDefinitionId", required = false) UUID statusDefinitionId,
             @RequestParam(value = "customerId", required = false) UUID customerId,
             @PageableDefault(size = 20) @NonNull Pageable pageable) {
 
         UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
-        Page<JobDto> page = jobService.listJobs(tenantId, userId, status, customerId, pageable);
+        Page<JobDto> page = jobService.listJobs(tenantId, userId, statusDefinitionId, customerId, pageable);
         return ResponseEntity.ok(page);
     }
 
@@ -113,7 +112,7 @@ public class JobController {
             @Valid @RequestBody UpdateJobStatusRequest request) {
 
         UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
-        JobDto updated = jobService.updateJobStatus(tenantId, userId, jobId, request.getStatus());
+        JobDto updated = jobService.updateJobStatus(tenantId, userId, jobId, request.getStatusDefinitionId());
         return ResponseEntity.ok(updated);
     }
 }

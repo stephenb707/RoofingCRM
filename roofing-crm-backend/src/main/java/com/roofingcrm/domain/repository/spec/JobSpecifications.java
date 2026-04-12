@@ -2,7 +2,6 @@ package com.roofingcrm.domain.repository.spec;
 
 import com.roofingcrm.domain.entity.Job;
 import com.roofingcrm.domain.entity.Tenant;
-import com.roofingcrm.domain.enums.JobStatus;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.lang.NonNull;
@@ -10,6 +9,7 @@ import org.springframework.lang.NonNull;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 public final class JobSpecifications {
 
@@ -18,7 +18,7 @@ public final class JobSpecifications {
 
     /**
      * Build specification for schedule query.
-     * Matches: tenant + archived=false, optional status, optional crewName (case-insensitive),
+     * Matches: tenant + archived=false, optional status definition, optional crewName (case-insensitive),
      * and (scheduled overlap with [from,to] OR unscheduled when includeUnscheduled=true).
      */
     @NonNull
@@ -26,7 +26,7 @@ public final class JobSpecifications {
             Tenant tenant,
             LocalDate from,
             LocalDate to,
-            JobStatus status,
+            UUID statusDefinitionId,
             String crewName,
             boolean includeUnscheduled) {
         return (root, query, cb) -> {
@@ -35,16 +35,14 @@ public final class JobSpecifications {
             predicates.add(cb.equal(root.get("tenant"), tenant));
             predicates.add(cb.isFalse(root.get("archived")));
 
-            if (status != null) {
-                predicates.add(cb.equal(root.get("status"), status));
+            if (statusDefinitionId != null) {
+                predicates.add(cb.equal(root.join("statusDefinition").get("id"), statusDefinitionId));
             }
 
             if (crewName != null && !crewName.isBlank()) {
                 predicates.add(cb.like(cb.lower(root.get("assignedCrew")), "%" + crewName.toLowerCase() + "%"));
             }
 
-            // Date predicate: scheduled overlap OR unscheduled
-            // Overlap: scheduledStartDate <= to AND effectiveEnd >= from, where effectiveEnd = coalesce(scheduledEndDate, scheduledStartDate)
             var effectiveEndGteFrom = cb.or(
                     cb.and(cb.isNotNull(root.get("scheduledEndDate")), cb.greaterThanOrEqualTo(root.get("scheduledEndDate"), from)),
                     cb.and(cb.isNull(root.get("scheduledEndDate")), cb.greaterThanOrEqualTo(root.get("scheduledStartDate"), from))

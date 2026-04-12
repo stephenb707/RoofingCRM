@@ -14,6 +14,7 @@ import com.roofingcrm.domain.repository.TenantUserMembershipRepository;
 import com.roofingcrm.domain.repository.UserRepository;
 import com.roofingcrm.security.JwtService;
 import com.roofingcrm.service.exception.InviteConflictException;
+import com.roofingcrm.service.pipeline.PipelineStatusAdminService;
 import com.roofingcrm.service.team.TeamService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -51,6 +52,8 @@ class AuthServiceImplUnitTest {
     private TeamService teamService;
     @Mock
     private JwtService jwtService;
+    @Mock
+    private PipelineStatusAdminService pipelineStatusAdminService;
 
     private AuthServiceImpl service;
 
@@ -62,7 +65,8 @@ class AuthServiceImplUnitTest {
                 membershipRepository,
                 inviteRepository,
                 teamService,
-                jwtService
+                jwtService,
+                pipelineStatusAdminService
         );
     }
 

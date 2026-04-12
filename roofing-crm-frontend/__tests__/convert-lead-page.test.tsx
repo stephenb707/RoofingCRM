@@ -49,7 +49,10 @@ jest.mock("next/navigation", () => ({
 const mockLead: LeadDto = {
   id: "lead-1",
   customerId: "cust-1",
-  status: "QUOTE_SENT",
+  statusDefinitionId: "def-quote",
+  statusKey: "QUOTE_SENT",
+  statusLabel: "Quote sent",
+  pipelinePosition: 0,
   source: "WEBSITE",
   leadNotes: null,
   propertyAddress: {
@@ -70,7 +73,9 @@ const mockJob: JobDto = {
   id: "job-1",
   customerId: "cust-1",
   leadId: "lead-1",
-  status: "SCHEDULED",
+  statusDefinitionId: "def-sched",
+  statusKey: "SCHEDULED",
+  statusLabel: "Scheduled",
   type: "REPLACEMENT",
   propertyAddress: {
     line1: "123 Main St",
@@ -210,7 +215,9 @@ describe("ConvertLeadPage", () => {
     mockedLeadsApi.getLead.mockResolvedValue({
       ...mockLead,
       convertedJobId: "job-99",
-      status: "WON",
+      statusDefinitionId: "def-won",
+      statusKey: "WON",
+      statusLabel: "Won",
     });
 
     render(<ConvertLeadPage />);
@@ -239,7 +246,9 @@ describe("ConvertLeadPage", () => {
   it("when lead is LOST, shows cannot convert message", async () => {
     mockedLeadsApi.getLead.mockResolvedValue({
       ...mockLead,
-      status: "LOST",
+      statusDefinitionId: "def-lost",
+      statusKey: "LOST",
+      statusLabel: "Lost",
       convertedJobId: undefined,
     });
 

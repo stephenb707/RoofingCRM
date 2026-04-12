@@ -15,10 +15,10 @@ export const queryKeys = {
 
   leadsList: (
     tenantId: string | null,
-    status: string | null,
+    statusDefinitionId: string | null,
     customerId: string | null,
     page: number
-  ) => ["leads", tenantId, status ?? "", customerId ?? "", page] as const,
+  ) => ["leads", tenantId, statusDefinitionId ?? "", customerId ?? "", page] as const,
 
   lead: (tenantId: string | null, leadId: string) =>
     ["lead", tenantId, leadId] as const,
@@ -29,8 +29,12 @@ export const queryKeys = {
   activityForEntity: (tenantId: string | null, entityType: string, entityId: string) =>
     ["activity", tenantId, entityType, entityId] as const,
 
-  jobsList: (tenantId: string | null, status: string | null, customerId: string | null, page: number) =>
-    ["jobs", tenantId, status ?? "", customerId ?? "", page] as const,
+  jobsList: (
+    tenantId: string | null,
+    statusDefinitionId: string | null,
+    customerId: string | null,
+    page: number
+  ) => ["jobs", tenantId, statusDefinitionId ?? "", customerId ?? "", page] as const,
 
   jobsPipeline: (tenantId: string | null, customerId: string | null) =>
     ["jobsPipeline", tenantId, customerId ?? ""] as const,
@@ -42,7 +46,7 @@ export const queryKeys = {
     tenantId: string | null,
     from: string,
     to: string,
-    status: string | null,
+    statusDefinitionId: string | null,
     crewName: string | null,
     includeUnscheduled: boolean
   ) =>
@@ -51,7 +55,7 @@ export const queryKeys = {
       tenantId,
       from,
       to,
-      status ?? null,
+      statusDefinitionId ?? null,
       crewName ?? null,
       includeUnscheduled ?? true,
     ] as const,
@@ -60,7 +64,7 @@ export const queryKeys = {
     tenantId: string | null,
     startDate: string,
     endDate: string,
-    status: string | null,
+    statusDefinitionId: string | null,
     crewName: string | null,
     includeUnscheduled: boolean
   ) =>
@@ -69,7 +73,7 @@ export const queryKeys = {
       tenantId,
       startDate,
       endDate,
-      status ?? "",
+      statusDefinitionId ?? "",
       crewName ?? "",
       includeUnscheduled,
     ] as const,
@@ -121,4 +125,12 @@ export const queryKeys = {
     ["commLogs", "lead", tenantId, leadId] as const,
   jobCommLogs: (tenantId: string | null, jobId: string) =>
     ["commLogs", "job", tenantId, jobId] as const,
+
+  /** Active pipeline status definitions (read-only). */
+  pipelineStatuses: (tenantId: string | null, pipelineType: "LEAD" | "JOB") =>
+    ["pipelineStatuses", tenantId, pipelineType] as const,
+
+  /** Full pipeline status list for admin settings (includes inactive). */
+  settingsPipelineStatuses: (tenantId: string | null, pipelineType: "LEAD" | "JOB") =>
+    ["settingsPipelineStatuses", tenantId, pipelineType] as const,
 };

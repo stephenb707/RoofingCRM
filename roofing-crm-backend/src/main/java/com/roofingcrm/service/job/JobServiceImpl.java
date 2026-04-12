@@ -8,18 +8,20 @@ import com.roofingcrm.api.v1.job.UpdateJobRequest;
 import com.roofingcrm.domain.entity.Customer;
 import com.roofingcrm.domain.entity.Job;
 import com.roofingcrm.domain.entity.Lead;
+import com.roofingcrm.domain.entity.PipelineStatusDefinition;
 import com.roofingcrm.domain.entity.Tenant;
 import com.roofingcrm.domain.enums.ActivityEntityType;
-import com.roofingcrm.domain.repository.spec.JobSpecifications;
 import com.roofingcrm.domain.enums.ActivityEventType;
-import com.roofingcrm.service.activity.ActivityEventService;
-import com.roofingcrm.domain.enums.JobStatus;
+import com.roofingcrm.domain.enums.PipelineType;
 import com.roofingcrm.domain.repository.CustomerRepository;
 import com.roofingcrm.domain.repository.JobRepository;
 import com.roofingcrm.domain.repository.LeadRepository;
+import com.roofingcrm.domain.repository.PipelineStatusDefinitionRepository;
+import com.roofingcrm.domain.repository.spec.JobSpecifications;
 import com.roofingcrm.domain.value.Address;
-import com.roofingcrm.service.exception.ResourceNotFoundException;
+import com.roofingcrm.service.activity.ActivityEventService;
 import com.roofingcrm.service.audit.AuditSupport;
+import com.roofingcrm.service.exception.ResourceNotFoundException;
 import com.roofingcrm.service.tenant.TenantAccessService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -46,18 +48,21 @@ public class JobServiceImpl implements JobService {
     private final CustomerRepository customerRepository;
     private final LeadRepository leadRepository;
     private final ActivityEventService activityEventService;
+    private final PipelineStatusDefinitionRepository definitionRepository;
 
     @Autowired
     public JobServiceImpl(TenantAccessService tenantAccessService,
                           JobRepository jobRepository,
                           CustomerRepository customerRepository,
                           LeadRepository leadRepository,
-                          ActivityEventService activityEventService) {
+                          ActivityEventService activityEventService,
+                          PipelineStatusDefinitionRepository definitionRepository) {
         this.tenantAccessService = tenantAccessService;
         this.jobRepository = jobRepository;
         this.customerRepository = customerRepository;
         this.leadRepository = leadRepository;
         this.activityEventService = activityEventService;
+        this.definitionRepository = definitionRepository;
     }
 
     @Override
@@ -68,7 +73,6 @@ public class JobServiceImpl implements JobService {
         Lead lead = null;
 
         if (request.getLeadId() != null) {
-            // Create job from a lead
             lead = leadRepository.findByIdAndTenantAndArchivedFalse(request.getLeadId(), tenant)
                     .orElseThrow(() -> new ResourceNotFoundException("Lead not found"));
             customer = lead.getCustomer();
@@ -76,7 +80,6 @@ public class JobServiceImpl implements JobService {
                 throw new IllegalArgumentException("Lead has no associated customer");
             }
         } else if (request.getCustomerId() != null) {
-            // Create job directly from customer
             customer = customerRepository.findByIdAndTenantAndArchivedFalse(request.getCustomerId(), tenant)
                     .orElseThrow(() -> new ResourceNotFoundException("Customer not found"));
         } else {
@@ -90,7 +93,10 @@ public class JobServiceImpl implements JobService {
         AuditSupport.touchForCreate(job, userId);
 
         job.setJobType(request.getType());
-        job.setStatus(request.getScheduledStartDate() != null ? JobStatus.SCHEDULED : JobStatus.UNSCHEDULED);
+        PipelineStatusDefinition initial = request.getScheduledStartDate() != null
+                ? requireJobDefByKey(tenant, "SCHEDULED")
+                : requireJobDefByKey(tenant, "UNSCHEDULED");
+        job.setStatusDefinition(initial);
 
         if (request.getPropertyAddress() != null) {
             Address address = new Address();
@@ -115,18 +121,14 @@ public class JobServiceImpl implements JobService {
         return toDto(saved);
     }
 
-    /**
-     * Normalize scheduling status: ensure status reflects schedule state.
-     * scheduled → SCHEDULED; unscheduled → UNSCHEDULED.
-     * Idempotent; only flips between SCHEDULED and UNSCHEDULED.
-     */
     private void normalizeSchedulingStatus(Job job) {
         boolean isScheduled = job.getScheduledStartDate() != null;
-        JobStatus current = job.getStatus();
-        if (isScheduled && current == JobStatus.UNSCHEDULED) {
-            job.setStatus(JobStatus.SCHEDULED);
-        } else if (!isScheduled && current == JobStatus.SCHEDULED) {
-            job.setStatus(JobStatus.UNSCHEDULED);
+        String key = job.getStatusDefinition().getSystemKey();
+        Tenant tenant = job.getTenant();
+        if (isScheduled && "UNSCHEDULED".equals(key)) {
+            job.setStatusDefinition(requireJobDefByKey(tenant, "SCHEDULED"));
+        } else if (!isScheduled && "SCHEDULED".equals(key)) {
+            job.setStatusDefinition(requireJobDefByKey(tenant, "UNSCHEDULED"));
         }
     }
 
@@ -259,14 +261,21 @@ public class JobServiceImpl implements JobService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<JobDto> listJobs(@NonNull UUID tenantId, @NonNull UUID userId, JobStatus statusFilter, UUID customerIdFilter, @NonNull Pageable pageable) {
+    public Page<JobDto> listJobs(
+            @NonNull UUID tenantId,
+            @NonNull UUID userId,
+            UUID statusDefinitionIdFilter,
+            UUID customerIdFilter,
+            @NonNull Pageable pageable) {
         Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
 
         Page<Job> page;
-        if (statusFilter != null && customerIdFilter != null) {
-            page = jobRepository.findByTenantAndStatusAndCustomerIdAndArchivedFalse(tenant, statusFilter, customerIdFilter, pageable);
-        } else if (statusFilter != null) {
-            page = jobRepository.findByTenantAndStatusAndArchivedFalse(tenant, statusFilter, pageable);
+        if (statusDefinitionIdFilter != null && customerIdFilter != null) {
+            PipelineStatusDefinition def = requireJobDef(tenant, statusDefinitionIdFilter);
+            page = jobRepository.findByTenantAndStatusDefinitionAndCustomerIdAndArchivedFalse(tenant, def, customerIdFilter, pageable);
+        } else if (statusDefinitionIdFilter != null) {
+            PipelineStatusDefinition def = requireJobDef(tenant, statusDefinitionIdFilter);
+            page = jobRepository.findByTenantAndStatusDefinitionAndArchivedFalse(tenant, def, pageable);
         } else if (customerIdFilter != null) {
             page = jobRepository.findByTenantAndCustomerIdAndArchivedFalse(tenant, customerIdFilter, pageable);
         } else {
@@ -280,14 +289,14 @@ public class JobServiceImpl implements JobService {
     @Transactional(readOnly = true)
     public Page<JobDto> listScheduleJobs(@NonNull UUID tenantId, @NonNull UUID userId,
                                          @NonNull LocalDate startDate, @NonNull LocalDate endDate,
-                                         JobStatus status, String crewName, boolean includeUnscheduled,
+                                         UUID statusDefinitionId, String crewName, boolean includeUnscheduled,
                                          @NonNull Pageable pageable) {
         if (startDate.isAfter(endDate)) {
             throw new IllegalArgumentException("startDate must be before or equal to endDate");
         }
         Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
         Page<Job> page = jobRepository.searchSchedule(
-                tenant, status, crewName != null ? crewName : "", startDate, endDate, includeUnscheduled, pageable);
+                tenant, statusDefinitionId, crewName != null ? crewName : "", startDate, endDate, includeUnscheduled, pageable);
         return page.map(this::toDto);
     }
 
@@ -295,12 +304,12 @@ public class JobServiceImpl implements JobService {
     @Transactional(readOnly = true)
     public List<JobDto> listSchedule(@NonNull UUID tenantId, @NonNull UUID userId,
                                     @NonNull LocalDate from, @NonNull LocalDate to,
-                                    JobStatus status, String crewName, boolean includeUnscheduled) {
+                                    UUID statusDefinitionId, String crewName, boolean includeUnscheduled) {
         if (from.isAfter(to)) {
             throw new IllegalArgumentException("from must be before or equal to to");
         }
         Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
-        var spec = JobSpecifications.forSchedule(tenant, from, to, status, crewName, includeUnscheduled);
+        var spec = JobSpecifications.forSchedule(tenant, from, to, statusDefinitionId, crewName, includeUnscheduled);
         Sort sort = Sort.by(
                 Sort.Order.asc("scheduledStartDate").nullsLast(),
                 Sort.Order.desc("createdAt")
@@ -334,29 +343,49 @@ public class JobServiceImpl implements JobService {
     }
 
     @Override
-    public JobDto updateJobStatus(@NonNull UUID tenantId, @NonNull UUID userId, UUID jobId, JobStatus newStatus) {
+    public JobDto updateJobStatus(@NonNull UUID tenantId, @NonNull UUID userId, UUID jobId, UUID newStatusDefinitionId) {
         Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
 
         Job job = jobRepository.findByIdAndTenantAndArchivedFalse(jobId, tenant)
                 .orElseThrow(() -> new ResourceNotFoundException("Job not found"));
 
-        JobStatus prevStatus = job.getStatus();
-        job.setStatus(newStatus);
+        PipelineStatusDefinition newDef = requireJobDef(tenant, newStatusDefinitionId);
+        if (!newDef.isActive()) {
+            throw new IllegalArgumentException("Target status is not active.");
+        }
+        PipelineStatusDefinition prev = job.getStatusDefinition();
+        job.setStatusDefinition(newDef);
         AuditSupport.touchForUpdate(job, userId);
 
         Job updated = jobRepository.save(job);
 
-        if (prevStatus != newStatus) {
+        if (!prev.getId().equals(newDef.getId())) {
             Map<String, Object> meta = new HashMap<>();
             meta.put("jobId", jobId);
-            meta.put("fromStatus", prevStatus.name());
-            meta.put("toStatus", newStatus.name());
+            meta.put("fromStatus", prev.getSystemKey());
+            meta.put("toStatus", newDef.getSystemKey());
             activityEventService.recordEvent(tenant, userId, ActivityEntityType.JOB,
                     Objects.requireNonNull(jobId),
-                    ActivityEventType.JOB_STATUS_CHANGED, "Status: " + prevStatus + " → " + newStatus, meta);
+                    ActivityEventType.JOB_STATUS_CHANGED,
+                    "Status: " + prev.getLabel() + " → " + newDef.getLabel(), meta);
         }
 
         return toDto(updated);
+    }
+
+    private PipelineStatusDefinition requireJobDef(Tenant tenant, UUID id) {
+        PipelineStatusDefinition def = definitionRepository.findByIdAndTenantAndArchivedFalse(id, tenant)
+                .orElseThrow(() -> new ResourceNotFoundException("Status not found"));
+        if (def.getPipelineType() != PipelineType.JOB) {
+            throw new IllegalArgumentException("Not a job status");
+        }
+        return def;
+    }
+
+    private PipelineStatusDefinition requireJobDefByKey(Tenant tenant, String systemKey) {
+        return definitionRepository
+                .findByTenantAndPipelineTypeAndSystemKeyAndArchivedFalse(tenant, PipelineType.JOB, systemKey)
+                .orElseThrow(() -> new ResourceNotFoundException("Job pipeline is not configured for this tenant."));
     }
 
     private void applyAddress(Address entity, AddressDto dto) {
@@ -371,7 +400,10 @@ public class JobServiceImpl implements JobService {
     private JobDto toDto(Job entity) {
         JobDto dto = new JobDto();
         dto.setId(entity.getId());
-        dto.setStatus(entity.getStatus());
+        PipelineStatusDefinition sd = entity.getStatusDefinition();
+        dto.setStatusDefinitionId(sd.getId());
+        dto.setStatusKey(sd.getSystemKey());
+        dto.setStatusLabel(sd.getLabel());
         dto.setType(entity.getJobType());
         dto.setScheduledStartDate(entity.getScheduledStartDate());
         dto.setScheduledEndDate(entity.getScheduledEndDate());

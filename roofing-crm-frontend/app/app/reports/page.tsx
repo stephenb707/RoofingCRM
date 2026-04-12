@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useAuthReady } from "@/lib/AuthContext";
 import {
   downloadAccountingJobsExcel,
@@ -11,30 +12,23 @@ import {
   triggerBrowserDownload,
   LIMIT_OPTIONS,
 } from "@/lib/reportsApi";
-import {
-  LEAD_STATUSES,
-  STATUS_LABELS,
-  LEAD_SOURCES,
-  SOURCE_LABELS,
-} from "@/lib/leadsConstants";
-import {
-  JOB_STATUSES,
-  JOB_STATUS_LABELS,
-} from "@/lib/jobsConstants";
-import type { LeadStatus, LeadSource, JobStatus } from "@/lib/types";
+import { LEAD_SOURCES, SOURCE_LABELS } from "@/lib/leadsConstants";
+import { listPipelineStatuses } from "@/lib/pipelineStatusesApi";
+import { queryKeys } from "@/lib/queryKeys";
+import type { LeadSource } from "@/lib/types";
 
 export default function ReportsPage() {
-  const { api, ready } = useAuthReady();
+  const { api, auth, ready } = useAuthReady();
   const [leadsLoading, setLeadsLoading] = useState(false);
   const [jobsLoading, setJobsLoading] = useState(false);
   const [leadsError, setLeadsError] = useState<string | null>(null);
   const [jobsError, setJobsError] = useState<string | null>(null);
 
-  const [leadsStatus, setLeadsStatus] = useState<LeadStatus | "">("");
+  const [leadsStatusDefinitionId, setLeadsStatusDefinitionId] = useState<string>("");
   const [leadsSource, setLeadsSource] = useState<LeadSource | "">("");
   const [leadsLimit, setLeadsLimit] = useState(2000);
 
-  const [jobsStatus, setJobsStatus] = useState<JobStatus | "">("");
+  const [jobsStatusDefinitionId, setJobsStatusDefinitionId] = useState<string>("");
   const [jobsLimit, setJobsLimit] = useState(2000);
 
   const [invoiceYears, setInvoiceYears] = useState<number[] | null>(null);
@@ -47,13 +41,35 @@ export default function ReportsPage() {
   const [accountingXlsxLoading, setAccountingXlsxLoading] = useState(false);
   const [accountingXlsxError, setAccountingXlsxError] = useState<string | null>(null);
 
+  const { data: leadDefs = [] } = useQuery({
+    queryKey: queryKeys.pipelineStatuses(auth.selectedTenantId, "LEAD"),
+    queryFn: () => listPipelineStatuses(api, "LEAD"),
+    enabled: ready && !!auth.selectedTenantId,
+  });
+
+  const { data: jobDefs = [] } = useQuery({
+    queryKey: queryKeys.pipelineStatuses(auth.selectedTenantId, "JOB"),
+    queryFn: () => listPipelineStatuses(api, "JOB"),
+    enabled: ready && !!auth.selectedTenantId,
+  });
+
+  const sortedLeadDefs = useMemo(
+    () => [...leadDefs].filter((d) => d.active).sort((a, b) => a.sortOrder - b.sortOrder),
+    [leadDefs]
+  );
+
+  const sortedJobDefs = useMemo(
+    () => [...jobDefs].filter((d) => d.active).sort((a, b) => a.sortOrder - b.sortOrder),
+    [jobDefs]
+  );
+
   const handleDownloadLeads = useCallback(async () => {
     if (!ready) return;
     setLeadsError(null);
     setLeadsLoading(true);
     try {
       const { blob, filename } = await downloadLeadsCsv(api, {
-        status: leadsStatus || undefined,
+        statusDefinitionId: leadsStatusDefinitionId || undefined,
         source: leadsSource || undefined,
         limit: leadsLimit,
       });
@@ -63,7 +79,7 @@ export default function ReportsPage() {
     } finally {
       setLeadsLoading(false);
     }
-  }, [api, ready, leadsStatus, leadsSource, leadsLimit]);
+  }, [api, ready, leadsStatusDefinitionId, leadsSource, leadsLimit]);
 
   const handleDownloadJobs = useCallback(async () => {
     if (!ready) return;
@@ -71,7 +87,7 @@ export default function ReportsPage() {
     setJobsLoading(true);
     try {
       const { blob, filename } = await downloadJobsCsv(api, {
-        status: jobsStatus || undefined,
+        statusDefinitionId: jobsStatusDefinitionId || undefined,
         limit: jobsLimit,
       });
       triggerBrowserDownload(blob, filename);
@@ -80,7 +96,7 @@ export default function ReportsPage() {
     } finally {
       setJobsLoading(false);
     }
-  }, [api, ready, jobsStatus, jobsLimit]);
+  }, [api, ready, jobsStatusDefinitionId, jobsLimit]);
 
   useEffect(() => {
     if (!ready) return;
@@ -172,14 +188,14 @@ export default function ReportsPage() {
             </label>
             <select
               id="leads-status"
-              value={leadsStatus}
-              onChange={(e) => setLeadsStatus(e.target.value as LeadStatus | "")}
+              value={leadsStatusDefinitionId}
+              onChange={(e) => setLeadsStatusDefinitionId(e.target.value)}
               className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
             >
               <option value="">All</option>
-              {LEAD_STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {STATUS_LABELS[s]}
+              {sortedLeadDefs.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.label}
                 </option>
               ))}
             </select>
@@ -244,14 +260,14 @@ export default function ReportsPage() {
             </label>
             <select
               id="jobs-status"
-              value={jobsStatus}
-              onChange={(e) => setJobsStatus(e.target.value as JobStatus | "")}
+              value={jobsStatusDefinitionId}
+              onChange={(e) => setJobsStatusDefinitionId(e.target.value)}
               className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
             >
               <option value="">All</option>
-              {JOB_STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {JOB_STATUS_LABELS[s]}
+              {sortedJobDefs.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.label}
                 </option>
               ))}
             </select>

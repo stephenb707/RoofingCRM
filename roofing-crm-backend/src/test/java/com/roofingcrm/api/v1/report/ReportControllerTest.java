@@ -1,7 +1,6 @@
 package com.roofingcrm.api.v1.report;
 
 import com.roofingcrm.domain.enums.LeadSource;
-import com.roofingcrm.domain.enums.LeadStatus;
 import com.roofingcrm.security.AuthenticatedUser;
 import com.roofingcrm.service.report.ReportService;
 import org.junit.jupiter.api.BeforeEach;
@@ -97,16 +96,17 @@ class ReportControllerTest {
     @Test
     void leadsCsv_withStatusAndSource_passesFilters() throws Exception {
         byte[] csvBytes = "data".getBytes();
-        when(reportService.exportLeadsCsv(eq(userId), eq(tenantId), eq(LeadStatus.NEW), eq(LeadSource.WEBSITE), eq(100)))
+        UUID newLeadDef = UUID.randomUUID();
+        when(reportService.exportLeadsCsv(eq(userId), eq(tenantId), eq(newLeadDef), eq(LeadSource.WEBSITE), eq(100)))
                 .thenReturn(csvBytes);
 
         mockMvc.perform(get("/api/v1/reports/leads.csv")
                         .header("X-Tenant-Id", tenantId.toString())
-                        .param("status", "NEW")
+                        .param("statusDefinitionId", newLeadDef.toString())
                         .param("source", "WEBSITE")
                         .param("limit", "100"))
                 .andExpect(status().isOk());
 
-        verify(reportService).exportLeadsCsv(eq(userId), eq(tenantId), eq(LeadStatus.NEW), eq(LeadSource.WEBSITE), eq(100));
+        verify(reportService).exportLeadsCsv(eq(userId), eq(tenantId), eq(newLeadDef), eq(LeadSource.WEBSITE), eq(100));
     }
 }

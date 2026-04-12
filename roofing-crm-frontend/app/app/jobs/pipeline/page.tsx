@@ -17,16 +17,14 @@ import {
 } from "@dnd-kit/core";
 import { useAuthReady } from "@/lib/AuthContext";
 import { listJobs, updateJobStatus } from "@/lib/jobsApi";
+import { listPipelineStatuses } from "@/lib/pipelineStatusesApi";
+import type { PipelineStatusDefinitionDto } from "@/lib/pipelineStatusesApi";
+import { jobStatusBadgeClass } from "@/lib/pipelineStatusVisuals";
 import { getApiErrorMessage } from "@/lib/apiError";
-import {
-  JOB_STATUSES,
-  JOB_STATUS_LABELS,
-  JOB_STATUS_COLORS,
-  JOB_TYPE_LABELS,
-} from "@/lib/jobsConstants";
+import { JOB_TYPE_LABELS } from "@/lib/jobsConstants";
 import { queryKeys } from "@/lib/queryKeys";
 import { formatAddress, formatDate, formatPhone } from "@/lib/format";
-import type { JobDto, JobStatus } from "@/lib/types";
+import type { JobDto } from "@/lib/types";
 
 function customerName(job: JobDto): string {
   const parts = [job.customerFirstName, job.customerLastName].filter(Boolean);
@@ -35,6 +33,10 @@ function customerName(job: JobDto): string {
 
 function sortJobsInColumn(jobs: JobDto[]): JobDto[] {
   return [...jobs].sort((a, b) => (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""));
+}
+
+function sortActiveJobColumns(defs: PipelineStatusDefinitionDto[]): PipelineStatusDefinitionDto[] {
+  return [...defs].filter((d) => d.active).sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
 function jobMatchesSearch(job: JobDto, q: string): boolean {
@@ -50,6 +52,7 @@ function jobMatchesSearch(job: JobDto, q: string): boolean {
     job.scheduledEndDate ?? "",
     job.customerPhone ?? "",
     phoneDigits,
+    job.statusLabel ?? "",
   ];
   return parts.some((p) => p.toLowerCase().includes(needle));
 }
@@ -74,6 +77,21 @@ export default function JobsPipelinePage() {
     auth.tenants.find((t) => t.tenantId === auth.selectedTenantId)?.role === "SALES";
 
   const pipelineKey = queryKeys.jobsPipeline(auth.selectedTenantId, customerIdFromQuery);
+  const pipelineDefsKey = queryKeys.pipelineStatuses(auth.selectedTenantId, "JOB");
+
+  const { data: jobDefs = [], isLoading: defsLoading } = useQuery({
+    queryKey: pipelineDefsKey,
+    queryFn: () => listPipelineStatuses(api, "JOB"),
+    enabled: ready,
+  });
+
+  const columnDefs = useMemo(() => sortActiveJobColumns(jobDefs), [jobDefs]);
+
+  const defById = useMemo(() => {
+    const m = new Map<string, PipelineStatusDefinitionDto>();
+    for (const d of jobDefs) m.set(d.id, d);
+    return m;
+  }, [jobDefs]);
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: pipelineKey,
@@ -82,7 +100,6 @@ export default function JobsPipelinePage() {
         page: 0,
         size: 200,
         customerId: customerIdFromQuery || null,
-        status: null,
       }),
     enabled: ready,
   });
@@ -94,14 +111,29 @@ export default function JobsPipelinePage() {
   );
 
   const updateStatusMutation = useMutation({
-    mutationFn: ({ jobId, status }: { jobId: string; status: JobStatus }) =>
-      updateJobStatus(api, jobId, status),
-    onMutate: async ({ jobId, status }) => {
+    mutationFn: ({
+      jobId,
+      statusDefinitionId,
+    }: {
+      jobId: string;
+      statusDefinitionId: string;
+    }) => updateJobStatus(api, jobId, statusDefinitionId),
+    onMutate: async ({ jobId, statusDefinitionId }) => {
       await queryClient.cancelQueries({ queryKey: pipelineKey });
       const previous = queryClient.getQueryData<typeof data>(pipelineKey);
+      const targetDef = defById.get(statusDefinitionId);
       queryClient.setQueryData(pipelineKey, (old: typeof data) => {
-        if (!old) return old;
-        const newContent = old.content.map((j) => (j.id === jobId ? { ...j, status } : j));
+        if (!old || !targetDef) return old;
+        const newContent = old.content.map((j) =>
+          j.id === jobId
+            ? {
+                ...j,
+                statusDefinitionId,
+                statusKey: targetDef.systemKey,
+                statusLabel: targetDef.label,
+              }
+            : j
+        );
         return { ...old, content: newContent };
       });
       return { previous };
@@ -125,24 +157,24 @@ export default function JobsPipelinePage() {
     return jobs.filter((j) => jobMatchesSearch(j, debouncedSearch));
   }, [data?.content, debouncedSearch]);
 
-  const jobsByStatus = useMemo(() => {
-    const byStatus = new Map<JobStatus, JobDto[]>();
-    for (const s of JOB_STATUSES) {
-      byStatus.set(s, []);
+  const jobsByDefinitionId = useMemo(() => {
+    const byId = new Map<string, JobDto[]>();
+    for (const d of columnDefs) {
+      byId.set(d.id, []);
     }
     for (const job of filteredContent) {
-      const list = byStatus.get(job.status) ?? [];
+      const list = byId.get(job.statusDefinitionId) ?? [];
       list.push(job);
-      byStatus.set(job.status, list);
+      byId.set(job.statusDefinitionId, list);
     }
-    for (const s of JOB_STATUSES) {
-      byStatus.set(s, sortJobsInColumn(byStatus.get(s) ?? []));
+    for (const d of columnDefs) {
+      byId.set(d.id, sortJobsInColumn(byId.get(d.id) ?? []));
     }
-    return byStatus;
-  }, [filteredContent]);
+    return byId;
+  }, [filteredContent, columnDefs]);
 
-  const handleStatusChange = (jobId: string, newStatus: JobStatus) => {
-    updateStatusMutation.mutate({ jobId, status: newStatus });
+  const handleStatusChange = (jobId: string, statusDefinitionId: string) => {
+    updateStatusMutation.mutate({ jobId, statusDefinitionId });
   };
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -160,25 +192,26 @@ export default function JobsPipelinePage() {
     if (!job) return;
 
     const overId = String(over.id);
-    let newStatus: JobStatus;
+    let newDefId: string;
 
-    if (JOB_STATUSES.includes(overId as JobStatus)) {
-      newStatus = overId as JobStatus;
+    const colIds = new Set(columnDefs.map((c) => c.id));
+    if (colIds.has(overId)) {
+      newDefId = overId;
     } else if (overId.startsWith("job-")) {
       const overJobId = overId.replace("job-", "");
       const overJob = (data?.content ?? []).find((j) => j.id === overJobId);
       if (!overJob) return;
-      newStatus = overJob.status;
+      newDefId = overJob.statusDefinitionId;
     } else {
       return;
     }
 
-    if (job.status === newStatus) return;
+    if (job.statusDefinitionId === newDefId) return;
 
-    handleStatusChange(jobId, newStatus);
+    handleStatusChange(jobId, newDefId);
   };
 
-  if (isLoading) {
+  if (defsLoading || isLoading) {
     return (
       <div className="max-w-7xl mx-auto">
         <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
@@ -273,11 +306,11 @@ export default function JobsPipelinePage() {
 
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <div className="flex overflow-x-auto pb-4 gap-3">
-          {JOB_STATUSES.map((status) => (
+          {columnDefs.map((def) => (
             <JobPipelineColumn
-              key={status}
-              status={status}
-              jobs={jobsByStatus.get(status) ?? []}
+              key={def.id}
+              definition={def}
+              jobs={jobsByDefinitionId.get(def.id) ?? []}
               canEdit={canEditPipeline}
             />
           ))}
@@ -305,15 +338,15 @@ export default function JobsPipelinePage() {
 }
 
 function JobPipelineColumn({
-  status,
+  definition,
   jobs,
   canEdit,
 }: {
-  status: JobStatus;
+  definition: PipelineStatusDefinitionDto;
   jobs: JobDto[];
   canEdit: boolean;
 }) {
-  const { setNodeRef, isOver } = useDroppable({ id: status as string });
+  const { setNodeRef, isOver } = useDroppable({ id: definition.id });
 
   return (
     <div
@@ -321,10 +354,10 @@ function JobPipelineColumn({
       className={`flex-shrink-0 w-56 bg-slate-50 rounded-xl border-2 overflow-hidden transition-colors ${
         isOver ? "border-sky-400 bg-sky-50/50" : "border-slate-200"
       }`}
-      data-testid={`job-pipeline-col-${status}`}
+      data-testid={`job-pipeline-col-${definition.id}`}
     >
-      <div className={`border-b border-slate-200 ${JOB_STATUS_COLORS[status]} rounded-t-xl p-3`}>
-        <h2 className="font-semibold text-slate-800 text-sm">{JOB_STATUS_LABELS[status]}</h2>
+      <div className={`border-b border-slate-200 ${jobStatusBadgeClass(definition.systemKey)} rounded-t-xl p-3`}>
+        <h2 className="font-semibold text-slate-800 text-sm">{definition.label}</h2>
         <p className="text-xs text-slate-600 mt-0.5">{jobs.length} jobs</p>
       </div>
       <div className="max-h-[calc(100vh-280px)] overflow-y-auto p-2 space-y-2">
@@ -382,10 +415,10 @@ function JobPipelineCard({ job, canEdit }: { job: JobDto; canEdit: boolean }) {
       )}
       <div className="flex items-center justify-between gap-2 mt-2">
         <span
-          className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full border ${JOB_STATUS_COLORS[job.status]}`}
+          className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full border ${jobStatusBadgeClass(job.statusKey)}`}
           data-testid={`job-pipeline-card-status-${job.id}`}
         >
-          {JOB_STATUS_LABELS[job.status]}
+          {job.statusLabel}
         </span>
         <Link
           href={`/app/jobs/${job.id}`}

@@ -7,19 +7,21 @@ import com.roofingcrm.api.v1.job.CreateJobRequest;
 import com.roofingcrm.api.v1.job.JobDto;
 import com.roofingcrm.domain.entity.Customer;
 import com.roofingcrm.domain.entity.Lead;
+import com.roofingcrm.domain.entity.PipelineStatusDefinition;
 import com.roofingcrm.domain.entity.Tenant;
 import com.roofingcrm.domain.entity.TenantUserMembership;
 import com.roofingcrm.domain.entity.User;
-import com.roofingcrm.domain.enums.JobStatus;
 import com.roofingcrm.domain.enums.JobType;
 import com.roofingcrm.domain.enums.LeadSource;
-import com.roofingcrm.domain.enums.LeadStatus;
+import com.roofingcrm.domain.enums.PipelineType;
 import com.roofingcrm.domain.enums.UserRole;
 import com.roofingcrm.domain.repository.CustomerRepository;
 import com.roofingcrm.domain.repository.LeadRepository;
+import com.roofingcrm.domain.repository.PipelineStatusDefinitionRepository;
 import com.roofingcrm.domain.repository.TenantRepository;
 import com.roofingcrm.domain.repository.TenantUserMembershipRepository;
 import com.roofingcrm.domain.repository.UserRepository;
+import com.roofingcrm.service.pipeline.PipelineStatusAdminService;
 import com.roofingcrm.service.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -57,6 +59,12 @@ class JobServiceImplTest extends AbstractIntegrationTest {
     @Autowired
     private TestDatabaseCleaner dbCleaner;
 
+    @Autowired
+    private PipelineStatusAdminService pipelineStatusAdminService;
+
+    @Autowired
+    private PipelineStatusDefinitionRepository pipelineStatusDefinitionRepository;
+
     @NonNull
     private UUID tenantId = Objects.requireNonNull(UUID.randomUUID());
     @NonNull
@@ -89,6 +97,8 @@ class JobServiceImplTest extends AbstractIntegrationTest {
         this.tenantId = Objects.requireNonNull(tenant.getId());
         this.userId = Objects.requireNonNull(user.getId());
 
+        pipelineStatusAdminService.seedDefaultsForNewTenant(tenant);
+
         Customer customer = new Customer();
         customer.setTenant(tenant);
         customer.setFirstName("John");
@@ -97,13 +107,24 @@ class JobServiceImplTest extends AbstractIntegrationTest {
         customer = customerRepository.save(customer);
         this.customerId = Objects.requireNonNull(customer.getId());
 
+        PipelineStatusDefinition newLeadStatus = pipelineStatusDefinitionRepository
+                .findByTenantAndPipelineTypeAndSystemKeyAndArchivedFalse(tenant, PipelineType.LEAD, "NEW")
+                .orElseThrow();
         Lead lead = new Lead();
         lead.setTenant(tenant);
         lead.setCustomer(customer);
-        lead.setStatus(LeadStatus.NEW);
+        lead.setStatusDefinition(newLeadStatus);
         lead.setSource(LeadSource.WEBSITE);
         lead = leadRepository.save(lead);
         this.leadId = Objects.requireNonNull(lead.getId());
+    }
+
+    private UUID jobStatusId(String systemKey) {
+        Tenant t = tenantRepository.findById(tenantId).orElseThrow();
+        return pipelineStatusDefinitionRepository
+                .findByTenantAndPipelineTypeAndSystemKeyAndArchivedFalse(t, PipelineType.JOB, systemKey)
+                .orElseThrow()
+                .getId();
     }
 
     private void setScheduledDates(CreateJobRequest request) {
@@ -136,7 +157,7 @@ class JobServiceImplTest extends AbstractIntegrationTest {
         assertNotNull(dto.getId());
         assertEquals(customerId, dto.getCustomerId());
         assertEquals(leadId, dto.getLeadId());
-        assertEquals(JobStatus.SCHEDULED, dto.getStatus());
+        assertEquals("SCHEDULED", dto.getStatusKey());
         assertEquals(JobType.REPLACEMENT, dto.getType());
         assertEquals("Test job notes", dto.getInternalNotes());
         assertEquals("Team Alpha", dto.getCrewName());
@@ -161,7 +182,7 @@ class JobServiceImplTest extends AbstractIntegrationTest {
         assertNotNull(dto.getId());
         assertEquals(customerId, dto.getCustomerId());
         assertNull(dto.getLeadId());
-        assertEquals(JobStatus.SCHEDULED, dto.getStatus());
+        assertEquals("SCHEDULED", dto.getStatusKey());
         assertEquals(JobType.REPAIR, dto.getType());
         assertEquals("John", dto.getCustomerFirstName());
         assertEquals("Doe", dto.getCustomerLastName());
@@ -196,10 +217,10 @@ class JobServiceImplTest extends AbstractIntegrationTest {
         JobDto job2 = jobService.createJob(tenantId, userId, request2);
 
         // Update second job to IN_PROGRESS
-        jobService.updateJobStatus(tenantId, userId, job2.getId(), JobStatus.IN_PROGRESS);
+        jobService.updateJobStatus(tenantId, userId, job2.getId(), jobStatusId("IN_PROGRESS"));
 
-        Page<JobDto> scheduledJobs = jobService.listJobs(tenantId, userId, JobStatus.SCHEDULED, null, PageRequest.of(0, 10));
-        Page<JobDto> inProgressJobs = jobService.listJobs(tenantId, userId, JobStatus.IN_PROGRESS, null, PageRequest.of(0, 10));
+        Page<JobDto> scheduledJobs = jobService.listJobs(tenantId, userId, jobStatusId("SCHEDULED"), null, PageRequest.of(0, 10));
+        Page<JobDto> inProgressJobs = jobService.listJobs(tenantId, userId, jobStatusId("IN_PROGRESS"), null, PageRequest.of(0, 10));
 
         assertEquals(1, scheduledJobs.getTotalElements());
         assertEquals(job1.getId(), scheduledJobs.getContent().get(0).getId());
@@ -246,11 +267,11 @@ class JobServiceImplTest extends AbstractIntegrationTest {
         setScheduledDates(request);
         JobDto job = jobService.createJob(tenantId, userId, request);
 
-        assertEquals(JobStatus.SCHEDULED, job.getStatus());
+        assertEquals("SCHEDULED", job.getStatusKey());
 
-        JobDto updated = jobService.updateJobStatus(tenantId, userId, job.getId(), JobStatus.COMPLETED);
+        JobDto updated = jobService.updateJobStatus(tenantId, userId, job.getId(), jobStatusId("COMPLETED"));
 
-        assertEquals(JobStatus.COMPLETED, updated.getStatus());
+        assertEquals("COMPLETED", updated.getStatusKey());
     }
 
     @Test
@@ -317,7 +338,7 @@ class JobServiceImplTest extends AbstractIntegrationTest {
         request2.setType(JobType.REPAIR);
         request2.setPropertyAddress(createPropertyAddress());
         JobDto job2 = jobService.createJob(tenantId, userId, request2);
-        jobService.updateJobStatus(tenantId, userId, job2.getId(), JobStatus.IN_PROGRESS);
+        jobService.updateJobStatus(tenantId, userId, job2.getId(), jobStatusId("IN_PROGRESS"));
 
         CreateJobRequest request3 = new CreateJobRequest();
         request3.setCustomerId(otherCustomer.getId());
@@ -326,11 +347,33 @@ class JobServiceImplTest extends AbstractIntegrationTest {
         jobService.createJob(tenantId, userId, request3);
 
         // Filter by status and customerId
-        Page<JobDto> filtered = jobService.listJobs(tenantId, userId, JobStatus.SCHEDULED, customerId, PageRequest.of(0, 10));
+        Page<JobDto> filtered = jobService.listJobs(tenantId, userId, jobStatusId("SCHEDULED"), customerId, PageRequest.of(0, 10));
 
         assertEquals(1, filtered.getTotalElements());
         assertEquals(job1.getId(), filtered.getContent().get(0).getId());
         assertEquals("John", filtered.getContent().get(0).getCustomerFirstName());
         assertEquals("Doe", filtered.getContent().get(0).getCustomerLastName());
+    }
+
+    /**
+     * Dashboard and schedule list call {@code searchSchedule} with a null status filter.
+     * PostgreSQL rejects {@code (? is null or col = ?)} when the bound value is null because
+     * the JDBC parameter type is ambiguous; coalesce-based predicates avoid that.
+     */
+    @Test
+    void listScheduleJobs_withNullStatusFilter_executesSuccessfully() {
+        CreateJobRequest request = new CreateJobRequest();
+        request.setCustomerId(customerId);
+        request.setType(JobType.REPLACEMENT);
+        request.setPropertyAddress(createPropertyAddress());
+        setScheduledDates(request);
+        jobService.createJob(tenantId, userId, request);
+
+        LocalDate from = LocalDate.of(2026, 1, 20);
+        LocalDate to = LocalDate.of(2026, 2, 28);
+        Page<JobDto> page = jobService.listScheduleJobs(
+                tenantId, userId, Objects.requireNonNull(from), Objects.requireNonNull(to), null, "", false, PageRequest.of(0, 10));
+
+        assertEquals(1, page.getTotalElements());
     }
 }

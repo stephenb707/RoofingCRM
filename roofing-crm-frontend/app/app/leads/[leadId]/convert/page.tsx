@@ -137,7 +137,7 @@ export default function ConvertLeadPage() {
   }
 
   // LOST: cannot convert (single "Back to Lead" in card)
-  if (lead.status === "LOST") {
+  if (lead.statusKey === "LOST") {
     return (
       <div className="max-w-2xl mx-auto">
         <div className="mb-6">
@@ -192,7 +192,7 @@ export default function ConvertLeadPage() {
             </div>
             <div className="flex justify-between">
               <dt className="text-slate-500">Status:</dt>
-              <dd className="text-slate-800">{lead.status}</dd>
+              <dd className="text-slate-800">{lead.statusLabel}</dd>
             </div>
           </dl>
         </div>

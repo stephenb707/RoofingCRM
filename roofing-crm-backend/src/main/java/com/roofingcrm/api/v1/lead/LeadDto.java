@@ -2,7 +2,6 @@ package com.roofingcrm.api.v1.lead;
 
 import com.roofingcrm.api.v1.common.AddressDto;
 import com.roofingcrm.domain.enums.LeadSource;
-import com.roofingcrm.domain.enums.LeadStatus;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -22,7 +21,11 @@ public class LeadDto {
     private String customerEmail;
     private String customerPhone;
 
-    private LeadStatus status;
+    private UUID statusDefinitionId;
+    /** Stable key: built-in enum name or {@code C_<uuid>} for custom. */
+    private String statusKey;
+    /** Tenant-configured display label. */
+    private String statusLabel;
 
     private LeadSource source;
 

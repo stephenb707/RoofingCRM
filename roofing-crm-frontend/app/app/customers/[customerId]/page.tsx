@@ -12,8 +12,8 @@ import { queryKeys } from "@/lib/queryKeys";
 import { formatPhone, formatAddress, formatDate } from "@/lib/format";
 import { PREFERRED_CONTACT_LABELS } from "@/lib/preferredContactConstants";
 import type { LeadDto } from "@/lib/types";
-import { JOB_TYPE_LABELS, JOB_STATUS_LABELS, JOB_STATUS_COLORS } from "@/lib/jobsConstants";
-import { STATUS_LABELS, STATUS_COLORS } from "@/lib/leadsConstants";
+import { JOB_TYPE_LABELS } from "@/lib/jobsConstants";
+import { jobStatusBadgeClass, leadStatusBadgeClass } from "@/lib/pipelineStatusVisuals";
 
 export default function CustomerDetailPage() {
   const params = useParams();
@@ -160,8 +160,8 @@ export default function CustomerDetailPage() {
                       <tr key={job.id} className="hover:bg-slate-50">
                         <td className="px-4 py-2 text-sm text-slate-800">{JOB_TYPE_LABELS[job.type]}</td>
                         <td className="px-4 py-2">
-                          <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full border ${JOB_STATUS_COLORS[job.status]}`}>
-                            {JOB_STATUS_LABELS[job.status]}
+                          <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full border ${jobStatusBadgeClass(job.statusKey)}`}>
+                            {job.statusLabel}
                           </span>
                         </td>
                         <td className="px-4 py-2 text-sm text-slate-600">
@@ -208,8 +208,8 @@ export default function CustomerDetailPage() {
                     {leads.map((lead) => (
                       <tr key={lead.id} className="hover:bg-slate-50">
                         <td className="px-4 py-2">
-                          <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full border ${STATUS_COLORS[lead.status]}`}>
-                            {STATUS_LABELS[lead.status]}
+                          <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full border ${leadStatusBadgeClass(lead.statusKey)}`}>
+                            {lead.statusLabel}
                           </span>
                         </td>
                         <td className="px-4 py-2 text-sm text-slate-600">{formatAddress(lead.propertyAddress)}</td>

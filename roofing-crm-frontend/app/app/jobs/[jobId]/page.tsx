@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -9,12 +9,10 @@ import { getJob, updateJobStatus } from "@/lib/jobsApi";
 import { listEstimatesForJob } from "@/lib/estimatesApi";
 import { getCustomer } from "@/lib/customersApi";
 import { getApiErrorMessage } from "@/lib/apiError";
-import {
-  JOB_STATUSES,
-  JOB_STATUS_LABELS,
-  JOB_STATUS_COLORS,
-  JOB_TYPE_LABELS,
-} from "@/lib/jobsConstants";
+import { JOB_TYPE_LABELS } from "@/lib/jobsConstants";
+import { listPipelineStatuses } from "@/lib/pipelineStatusesApi";
+import type { PipelineStatusDefinitionDto } from "@/lib/pipelineStatusesApi";
+import { jobStatusBadgeClass } from "@/lib/pipelineStatusVisuals";
 import { queryKeys } from "@/lib/queryKeys";
 import { formatAddress, formatDate, formatDateTime, formatMoney, formatPhone } from "@/lib/format";
 import { listJobAttachments, uploadJobAttachment, downloadAttachment } from "@/lib/attachmentsApi";
@@ -32,7 +30,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { NextBestActions } from "@/components/NextBestActions";
 import { EstimateSharePanel } from "@/components/EstimateSharePanel";
 import { ESTIMATE_STATUS_COLORS, ESTIMATE_STATUS_LABELS } from "@/lib/estimatesConstants";
-import type { EstimateStatus, JobStatus, CreateCommunicationLogRequest, AttachmentTag } from "@/lib/types";
+import type { EstimateStatus, CreateCommunicationLogRequest, AttachmentTag } from "@/lib/types";
 import { PREFERRED_CONTACT_LABELS } from "@/lib/preferredContactConstants";
 
 export default function JobDetailPage() {
@@ -41,7 +39,7 @@ export default function JobDetailPage() {
   const { api, auth, ready } = useAuthReady();
   const queryClient = useQueryClient();
 
-  const [selectedStatus, setSelectedStatus] = useState<JobStatus | null>(null);
+  const [selectedStatusId, setSelectedStatusId] = useState<string | null>(null);
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [commLogError, setCommLogError] = useState<string | null>(null);
@@ -53,6 +51,18 @@ export default function JobDetailPage() {
     queryFn: () => getJob(api, jobId),
     enabled: ready && !!jobId,
   });
+
+  const pipelineDefsKey = queryKeys.pipelineStatuses(auth.selectedTenantId, "JOB");
+  const { data: jobDefs = [] } = useQuery({
+    queryKey: pipelineDefsKey,
+    queryFn: () => listPipelineStatuses(api, "JOB"),
+    enabled: ready,
+  });
+
+  const sortedJobDefs = useMemo(
+    () => [...jobDefs].filter((d) => d.active).sort((a, b) => a.sortOrder - b.sortOrder),
+    [jobDefs]
+  );
 
   const { data: customer } = useQuery({
     queryKey: queryKeys.customer(auth.selectedTenantId, job?.customerId ?? ""),
@@ -73,9 +83,9 @@ export default function JobDetailPage() {
     selectedTenant?.role === "SALES";
 
   useEffect(() => {
-    if (job) setSelectedStatus(job.status);
+    if (job) setSelectedStatusId(job.statusDefinitionId);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sync only when server status changes
-  }, [job?.status]);
+  }, [job?.statusDefinitionId]);
 
   useEffect(() => {
     const id = "attachments";
@@ -93,7 +103,7 @@ export default function JobDetailPage() {
   }, [jobId]);
 
   const statusMutation = useMutation({
-    mutationFn: (newStatus: JobStatus) => updateJobStatus(api, jobId, newStatus),
+    mutationFn: (statusDefinitionId: string) => updateJobStatus(api, jobId, statusDefinitionId),
     onSuccess: () => {
       setUpdateError(null);
       queryClient.invalidateQueries({ queryKey: queryKeys.job(auth.selectedTenantId, jobId) });
@@ -102,14 +112,14 @@ export default function JobDetailPage() {
     onError: (err: unknown) => {
       console.error("Failed to update job status:", err);
       setUpdateError(getApiErrorMessage(err, "Failed to update status. Please try again."));
-      if (job) setSelectedStatus(job.status);
+      if (job) setSelectedStatusId(job.statusDefinitionId);
     },
   });
 
-  const handleStatusChange = (newStatus: JobStatus) => {
-    if (newStatus !== job?.status) {
-      setSelectedStatus(newStatus);
-      statusMutation.mutate(newStatus);
+  const handleStatusChange = (statusDefinitionId: string) => {
+    if (statusDefinitionId !== job?.statusDefinitionId) {
+      setSelectedStatusId(statusDefinitionId);
+      statusMutation.mutate(statusDefinitionId);
     }
   };
 
@@ -233,8 +243,8 @@ export default function JobDetailPage() {
             </h1>
             <p className="text-sm text-slate-500 mt-1">Job Details</p>
           </div>
-          <span className={`inline-flex px-3 py-1.5 text-sm font-medium rounded-full border ${JOB_STATUS_COLORS[job.status]}`}>
-            {JOB_STATUS_LABELS[job.status]}
+          <span className={`inline-flex px-3 py-1.5 text-sm font-medium rounded-full border ${jobStatusBadgeClass(job.statusKey)}`}>
+            {job.statusLabel}
           </span>
         </div>
       </div>
@@ -309,8 +319,8 @@ export default function JobDetailPage() {
               <div>
                 <dt className="text-xs font-medium text-slate-500 uppercase tracking-wider">Status</dt>
                 <dd className="mt-1">
-                  <span className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full border ${JOB_STATUS_COLORS[job.status]}`}>
-                    {JOB_STATUS_LABELS[job.status]}
+                  <span className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full border ${jobStatusBadgeClass(job.statusKey)}`}>
+                    {job.statusLabel}
                   </span>
                 </dd>
               </div>
@@ -406,7 +416,7 @@ export default function JobDetailPage() {
         </div>
 
         <div className="space-y-6">
-          <NextBestActions entityType="job" status={job.status} jobId={jobId} />
+          <NextBestActions entityType="job" status={job.statusKey} jobId={jobId} />
 
           <div className="bg-white rounded-xl border border-slate-200 p-6">
             <h2 className="text-lg font-semibold text-slate-800 mb-4">Latest Estimate</h2>
@@ -503,20 +513,20 @@ export default function JobDetailPage() {
               </div>
             )}
             <div className="space-y-2">
-              {JOB_STATUSES.map((status) => (
+              {sortedJobDefs.map((def: PipelineStatusDefinitionDto) => (
                 <button
-                  key={status}
-                  onClick={() => handleStatusChange(status)}
+                  key={def.id}
+                  onClick={() => handleStatusChange(def.id)}
                   disabled={statusMutation.isPending}
                   className={`w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                    selectedStatus === status
-                      ? JOB_STATUS_COLORS[status] + " border"
+                    selectedStatusId === def.id
+                      ? jobStatusBadgeClass(def.systemKey) + " border"
                       : "bg-slate-50 text-slate-700 hover:bg-slate-100 border border-transparent"
                   } ${statusMutation.isPending ? "opacity-60 cursor-not-allowed" : ""}`}
                 >
                   <div className="flex items-center justify-between">
-                    <span>{JOB_STATUS_LABELS[status]}</span>
-                    {selectedStatus === status && (
+                    <span>{def.label}</span>
+                    {selectedStatusId === def.id && (
                       <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                       </svg>

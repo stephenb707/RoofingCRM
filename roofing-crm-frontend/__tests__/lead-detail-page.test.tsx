@@ -8,6 +8,7 @@ import * as attachmentsApi from "@/lib/attachmentsApi";
 import * as communicationLogsApi from "@/lib/communicationLogsApi";
 import * as tasksApi from "@/lib/tasksApi";
 import * as activityApi from "@/lib/activityApi";
+import * as pipelineStatusesApi from "@/lib/pipelineStatusesApi";
 import { LeadDto } from "@/lib/types";
 
 jest.mock("@/lib/leadsApi");
@@ -16,6 +17,7 @@ jest.mock("@/lib/attachmentsApi");
 jest.mock("@/lib/communicationLogsApi");
 jest.mock("@/lib/tasksApi");
 jest.mock("@/lib/activityApi");
+jest.mock("@/lib/pipelineStatusesApi");
 jest.mock("next/navigation", () => ({
   useRouter: () => ({ push: jest.fn(), replace: jest.fn(), back: jest.fn() }),
   usePathname: () => "/app/leads/lead-1",
@@ -29,15 +31,48 @@ const mockedAttachmentsApi = attachmentsApi as jest.Mocked<typeof attachmentsApi
 const mockedCommLogsApi = communicationLogsApi as jest.Mocked<typeof communicationLogsApi>;
 const mockedTasksApi = tasksApi as jest.Mocked<typeof tasksApi>;
 const mockedActivityApi = activityApi as jest.Mocked<typeof activityApi>;
+const mockedPipelineApi = pipelineStatusesApi as jest.Mocked<typeof pipelineStatusesApi>;
+
+const defNew = {
+  id: "def-new",
+  pipelineType: "LEAD" as const,
+  systemKey: "NEW",
+  label: "New",
+  sortOrder: 0,
+  builtIn: true,
+  active: true,
+};
+
+const defLost = {
+  id: "def-lost",
+  pipelineType: "LEAD" as const,
+  systemKey: "LOST",
+  label: "Lost",
+  sortOrder: 5,
+  builtIn: true,
+  active: true,
+};
+
+const defWon = {
+  id: "def-won",
+  pipelineType: "LEAD" as const,
+  systemKey: "WON",
+  label: "Won",
+  sortOrder: 4,
+  builtIn: true,
+  active: true,
+};
 
 const mockLead: LeadDto = {
   id: "lead-1",
   customerId: "cust-1",
-  status: "NEW",
+  statusDefinitionId: defNew.id,
+  statusKey: "NEW",
+  statusLabel: "New",
   source: "WEBSITE",
   leadNotes: "Notes",
   propertyAddress: { line1: "123 Main St", city: "Denver", state: "CO" },
-  preferredContactMethod: "Phone",
+  pipelinePosition: 0,
   createdAt: "2024-01-01T00:00:00Z",
   updatedAt: "2024-01-01T00:00:00Z",
   customerFirstName: "John",
@@ -51,6 +86,7 @@ describe("LeadDetailPage", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockedPipelineApi.listPipelineStatuses.mockResolvedValue([defNew, defWon, defLost]);
     mockedLeadsApi.getLead.mockResolvedValue(mockLead);
     mockedCustomersApi.getCustomer.mockResolvedValue({
       id: "cust-1",
@@ -99,7 +135,9 @@ describe("LeadDetailPage", () => {
   it("hides Convert to Job button when lead status is LOST", async () => {
     mockedLeadsApi.getLead.mockResolvedValue({
       ...mockLead,
-      status: "LOST",
+      statusDefinitionId: defLost.id,
+      statusKey: "LOST",
+      statusLabel: "Lost",
     });
 
     render(<LeadDetailPage />);
@@ -116,7 +154,9 @@ describe("LeadDetailPage", () => {
     mockedLeadsApi.getLead.mockResolvedValue({
       ...mockLead,
       convertedJobId: "job-99",
-      status: "WON",
+      statusDefinitionId: defWon.id,
+      statusKey: "WON",
+      statusLabel: "Won",
     });
 
     render(<LeadDetailPage />);

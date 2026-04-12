@@ -1,8 +1,8 @@
 package com.roofingcrm.domain.repository;
 
 import com.roofingcrm.domain.entity.Job;
+import com.roofingcrm.domain.entity.PipelineStatusDefinition;
 import com.roofingcrm.domain.entity.Tenant;
-import com.roofingcrm.domain.enums.JobStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -44,34 +44,36 @@ public interface JobRepository extends JpaRepository<Job, UUID>, JpaSpecificatio
             @Param("rangeStart") LocalDate rangeStart,
             @Param("rangeEnd") LocalDate rangeEnd);
 
-    @EntityGraph(attributePaths = {"customer", "lead"})
+    @EntityGraph(attributePaths = {"customer", "lead", "statusDefinition"})
     @NonNull List<Job> findAll(@NonNull Specification<Job> spec, @NonNull Sort sort);
 
-    @EntityGraph(attributePaths = {"customer"})
+    @EntityGraph(attributePaths = {"customer", "statusDefinition"})
     Page<Job> findByTenantAndArchivedFalse(Tenant tenant, Pageable pageable);
 
-    @EntityGraph(attributePaths = {"customer"})
-    Page<Job> findByTenantAndStatusAndArchivedFalse(Tenant tenant, JobStatus status, Pageable pageable);
+    @EntityGraph(attributePaths = {"customer", "statusDefinition"})
+    Page<Job> findByTenantAndStatusDefinitionAndArchivedFalse(
+            Tenant tenant, PipelineStatusDefinition statusDefinition, Pageable pageable);
 
-    @EntityGraph(attributePaths = {"customer"})
+    @EntityGraph(attributePaths = {"customer", "statusDefinition"})
     Page<Job> findByTenantAndCustomerIdAndArchivedFalse(Tenant tenant, UUID customerId, Pageable pageable);
 
-    @EntityGraph(attributePaths = {"customer"})
-    Page<Job> findByTenantAndStatusAndCustomerIdAndArchivedFalse(Tenant tenant, JobStatus status, UUID customerId, Pageable pageable);
+    @EntityGraph(attributePaths = {"customer", "statusDefinition"})
+    Page<Job> findByTenantAndStatusDefinitionAndCustomerIdAndArchivedFalse(
+            Tenant tenant, PipelineStatusDefinition statusDefinition, UUID customerId, Pageable pageable);
 
-    @EntityGraph(attributePaths = {"customer"})
+    @EntityGraph(attributePaths = {"customer", "lead", "statusDefinition"})
     Optional<Job> findByIdAndTenantAndArchivedFalse(UUID id, Tenant tenant);
 
-    @EntityGraph(attributePaths = {"customer"})
+    @EntityGraph(attributePaths = {"customer", "lead", "statusDefinition"})
     Optional<Job> findByTenantAndLeadIdAndArchivedFalse(Tenant tenant, UUID leadId);
 
-    @EntityGraph(attributePaths = {"customer", "lead"})
+    @EntityGraph(attributePaths = {"customer", "statusDefinition"})
     @Query("""
         select j from Job j
         where j.tenant = :tenant
           and j.archived = false
-          and (:status is null or j.status = :status)
-          and (:crewName is null or :crewName = '' or lower(j.assignedCrew) like lower(concat('%', :crewName, '%')))
+          and coalesce(:statusDefinitionId, j.statusDefinition.id) = j.statusDefinition.id
+          and (coalesce(:crewName, '') = '' or lower(j.assignedCrew) like lower(concat('%', :crewName, '%')))
           and (
             (j.scheduledStartDate is not null
               and j.scheduledStartDate <= :endDate
@@ -82,7 +84,7 @@ public interface JobRepository extends JpaRepository<Job, UUID>, JpaSpecificatio
         """)
     Page<Job> searchSchedule(
             @Param("tenant") Tenant tenant,
-            @Param("status") JobStatus status,
+            @Param("statusDefinitionId") UUID statusDefinitionId,
             @Param("crewName") String crewName,
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate,

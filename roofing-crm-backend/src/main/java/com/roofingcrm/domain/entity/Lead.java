@@ -1,7 +1,6 @@
 package com.roofingcrm.domain.entity;
 
 import com.roofingcrm.domain.enums.LeadSource;
-import com.roofingcrm.domain.enums.LeadStatus;
 import com.roofingcrm.domain.value.Address;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
@@ -16,7 +15,7 @@ import lombok.Setter;
 @Entity
 @Table(name = "leads",
         indexes = {
-                @Index(name = "idx_lead_tenant_status", columnList = "tenant_id, status"),
+                @Index(name = "idx_lead_tenant_status_def", columnList = "tenant_id, status_definition_id"),
                 @Index(name = "idx_lead_tenant_source", columnList = "tenant_id, source")
         })
 @Getter
@@ -29,9 +28,9 @@ public class Lead extends TenantAuditedEntity {
     private Customer customer;
 
     @NotNull
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 50)
-    private LeadStatus status;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "status_definition_id", nullable = false)
+    private PipelineStatusDefinition statusDefinition;
 
     @NotNull
     @Enumerated(EnumType.STRING)
