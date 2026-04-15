@@ -133,4 +133,14 @@ export const queryKeys = {
   /** Full pipeline status list for admin settings (includes inactive). */
   settingsPipelineStatuses: (tenantId: string | null, pipelineType: "LEAD" | "JOB") =>
     ["settingsPipelineStatuses", tenantId, pipelineType] as const,
+
+  customerPhotoReports: (tenantId: string | null) =>
+    ["customerPhotoReports", tenantId] as const,
+  customerPhotoReport: (tenantId: string | null, reportId: string) =>
+    ["customerPhotoReport", tenantId, reportId] as const,
+  customerPhotoReportCandidates: (
+    tenantId: string | null,
+    customerId: string,
+    jobId: string | null | undefined
+  ) => ["customerPhotoReportCandidates", tenantId, customerId, jobId ?? ""] as const,
 };

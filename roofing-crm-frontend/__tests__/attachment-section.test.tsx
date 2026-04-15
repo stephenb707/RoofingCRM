@@ -72,4 +72,32 @@ describe("AttachmentSection", () => {
       description: "Roof damage photo",
     });
   });
+
+  it("renders delete action and calls onDelete", async () => {
+    const onDelete = jest.fn();
+    const onDownload = jest.fn();
+
+    render(
+      <AttachmentSection
+        title="Attachments"
+        attachments={[
+          {
+            id: "att-1",
+            fileName: "damage.jpg",
+            contentType: "image/jpeg",
+            fileSize: 1024,
+            tag: "DAMAGE",
+            leadId: null,
+            jobId: "job-1",
+          },
+        ]}
+        onUpload={jest.fn()}
+        onDownload={onDownload}
+        onDelete={onDelete}
+      />
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: /delete/i }));
+    expect(onDelete).toHaveBeenCalledWith("att-1", "damage.jpg");
+  });
 });

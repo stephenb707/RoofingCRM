@@ -5,6 +5,7 @@ import { useState } from "react";
 export interface SendEmailModalValues {
   recipientEmail: string;
   recipientName?: string;
+  subject?: string;
   message?: string;
   expiresInDays?: number;
 }
@@ -15,6 +16,10 @@ interface SendEmailModalProps {
   error?: string | null;
   initialRecipientEmail?: string;
   initialRecipientName?: string;
+  initialSubject?: string;
+  initialMessage?: string;
+  showSubjectField?: boolean;
+  showExpiresField?: boolean;
   onClose: () => void;
   onSubmit: (values: SendEmailModalValues) => void | Promise<void>;
 }
@@ -25,13 +30,18 @@ export function SendEmailModal({
   error,
   initialRecipientEmail = "",
   initialRecipientName = "",
+  initialSubject = "",
+  initialMessage = "",
+  showSubjectField = false,
+  showExpiresField = true,
   onClose,
   onSubmit,
 }: SendEmailModalProps) {
   const titleId = "send-email-modal-title";
   const [recipientEmail, setRecipientEmail] = useState(initialRecipientEmail);
   const [recipientName, setRecipientName] = useState(initialRecipientName);
-  const [message, setMessage] = useState("");
+  const [subject, setSubject] = useState(initialSubject);
+  const [message, setMessage] = useState(initialMessage);
   const [expiresInDays, setExpiresInDays] = useState("14");
 
   return (
@@ -51,8 +61,10 @@ export function SendEmailModal({
             onSubmit({
               recipientEmail: recipientEmail.trim(),
               recipientName: recipientName.trim() || undefined,
+              subject: subject.trim() || undefined,
               message: message.trim() || undefined,
-              expiresInDays: expiresInDays.trim() ? Number(expiresInDays) : undefined,
+              expiresInDays:
+                showExpiresField && expiresInDays.trim() ? Number(expiresInDays) : undefined,
             });
           }}
           className="space-y-4"
@@ -82,6 +94,20 @@ export function SendEmailModal({
               className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
             />
           </div>
+          {showSubjectField && (
+            <div>
+              <label htmlFor="send-email-subject" className="block text-sm font-medium text-slate-700 mb-1">
+                Subject (optional)
+              </label>
+              <input
+                id="send-email-subject"
+                type="text"
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+              />
+            </div>
+          )}
           <div>
             <label htmlFor="send-email-message" className="block text-sm font-medium text-slate-700 mb-1">
               Message (optional)
@@ -94,20 +120,22 @@ export function SendEmailModal({
               className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
             />
           </div>
-          <div>
-            <label htmlFor="send-email-expires" className="block text-sm font-medium text-slate-700 mb-1">
-              Link expires in days
-            </label>
-            <input
-              id="send-email-expires"
-              type="number"
-              min={1}
-              max={365}
-              value={expiresInDays}
-              onChange={(e) => setExpiresInDays(e.target.value)}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
-            />
-          </div>
+          {showExpiresField && (
+            <div>
+              <label htmlFor="send-email-expires" className="block text-sm font-medium text-slate-700 mb-1">
+                Link expires in days
+              </label>
+              <input
+                id="send-email-expires"
+                type="number"
+                min={1}
+                max={365}
+                value={expiresInDays}
+                onChange={(e) => setExpiresInDays(e.target.value)}
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+              />
+            </div>
+          )}
           {error && <p className="text-sm text-red-600">{error}</p>}
           <div className="flex gap-3 justify-end pt-2">
             <button

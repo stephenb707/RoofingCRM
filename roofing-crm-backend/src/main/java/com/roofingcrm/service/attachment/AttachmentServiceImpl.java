@@ -9,6 +9,7 @@ import com.roofingcrm.domain.enums.ActivityEntityType;
 import com.roofingcrm.domain.enums.ActivityEventType;
 import com.roofingcrm.domain.enums.AttachmentTag;
 import com.roofingcrm.domain.repository.AttachmentRepository;
+import com.roofingcrm.domain.repository.CustomerPhotoReportSectionPhotoRepository;
 import com.roofingcrm.domain.repository.JobRepository;
 import com.roofingcrm.domain.repository.LeadRepository;
 import com.roofingcrm.service.activity.ActivityEventService;
@@ -21,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +35,7 @@ public class AttachmentServiceImpl implements AttachmentService {
 
     private final TenantAccessService tenantAccessService;
     private final AttachmentRepository attachmentRepository;
+    private final CustomerPhotoReportSectionPhotoRepository reportSectionPhotoRepository;
     private final LeadRepository leadRepository;
     private final JobRepository jobRepository;
     private final AttachmentStorageService storageService;
@@ -40,12 +43,14 @@ public class AttachmentServiceImpl implements AttachmentService {
 
     public AttachmentServiceImpl(TenantAccessService tenantAccessService,
                                   AttachmentRepository attachmentRepository,
+                                  CustomerPhotoReportSectionPhotoRepository reportSectionPhotoRepository,
                                   LeadRepository leadRepository,
                                   JobRepository jobRepository,
                                   AttachmentStorageService storageService,
                                   ActivityEventService activityEventService) {
         this.tenantAccessService = tenantAccessService;
         this.attachmentRepository = attachmentRepository;
+        this.reportSectionPhotoRepository = reportSectionPhotoRepository;
         this.leadRepository = leadRepository;
         this.jobRepository = jobRepository;
         this.storageService = storageService;
@@ -172,6 +177,24 @@ public class AttachmentServiceImpl implements AttachmentService {
         }
 
         return storageService.loadAsStream(attachment.getStorageKey());
+    }
+
+    @Override
+    public void deleteAttachment(@NonNull UUID tenantId, @NonNull UUID userId, @NonNull UUID attachmentId) {
+        Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
+
+        Attachment attachment = attachmentRepository.findByIdAndTenantAndArchivedFalse(attachmentId, tenant)
+                .orElseThrow(() -> new ResourceNotFoundException("Attachment not found"));
+
+        if (reportSectionPhotoRepository.existsActiveReportReference(attachmentId)) {
+            throw new IllegalArgumentException(
+                    "This attachment is still used in a customer photo report. Remove it from the report first.");
+        }
+
+        attachment.setArchived(true);
+        attachment.setArchivedAt(Instant.now());
+        attachment.setUpdatedByUserId(userId);
+        attachmentRepository.save(attachment);
     }
 
     private Attachment createAttachment(Tenant tenant, UUID userId, MultipartFile file, AttachmentTag tag, String description) {

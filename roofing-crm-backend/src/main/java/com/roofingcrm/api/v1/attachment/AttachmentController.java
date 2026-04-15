@@ -111,4 +111,13 @@ public class AttachmentController {
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
                 .body(new InputStreamResource(Objects.requireNonNull(content)));
     }
+
+    @DeleteMapping("/attachments/{id}")
+    public ResponseEntity<Void> deleteAttachment(
+            @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
+            @PathVariable("id") @NonNull UUID attachmentId) {
+        UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
+        attachmentService.deleteAttachment(tenantId, userId, attachmentId);
+        return ResponseEntity.noContent().build();
+    }
 }

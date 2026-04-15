@@ -67,6 +67,11 @@ describe("ReportsPage", () => {
     expect(screen.getByRole("button", { name: /Download Jobs CSV/i })).toBeInTheDocument();
     expect(screen.getByText("Accounting Report")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Download Excel/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Customer photo reports/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Open photo reports/i })).toHaveAttribute(
+      "href",
+      "/app/reports/customer-reports"
+    );
   });
 
   it("calls downloadLeadsCsv with selected filters when clicking Download Leads CSV", async () => {

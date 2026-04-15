@@ -36,6 +36,18 @@ public class ResendEmailService implements EmailService {
                 "html", message.html(),
                 "text", message.text()
         );
+        if (message.attachments() != null && !message.attachments().isEmpty()) {
+            payload = new java.util.HashMap<>(payload);
+            payload.put("attachments", message.attachments().stream().map(attachment -> {
+                Map<String, Object> entry = new java.util.HashMap<>();
+                entry.put("filename", attachment.filename());
+                entry.put("content", attachment.content());
+                if (attachment.contentType() != null && !attachment.contentType().isBlank()) {
+                    entry.put("content_type", attachment.contentType());
+                }
+                return entry;
+            }).toList());
+        }
 
         try {
             restClient.post()

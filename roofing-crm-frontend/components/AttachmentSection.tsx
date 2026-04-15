@@ -15,8 +15,10 @@ export interface AttachmentSectionProps {
   attachments: AttachmentDto[];
   onUpload: (file: File, options?: UploadOptions) => void | Promise<void>;
   onDownload: (attachmentId: string, fileName: string) => void | Promise<void>;
+  onDelete?: (attachmentId: string, fileName: string) => void | Promise<void>;
   isLoading?: boolean;
   isUploading?: boolean;
+  deletingAttachmentId?: string | null;
   errorMessage?: string | null;
 }
 
@@ -25,8 +27,10 @@ export function AttachmentSection({
   attachments,
   onUpload,
   onDownload,
+  onDelete,
   isLoading = false,
   isUploading = false,
+  deletingAttachmentId = null,
   errorMessage = null,
 }: AttachmentSectionProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -127,6 +131,16 @@ export function AttachmentSection({
               >
                 Download
               </button>
+              {onDelete && (
+                <button
+                  type="button"
+                  onClick={() => onDelete(a.id, a.fileName ?? a.id)}
+                  disabled={deletingAttachmentId === a.id}
+                  className="ml-2 px-3 py-1.5 text-sm font-medium text-red-700 bg-white border border-red-200 hover:bg-red-50 rounded-lg shrink-0 disabled:opacity-60"
+                >
+                  {deletingAttachmentId === a.id ? "Deleting…" : "Delete"}
+                </button>
+              )}
             </li>
           ))}
         </ul>

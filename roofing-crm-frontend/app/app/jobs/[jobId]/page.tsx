@@ -15,7 +15,7 @@ import type { PipelineStatusDefinitionDto } from "@/lib/pipelineStatusesApi";
 import { jobStatusBadgeClass } from "@/lib/pipelineStatusVisuals";
 import { queryKeys } from "@/lib/queryKeys";
 import { formatAddress, formatDate, formatDateTime, formatMoney, formatPhone } from "@/lib/format";
-import { listJobAttachments, uploadJobAttachment, downloadAttachment } from "@/lib/attachmentsApi";
+import { listJobAttachments, uploadJobAttachment, downloadAttachment, deleteAttachment } from "@/lib/attachmentsApi";
 import {
   listJobCommunicationLogs,
   addJobCommunicationLog,
@@ -152,6 +152,20 @@ export default function JobDetailPage() {
     },
   });
 
+  const deleteAttachmentMutation = useMutation({
+    mutationFn: (attachmentId: string) => deleteAttachment(api, attachmentId),
+    onSuccess: () => {
+      setAttachmentError(null);
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.jobAttachments(auth.selectedTenantId, jobId),
+      });
+    },
+    onError: (err: unknown) => {
+      console.error("Failed to delete attachment:", err);
+      setAttachmentError(getApiErrorMessage(err, "Failed to delete attachment."));
+    },
+  });
+
   const handleDownloadAttachment = async (attachmentId: string, fileName: string) => {
     try {
       const blob = await downloadAttachment(api, attachmentId);
@@ -165,6 +179,14 @@ export default function JobDetailPage() {
       console.error("Failed to download attachment:", err);
       setAttachmentError(getApiErrorMessage(err, "Failed to download."));
     }
+  };
+
+  const handleDeleteAttachment = async (attachmentId: string, fileName: string) => {
+    if (!window.confirm(`Delete "${fileName}" from this job? This cannot be undone.`)) {
+      return;
+    }
+    setAttachmentError(null);
+    deleteAttachmentMutation.mutate(attachmentId);
   };
 
   const commLogsQuery = useQuery({
@@ -398,8 +420,10 @@ export default function JobDetailPage() {
                 uploadAttachmentMutation.mutate({ file, tag: options?.tag, description: options?.description })
               }
               onDownload={handleDownloadAttachment}
+              onDelete={handleDeleteAttachment}
               isLoading={attachmentsQuery.isLoading}
               isUploading={uploadAttachmentMutation.isPending}
+              deletingAttachmentId={deleteAttachmentMutation.variables ?? null}
               errorMessage={attachmentError}
             />
           </div>

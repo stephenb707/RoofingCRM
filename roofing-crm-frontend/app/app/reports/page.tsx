@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuthReady } from "@/lib/AuthContext";
@@ -375,6 +376,22 @@ export default function ReportsPage() {
         {accountingXlsxError && (
           <p className="text-sm text-red-600 mt-3">{accountingXlsxError}</p>
         )}
+      </div>
+
+      {/* Customer photo reports */}
+      <div className="bg-white rounded-xl border border-slate-200 p-6 mt-6">
+        <h2 className="text-lg font-semibold text-slate-800 mb-2">Customer photo reports</h2>
+        <p className="text-sm text-slate-600 mb-4">
+          Create customer-facing reports with photos and text — ideal for inspections, before/after
+          documentation, scope explanations, and recommendations. Build sections, pull in job or customer
+          photos, then download a polished PDF.
+        </p>
+        <Link
+          href="/app/reports/customer-reports"
+          className="inline-flex items-center px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+        >
+          Open photo reports
+        </Link>
       </div>
     </div>
   );

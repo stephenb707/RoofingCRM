@@ -364,6 +364,36 @@ describe("JobDetailPage", () => {
     });
   });
 
+  it("deleting an attachment confirms and calls deleteAttachment", async () => {
+    jest.spyOn(window, "confirm").mockReturnValue(true);
+    mockedAttachmentsApi.listJobAttachments.mockResolvedValue([
+      {
+        id: "att-1",
+        fileName: "damage.jpg",
+        contentType: "image/jpeg",
+        fileSize: 100,
+        leadId: null,
+        jobId: "job-1",
+        tag: "DAMAGE",
+        createdAt: "2024-01-01T00:00:00Z",
+        updatedAt: "2024-01-01T00:00:00Z",
+      },
+    ]);
+    mockedAttachmentsApi.deleteAttachment.mockResolvedValue(undefined);
+
+    render(<JobDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("damage.jpg")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /delete/i }));
+
+    await waitFor(() => {
+      expect(mockedAttachmentsApi.deleteAttachment).toHaveBeenCalledWith(expect.anything(), "att-1");
+    });
+  });
+
   it("adding communication log calls addJobCommunicationLog", async () => {
     const user = userEvent.setup();
     mockedCommLogsApi.addJobCommunicationLog.mockResolvedValue({

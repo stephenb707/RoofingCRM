@@ -23,7 +23,9 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -152,5 +154,17 @@ class AttachmentControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(header().string("Content-Type", "application/pdf"))
                 .andExpect(header().string("Content-Disposition", "attachment; filename=\"download.pdf\""));
+    }
+
+    @Test
+    void deleteAttachment_returnsNoContent() throws Exception {
+        UUID tenantId = UUID.randomUUID();
+        UUID attachmentId = UUID.randomUUID();
+
+        mockMvc.perform(delete("/api/v1/attachments/{id}", attachmentId)
+                        .header("X-Tenant-Id", tenantId.toString()))
+                .andExpect(status().isNoContent());
+
+        verify(attachmentService).deleteAttachment(eq(tenantId), eq(userId), eq(attachmentId));
     }
 }

@@ -24,4 +24,6 @@ public interface AttachmentService {
     AttachmentDto getAttachment(@NonNull UUID tenantId, @NonNull UUID userId, @NonNull UUID attachmentId);
 
     InputStream loadAttachmentContent(@NonNull UUID tenantId, @NonNull UUID userId, @NonNull UUID attachmentId);
+
+    void deleteAttachment(@NonNull UUID tenantId, @NonNull UUID userId, @NonNull UUID attachmentId);
 }

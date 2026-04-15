@@ -762,3 +762,70 @@ export interface DashboardSummaryDto {
   upcomingJobs: DashboardJobSnippetDto[];
   openTasks: DashboardTaskSnippetDto[];
 }
+
+/** Customer-facing photo + text report (inspection, before/after, scope). */
+export interface CustomerPhotoReportSectionPhotoDto {
+  attachmentId: string;
+  sortOrder: number;
+}
+
+export interface CustomerPhotoReportSectionDto {
+  id?: string;
+  sortOrder: number;
+  title: string;
+  body?: string | null;
+  photos: CustomerPhotoReportSectionPhotoDto[];
+}
+
+export interface CustomerPhotoReportDto {
+  id: string;
+  customerId: string;
+  customerName: string;
+  customerEmail?: string | null;
+  jobId?: string | null;
+  jobDisplayName?: string | null;
+  title: string;
+  reportType?: string | null;
+  summary?: string | null;
+  sections: CustomerPhotoReportSectionDto[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CustomerPhotoReportSummaryDto {
+  id: string;
+  title: string;
+  reportType?: string | null;
+  customerId: string;
+  customerName: string;
+  jobId?: string | null;
+  jobDisplayName?: string | null;
+  updatedAt?: string;
+}
+
+export interface CustomerPhotoReportSectionRequest {
+  title: string;
+  body?: string | null;
+  attachmentIds: string[];
+}
+
+export interface UpsertCustomerPhotoReportRequest {
+  customerId: string;
+  jobId?: string | null;
+  title: string;
+  reportType?: string | null;
+  summary?: string | null;
+  sections: CustomerPhotoReportSectionRequest[];
+}
+
+export interface SendCustomerPhotoReportEmailRequest {
+  recipientEmail: string;
+  recipientName?: string;
+  subject?: string;
+  message?: string;
+}
+
+export interface SendCustomerPhotoReportEmailResponse {
+  success: boolean;
+  sentAt: string;
+}
