@@ -16,7 +16,6 @@ import com.roofingcrm.domain.repository.CustomerPhotoReportRepository;
 import com.roofingcrm.domain.repository.CustomerPhotoReportSectionPhotoRepository;
 import com.roofingcrm.domain.repository.CustomerRepository;
 import com.roofingcrm.domain.repository.JobRepository;
-import com.roofingcrm.service.mail.EmailMessage;
 import com.roofingcrm.service.mail.EmailService;
 import com.roofingcrm.service.report.CustomerPhotoReportPdfGenerator;
 import com.roofingcrm.service.tenant.TenantAccessService;

@@ -85,9 +85,14 @@ describe("ReportBuilderForm", () => {
         leadId: null,
       },
     ]);
+    mockedAttachmentsApi.downloadAttachment.mockResolvedValue(new Blob(["image"], { type: "image/jpeg" }));
+    Object.defineProperty(URL, "createObjectURL", {
+      value: jest.fn(() => "blob:preview-url"),
+      configurable: true,
+    });
   });
 
-  it("keeps photo selections scoped per section and appends uploaded photos only to the target section", async () => {
+  it("hides the picker by default, shows thumbnails when opened, and confirms selection before closing", async () => {
     mockedAttachmentsApi.uploadJobAttachment.mockResolvedValue({
       id: "img-3",
       fileName: "new-upload.jpg",
@@ -137,7 +142,26 @@ describe("ReportBuilderForm", () => {
     const section1 = await screen.findByTestId("report-section-1");
     const section2 = await screen.findByTestId("report-section-2");
 
+    expect(within(section1).queryByTestId("photo-picker-list-1")).not.toBeInTheDocument();
+    fireEvent.click(within(section1).getByRole("button", { name: /select existing photos/i }));
+
+    await waitFor(() => {
+      expect(within(section1).getByTestId("photo-picker-list-1")).toBeInTheDocument();
+      expect(within(section1).getByTestId("photo-thumbnail-img-1")).toBeInTheDocument();
+      expect(within(section1).getByAltText("roof-front.jpg")).toBeInTheDocument();
+    });
+
     fireEvent.click(within(section1).getByText("roof-front.jpg"));
+    fireEvent.click(within(section1).getByRole("button", { name: /confirm selection/i }));
+
+    await waitFor(() => {
+      expect(within(section1).queryByTestId("photo-picker-list-1")).not.toBeInTheDocument();
+      expect(within(section1).getByText("roof-front.jpg")).toBeInTheDocument();
+      expect(within(section1).getByTestId("selected-photo-thumbnail-img-1")).toBeInTheDocument();
+      expect(within(section1).getByAltText("Selected roof-front.jpg")).toBeInTheDocument();
+    });
+
+    fireEvent.click(within(section2).getByRole("button", { name: /select existing photos/i }));
 
     await waitFor(() => {
       expect(within(section2).getByLabelText("Upload photos to section 2")).toBeInTheDocument();
@@ -206,12 +230,18 @@ describe("ReportBuilderForm", () => {
     const section1 = await screen.findByTestId("report-section-1");
     const section2 = await screen.findByTestId("report-section-2");
 
+    fireEvent.click(within(section1).getByRole("button", { name: /select existing/i }));
     fireEvent.click(within(section1).getByText("roof-front.jpg"));
+    fireEvent.click(within(section1).getByRole("button", { name: /confirm selection/i }));
+    fireEvent.click(within(section2).getByRole("button", { name: /select existing/i }));
     fireEvent.click(within(section2).getByText("roof-back.jpg"));
+    fireEvent.click(within(section2).getByRole("button", { name: /confirm selection/i }));
 
     await waitFor(() => {
       expect(within(section1).getByRole("button", { name: /remove roof-front\.jpg from section 1/i })).toBeInTheDocument();
       expect(within(section2).getByRole("button", { name: /remove roof-back\.jpg from section 2/i })).toBeInTheDocument();
+      expect(within(section1).getByTestId("selected-photo-thumbnail-img-1")).toBeInTheDocument();
+      expect(within(section2).getByTestId("selected-photo-thumbnail-img-2")).toBeInTheDocument();
     });
 
     fireEvent.click(within(section1).getByRole("button", { name: /remove roof-front\.jpg from section 1/i }));

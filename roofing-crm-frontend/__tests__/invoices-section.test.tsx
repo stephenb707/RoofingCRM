@@ -60,6 +60,17 @@ describe("InvoicesSection", () => {
     expect(screen.getByText("$5,000.00")).toBeInTheDocument();
   });
 
+  it("clicking an invoice row navigates to invoice detail", async () => {
+    mockedInvoicesApi.listInvoicesForJob.mockResolvedValue([mockInvoice]);
+
+    render(<InvoicesSection jobId="job-1" />);
+
+    const row = await screen.findByTestId("invoice-row-inv-1");
+    fireEvent.click(row);
+
+    expect(mockPush).toHaveBeenCalledWith("/app/invoices/inv-1");
+  });
+
   it("create invoice opens modal and calls API on submit", async () => {
     const user = userEvent.setup();
     mockedEstimatesApi.listEstimatesForJob.mockResolvedValue([mockEstimate]);
@@ -115,5 +126,6 @@ describe("InvoicesSection", () => {
         "PAID"
       );
     });
+    expect(mockPush).not.toHaveBeenCalled();
   });
 });

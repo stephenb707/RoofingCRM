@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -45,6 +45,9 @@ export default function JobDetailPage() {
   const [commLogError, setCommLogError] = useState<string | null>(null);
   const [latestEstimateError, setLatestEstimateError] = useState<string | null>(null);
   const [createFromEstimateId, setCreateFromEstimateId] = useState<string | null>(null);
+  const [attachmentPreviewUrls, setAttachmentPreviewUrls] = useState<Record<string, string>>({});
+  const [loadingAttachmentPreviewIds, setLoadingAttachmentPreviewIds] = useState<string[]>([]);
+  const attachmentPreviewUrlRef = useRef<Record<string, string>>({});
 
   const { data: job, isLoading, isError, error } = useQuery({
     queryKey: queryKeys.job(auth.selectedTenantId, jobId),
@@ -128,7 +131,70 @@ export default function JobDetailPage() {
     queryFn: () => listJobAttachments(api, jobId),
     enabled: ready && !!jobId,
   });
-  const nonReceiptAttachments = (attachmentsQuery.data ?? []).filter((attachment) => attachment.tag !== "RECEIPT");
+  const nonReceiptAttachments = useMemo(
+    () => (attachmentsQuery.data ?? []).filter((attachment) => attachment.tag !== "RECEIPT"),
+    [attachmentsQuery.data]
+  );
+
+  useEffect(() => {
+    return () => {
+      if (typeof URL.revokeObjectURL !== "function") {
+        return;
+      }
+      for (const url of Object.values(attachmentPreviewUrlRef.current)) {
+        URL.revokeObjectURL(url);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof URL.createObjectURL !== "function") {
+      return;
+    }
+    const imageAttachments = nonReceiptAttachments.filter((attachment) =>
+      (attachment.contentType ?? "").toLowerCase().startsWith("image/")
+    );
+    const missing = imageAttachments.filter(
+      (attachment) => !Object.prototype.hasOwnProperty.call(attachmentPreviewUrlRef.current, attachment.id)
+    );
+    if (missing.length === 0) {
+      return;
+    }
+
+    let cancelled = false;
+    const ids = missing.map((attachment) => attachment.id);
+    for (const attachment of missing) {
+      attachmentPreviewUrlRef.current[attachment.id] = "";
+    }
+    setLoadingAttachmentPreviewIds((prev) => Array.from(new Set([...prev, ...ids])));
+
+    void Promise.all(
+      missing.map(async (attachment) => {
+        try {
+          const blob = await downloadAttachment(api, attachment.id);
+          if (cancelled || !(blob instanceof Blob)) {
+            return;
+          }
+          const url = URL.createObjectURL(blob);
+          attachmentPreviewUrlRef.current[attachment.id] = url;
+          setAttachmentPreviewUrls((prev) => ({ ...prev, [attachment.id]: url }));
+        } catch {
+          if (!cancelled) {
+            attachmentPreviewUrlRef.current[attachment.id] = "";
+            setAttachmentPreviewUrls((prev) => ({ ...prev, [attachment.id]: "" }));
+          }
+        } finally {
+          if (!cancelled) {
+            setLoadingAttachmentPreviewIds((prev) => prev.filter((id) => id !== attachment.id));
+          }
+        }
+      })
+    );
+
+    return () => {
+      cancelled = true;
+    };
+  }, [api, nonReceiptAttachments]);
 
   const uploadAttachmentMutation = useMutation({
     mutationFn: ({
@@ -416,6 +482,9 @@ export default function JobDetailPage() {
             <AttachmentSection
               title="Attachments"
               attachments={nonReceiptAttachments}
+              previewUrls={attachmentPreviewUrls}
+              loadingPreviewIds={loadingAttachmentPreviewIds}
+              scrollableList
               onUpload={(file, options) =>
                 uploadAttachmentMutation.mutate({ file, tag: options?.tag, description: options?.description })
               }

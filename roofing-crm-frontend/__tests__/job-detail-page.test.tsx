@@ -83,6 +83,14 @@ describe("JobDetailPage", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockPush.mockClear();
+    Object.defineProperty(URL, "createObjectURL", {
+      value: jest.fn(() => "blob:attachment-preview"),
+      configurable: true,
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      value: jest.fn(),
+      configurable: true,
+    });
     mockedPipelineApi.listPipelineStatuses.mockResolvedValue([defScheduled, defInProgress]);
     mockedJobsApi.getJob.mockResolvedValue(mockJob);
     mockedEstimatesApi.listEstimatesForJob.mockResolvedValue([]);
@@ -120,6 +128,31 @@ describe("JobDetailPage", () => {
     });
     mockedAccountingApi.listJobCostEntries.mockResolvedValue([]);
     mockedAccountingApi.listJobReceipts.mockResolvedValue([]);
+  });
+
+  it("clicking an invoice row navigates to invoice detail", async () => {
+    mockedInvoicesApi.listInvoicesForJob.mockResolvedValue([
+      {
+        id: "inv-1",
+        invoiceNumber: "INV-1",
+        status: "DRAFT",
+        total: 500,
+        jobId: "job-1",
+        estimateId: "est-1",
+        issuedAt: "2024-01-01T00:00:00Z",
+        dueAt: null,
+        sentAt: null,
+        paidAt: null,
+        items: [],
+      },
+    ]);
+
+    render(<JobDetailPage />);
+
+    const row = await screen.findByTestId("invoice-row-inv-1");
+    fireEvent.click(row);
+
+    expect(mockPush).toHaveBeenCalledWith("/app/invoices/inv-1");
   });
 
   it("renders job overview and status", async () => {
@@ -392,6 +425,32 @@ describe("JobDetailPage", () => {
     await waitFor(() => {
       expect(mockedAttachmentsApi.deleteAttachment).toHaveBeenCalledWith(expect.anything(), "att-1");
     });
+  });
+
+  it("renders image attachment thumbnails and scrollable attachments list", async () => {
+    mockedAttachmentsApi.listJobAttachments.mockResolvedValue([
+      {
+        id: "att-1",
+        fileName: "damage.jpg",
+        contentType: "image/jpeg",
+        fileSize: 100,
+        leadId: null,
+        jobId: "job-1",
+        tag: "DAMAGE",
+        createdAt: "2024-01-01T00:00:00Z",
+        updatedAt: "2024-01-01T00:00:00Z",
+      },
+    ]);
+    mockedAttachmentsApi.downloadAttachment.mockResolvedValue(new Blob(["image"], { type: "image/jpeg" }));
+
+    render(<JobDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("attachment-thumbnail-att-1")).toBeInTheDocument();
+      expect(screen.getByAltText("damage.jpg")).toBeInTheDocument();
+    });
+    expect(screen.getByTestId("attachments-scroll-region").className).toMatch(/max-h-80/);
+    expect(screen.getByTestId("attachments-scroll-region").className).toMatch(/overflow-y-auto/);
   });
 
   it("adding communication log calls addJobCommunicationLog", async () => {

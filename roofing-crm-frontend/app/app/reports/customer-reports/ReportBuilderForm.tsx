@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuthReady } from "@/lib/AuthContext";
 import {
   createCustomerPhotoReport,
@@ -15,7 +15,7 @@ import {
 } from "@/lib/customerPhotoReportsApi";
 import { listCustomers } from "@/lib/customersApi";
 import { listJobs } from "@/lib/jobsApi";
-import { uploadJobAttachment } from "@/lib/attachmentsApi";
+import { downloadAttachment, uploadJobAttachment } from "@/lib/attachmentsApi";
 import { queryKeys } from "@/lib/queryKeys";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { sanitizeAttachmentIds } from "@/lib/customerPhotoReportPayload";
@@ -78,10 +78,14 @@ export function ReportBuilderForm({
   const [sections, setSections] = useState<SectionDraft[]>([newSection()]);
   const [recentUploadsById, setRecentUploadsById] = useState<Record<string, AttachmentDto>>({});
   const [uploadingSectionKey, setUploadingSectionKey] = useState<string | null>(null);
+  const [openPhotoPickerKeys, setOpenPhotoPickerKeys] = useState<string[]>([]);
+  const [photoPreviewUrls, setPhotoPreviewUrls] = useState<Record<string, string>>({});
+  const [loadingPhotoPreviewIds, setLoadingPhotoPreviewIds] = useState<string[]>([]);
   const [pdfError, setPdfError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [emailSuccess, setEmailSuccess] = useState<string | null>(null);
+  const previewUrlRef = useRef<Record<string, string>>({});
 
   const { data: report, isLoading: reportLoading } = useQuery({
     queryKey: queryKeys.customerPhotoReport(auth.selectedTenantId, reportId ?? ""),
@@ -97,6 +101,7 @@ export function ReportBuilderForm({
     setReportType(report.reportType ?? "");
     setSummary(report.summary ?? "");
     setSections(mapDtoToDrafts(report));
+    setOpenPhotoPickerKeys([]);
     setRecentUploadsById({});
   }, [report, reportId]);
 
@@ -135,6 +140,57 @@ export function ReportBuilderForm({
     }
     return map;
   }, [imageCandidates, recentUploadsById]);
+
+  useEffect(() => {
+    return () => {
+      if (typeof URL.revokeObjectURL !== "function") {
+        return;
+      }
+      for (const url of Object.values(previewUrlRef.current)) {
+        URL.revokeObjectURL(url);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (openPhotoPickerKeys.length === 0 || imageCandidates.length === 0) {
+      return;
+    }
+    const missing = imageCandidates.filter((candidate) => !previewUrlRef.current[candidate.id]);
+    if (missing.length === 0) {
+      return;
+    }
+
+    let cancelled = false;
+    const ids = missing.map((candidate) => candidate.id);
+    setLoadingPhotoPreviewIds((prev) => Array.from(new Set([...prev, ...ids])));
+
+    void Promise.all(
+      missing.map(async (candidate) => {
+        try {
+          const blob = await downloadAttachment(api, candidate.id);
+          if (cancelled) {
+            return;
+          }
+          const url = URL.createObjectURL(blob);
+          previewUrlRef.current[candidate.id] = url;
+          setPhotoPreviewUrls((prev) => ({ ...prev, [candidate.id]: url }));
+        } catch {
+          if (!cancelled) {
+            setPhotoPreviewUrls((prev) => ({ ...prev, [candidate.id]: "" }));
+          }
+        } finally {
+          if (!cancelled) {
+            setLoadingPhotoPreviewIds((prev) => prev.filter((id) => id !== candidate.id));
+          }
+        }
+      })
+    );
+
+    return () => {
+      cancelled = true;
+    };
+  }, [api, imageCandidates, openPhotoPickerKeys]);
 
   const selectedCustomer = useMemo(
     () => customersPage?.content?.find((c) => c.id === customerId) ?? null,
@@ -239,6 +295,40 @@ export function ReportBuilderForm({
           : [...section.attachmentIds, attachmentId],
       };
     });
+  };
+
+  const openPhotoPicker = (sectionKey: string) => {
+    setOpenPhotoPickerKeys((prev) => (prev.includes(sectionKey) ? prev : [...prev, sectionKey]));
+  };
+
+  const closePhotoPicker = (sectionKey: string) => {
+    setOpenPhotoPickerKeys((prev) => prev.filter((key) => key !== sectionKey));
+  };
+
+  const renderPhotoThumbnail = (
+    attachmentId: string,
+    fileName: string | undefined,
+    testId: string,
+    altLabel: string
+  ) => {
+    const previewUrl = photoPreviewUrls[attachmentId];
+    const previewLoading = loadingPhotoPreviewIds.includes(attachmentId);
+
+    return (
+      <div
+        data-testid={testId}
+        className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md border border-slate-200 bg-slate-100"
+      >
+        {previewUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={previewUrl} alt={altLabel} className="h-full w-full object-cover" />
+        ) : previewLoading ? (
+          <span className="text-[10px] text-slate-400">Loading…</span>
+        ) : (
+          <span className="text-[10px] text-slate-400">No preview</span>
+        )}
+      </div>
+    );
   };
 
   const removePhotoFromSection = (sectionKey: string, attachmentId: string) => {
@@ -464,6 +554,10 @@ export function ReportBuilderForm({
             data-testid={`report-section-${idx + 1}`}
             className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-3"
           >
+            {(() => {
+              const pickerOpen = openPhotoPickerKeys.includes(sec.localKey);
+              return (
+                <>
             <div className="flex flex-wrap items-center gap-2 justify-between">
               <span className="text-xs font-medium text-slate-500">Section {idx + 1}</span>
               <div className="flex gap-1">
@@ -536,11 +630,24 @@ export function ReportBuilderForm({
                       return (
                         <li
                           key={`${sec.localKey}-${attachmentId}`}
-                          className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2"
+                          className="flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2"
                         >
+                          {renderPhotoThumbnail(
+                            attachmentId,
+                            attachment?.fileName,
+                            `selected-photo-thumbnail-${attachmentId}`,
+                            `Selected ${attachment?.fileName ?? attachmentId}`
+                          )}
                           <span className="text-xs font-medium text-slate-500">{photoIndex + 1}.</span>
-                          <span className="min-w-0 flex-1 truncate text-sm text-slate-800">
-                            {attachment?.fileName ?? attachmentId}
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm text-slate-800">
+                              {attachment?.fileName ?? attachmentId}
+                            </span>
+                            <span className="block text-xs text-slate-500">
+                              {(attachment?.description ?? "").trim() ||
+                                attachment?.contentType ||
+                                "Selected image"}
+                            </span>
                           </span>
                           <button
                             type="button"
@@ -576,6 +683,78 @@ export function ReportBuilderForm({
               </div>
 
               <div className="space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs font-medium text-slate-600">
+                    {jobId ? "Existing job photos" : "Existing customer photos"}
+                  </p>
+                  {!pickerOpen ? (
+                    <button
+                      type="button"
+                      onClick={() => openPhotoPicker(sec.localKey)}
+                      disabled={!customerId || imageCandidates.length === 0}
+                      className="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {jobId ? "Select Existing Photos" : "Select Existing Customer Photos"}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => closePhotoPicker(sec.localKey)}
+                      className="rounded bg-sky-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-700"
+                    >
+                      Confirm Selection
+                    </button>
+                  )}
+                </div>
+                {!customerId ? (
+                  <p className="text-xs text-slate-500">Select a customer to load photos.</p>
+                ) : imageCandidates.length === 0 ? (
+                  <p className="text-xs text-slate-500">
+                    No image attachments are available yet for this {jobId ? "job" : "customer"}.
+                  </p>
+                ) : pickerOpen ? (
+                  <ul
+                    data-testid={`photo-picker-list-${idx + 1}`}
+                    className="max-h-64 overflow-y-auto rounded-lg border border-slate-200 divide-y divide-slate-100 bg-white text-sm"
+                  >
+                    {imageCandidates.map((c) => {
+                      const selected = sec.attachmentIds.includes(c.id);
+                      return (
+                        <li
+                          key={c.id}
+                          className={`px-3 py-2 ${selected ? "bg-sky-50/70" : ""}`}
+                        >
+                          <label
+                            htmlFor={`${sec.localKey}-${c.id}`}
+                            className="flex cursor-pointer items-center gap-3"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selected}
+                              onChange={() => togglePhoto(sec.localKey, c.id)}
+                              id={`${sec.localKey}-${c.id}`}
+                            />
+                            {renderPhotoThumbnail(
+                              c.id,
+                              c.fileName,
+                              `photo-thumbnail-${c.id}`,
+                              c.fileName ?? "Attachment preview"
+                            )}
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-slate-800">{c.fileName ?? c.id}</span>
+                              <span className="block text-xs text-slate-500">
+                                {(c.description ?? "").trim() || c.contentType || "Image attachment"}
+                              </span>
+                            </span>
+                          </label>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : null}
+              </div>
+
+              <div className="space-y-2">
                 <label className="block text-xs font-medium text-slate-600">
                   {jobId ? "Upload new photos to this section" : "Upload new photos"}
                 </label>
@@ -598,39 +777,10 @@ export function ReportBuilderForm({
                   <p className="text-xs text-slate-500">Uploading photos…</p>
                 )}
               </div>
-
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-slate-600">
-                  {jobId ? "Add existing job photos" : "Add existing customer photos"}
-                </p>
-                {!customerId ? (
-                  <p className="text-xs text-slate-500">Select a customer to load photos.</p>
-                ) : imageCandidates.length === 0 ? (
-                  <p className="text-xs text-slate-500">
-                    No image attachments are available yet for this {jobId ? "job" : "customer"}.
-                  </p>
-                ) : (
-                  <ul className="max-h-48 overflow-y-auto rounded-lg border border-slate-200 divide-y divide-slate-100 bg-white text-sm">
-                    {imageCandidates.map((c) => (
-                      <li key={c.id} className="flex items-center gap-2 px-3 py-2">
-                        <input
-                          type="checkbox"
-                          checked={sec.attachmentIds.includes(c.id)}
-                          onChange={() => togglePhoto(sec.localKey, c.id)}
-                          id={`${sec.localKey}-${c.id}`}
-                        />
-                        <label htmlFor={`${sec.localKey}-${c.id}`} className="min-w-0 flex-1 cursor-pointer">
-                          <span className="block truncate text-slate-800">{c.fileName ?? c.id}</span>
-                          <span className="block text-xs text-slate-500">
-                            {(c.description ?? "").trim() || c.contentType || "Image attachment"}
-                          </span>
-                        </label>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
             </div>
+                </>
+              );
+            })()}
           </div>
         ))}
       </div>

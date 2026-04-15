@@ -1,6 +1,6 @@
 "use client";
 
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { useAuthReady } from "@/lib/AuthContext";
@@ -17,8 +17,20 @@ import { jobStatusBadgeClass, leadStatusBadgeClass } from "@/lib/pipelineStatusV
 
 export default function CustomerDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const customerId = params.customerId as string;
   const { api, auth, ready } = useAuthReady();
+
+  const navigateTo = (href: string) => {
+    router.push(href);
+  };
+
+  const handleRowKeyDown = (e: React.KeyboardEvent<HTMLTableRowElement>, href: string) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      navigateTo(href);
+    }
+  };
 
   const { data: customer, isLoading, isError, error } = useQuery({
     queryKey: queryKeys.customer(auth.selectedTenantId, customerId),
@@ -157,7 +169,15 @@ export default function CustomerDetailPage() {
                   </thead>
                   <tbody className="divide-y divide-slate-200">
                     {jobs.map((job) => (
-                      <tr key={job.id} className="hover:bg-slate-50">
+                      <tr
+                        key={job.id}
+                        data-testid={`related-job-row-${job.id}`}
+                        tabIndex={0}
+                        role="link"
+                        onClick={() => navigateTo(`/app/jobs/${job.id}`)}
+                        onKeyDown={(e) => handleRowKeyDown(e, `/app/jobs/${job.id}`)}
+                        className="cursor-pointer hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+                      >
                         <td className="px-4 py-2 text-sm text-slate-800">{JOB_TYPE_LABELS[job.type]}</td>
                         <td className="px-4 py-2">
                           <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full border ${jobStatusBadgeClass(job.statusKey)}`}>
@@ -168,7 +188,11 @@ export default function CustomerDetailPage() {
                           {job.propertyAddress ? formatAddress(job.propertyAddress) : "—"}
                         </td>
                         <td className="px-4 py-2 text-right">
-                          <Link href={`/app/jobs/${job.id}`} className="text-sm text-sky-600 hover:text-sky-700 font-medium">
+                          <Link
+                            href={`/app/jobs/${job.id}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-sm text-sky-600 hover:text-sky-700 font-medium"
+                          >
                             View
                           </Link>
                         </td>
@@ -206,7 +230,15 @@ export default function CustomerDetailPage() {
                   </thead>
                   <tbody className="divide-y divide-slate-200">
                     {leads.map((lead) => (
-                      <tr key={lead.id} className="hover:bg-slate-50">
+                      <tr
+                        key={lead.id}
+                        data-testid={`related-lead-row-${lead.id}`}
+                        tabIndex={0}
+                        role="link"
+                        onClick={() => navigateTo(`/app/leads/${lead.id}`)}
+                        onKeyDown={(e) => handleRowKeyDown(e, `/app/leads/${lead.id}`)}
+                        className="cursor-pointer hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+                      >
                         <td className="px-4 py-2">
                           <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full border ${leadStatusBadgeClass(lead.statusKey)}`}>
                             {lead.statusLabel}
@@ -215,7 +247,11 @@ export default function CustomerDetailPage() {
                         <td className="px-4 py-2 text-sm text-slate-600">{formatAddress(lead.propertyAddress)}</td>
                         <td className="px-4 py-2 text-sm text-slate-600">{formatDate(lead.updatedAt ?? lead.createdAt)}</td>
                         <td className="px-4 py-2 text-right">
-                          <Link href={`/app/leads/${lead.id}`} className="text-sm text-sky-600 hover:text-sky-700 font-medium">
+                          <Link
+                            href={`/app/leads/${lead.id}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-sm text-sky-600 hover:text-sky-700 font-medium"
+                          >
                             View
                           </Link>
                         </td>

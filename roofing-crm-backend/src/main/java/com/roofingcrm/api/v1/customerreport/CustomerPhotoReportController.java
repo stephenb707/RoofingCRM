@@ -13,6 +13,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 @RestController
@@ -54,7 +55,7 @@ public class CustomerPhotoReportController {
             @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
             @PathVariable("reportId") UUID reportId) {
         UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
-        return customerPhotoReportService.get(tenantId, userId, reportId);
+        return customerPhotoReportService.get(tenantId, userId, Objects.requireNonNull(reportId));
     }
 
     @PutMapping("/{reportId}")
@@ -63,7 +64,7 @@ public class CustomerPhotoReportController {
             @PathVariable("reportId") UUID reportId,
             @Valid @RequestBody UpsertCustomerPhotoReportRequest request) {
         UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
-        return customerPhotoReportService.update(tenantId, userId, reportId, request);
+        return customerPhotoReportService.update(tenantId, userId, Objects.requireNonNull(reportId), request);
     }
 
     @DeleteMapping("/{reportId}")
@@ -71,7 +72,7 @@ public class CustomerPhotoReportController {
             @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
             @PathVariable("reportId") UUID reportId) {
         UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
-        customerPhotoReportService.archive(tenantId, userId, reportId);
+        customerPhotoReportService.archive(tenantId, userId, Objects.requireNonNull(reportId));
         return ResponseEntity.noContent().build();
     }
 
@@ -80,9 +81,9 @@ public class CustomerPhotoReportController {
             @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
             @PathVariable("reportId") UUID reportId) {
         UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
-        CustomerPhotoReportPdfExport exported = customerPhotoReportService.exportPdf(tenantId, userId, reportId);
+        CustomerPhotoReportPdfExport exported = customerPhotoReportService.exportPdf(tenantId, userId, Objects.requireNonNull(reportId));
         return ResponseEntity.ok()
-                .contentType(MediaType.APPLICATION_PDF)
+                .contentType(Objects.requireNonNull(MediaType.APPLICATION_PDF))
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + exported.filename() + "\"")
                 .body(exported.content());
     }
@@ -93,6 +94,6 @@ public class CustomerPhotoReportController {
             @PathVariable("reportId") UUID reportId,
             @Valid @RequestBody SendCustomerPhotoReportEmailRequest request) {
         UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
-        return customerPhotoReportService.sendEmail(tenantId, userId, reportId, request);
+        return customerPhotoReportService.sendEmail(tenantId, userId, Objects.requireNonNull(reportId), Objects.requireNonNull(request));
     }
 }
