@@ -134,6 +134,9 @@ export const queryKeys = {
   settingsPipelineStatuses: (tenantId: string | null, pipelineType: "LEAD" | "JOB") =>
     ["settingsPipelineStatuses", tenantId, pipelineType] as const,
 
+  appPreferences: (tenantId: string | null) =>
+    ["appPreferences", tenantId] as const,
+
   customerPhotoReports: (tenantId: string | null) =>
     ["customerPhotoReports", tenantId] as const,
   customerPhotoReport: (tenantId: string | null, reportId: string) =>

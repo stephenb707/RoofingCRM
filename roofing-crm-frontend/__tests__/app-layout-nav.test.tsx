@@ -35,18 +35,18 @@ describe("AppLayout navigation", () => {
     expect(dash).toHaveClass("text-sky-600");
   });
 
-  it("shows Pipeline settings for OWNER or ADMIN", () => {
+  it("shows Settings for OWNER or ADMIN", () => {
     render(
       <AppLayout>
         <div>Content</div>
       </AppLayout>
     );
 
-    const link = screen.getByRole("link", { name: /^Pipeline settings$/i });
-    expect(link).toHaveAttribute("href", "/app/settings/pipeline-statuses");
+    const link = screen.getByRole("link", { name: /^Settings$/i });
+    expect(link).toHaveAttribute("href", "/app/settings");
   });
 
-  it("hides Pipeline settings for SALES", () => {
+  it("hides Settings for SALES", () => {
     mockAuthValue.auth.tenants[0]!.role = "SALES";
 
     render(
@@ -55,6 +55,6 @@ describe("AppLayout navigation", () => {
       </AppLayout>
     );
 
-    expect(screen.queryByRole("link", { name: /^Pipeline settings$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /^Settings$/i })).not.toBeInTheDocument();
   });
 });

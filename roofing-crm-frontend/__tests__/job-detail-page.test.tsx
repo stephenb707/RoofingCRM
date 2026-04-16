@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, waitFor, fireEvent } from "./test-utils";
+import { render, screen, waitFor, fireEvent, within } from "./test-utils";
 import userEvent from "@testing-library/user-event";
 import JobDetailPage from "@/app/app/jobs/[jobId]/page";
 import * as jobsApi from "@/lib/jobsApi";
@@ -165,6 +165,38 @@ describe("JobDetailPage", () => {
     expect(screen.getByText("Replacement")).toBeInTheDocument();
     expect(screen.getByText("Crew A")).toBeInTheDocument();
     expect(screen.getByText("Some notes")).toBeInTheDocument();
+  });
+
+  it("renders a fixed left section rail with matching anchors", async () => {
+    render(<JobDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("123 Main St, Denver, CO, 80202")).toBeInTheDocument();
+    });
+
+    expect(screen.queryByTestId("detail-section-nav-sidebar")).not.toBeInTheDocument();
+
+    const railContainer = screen.getByTestId("job-section-nav-rail-container");
+    expect(railContainer).toHaveClass("hidden", "lg:block", "lg:fixed", "lg:left-6");
+
+    const railNav = screen.getByTestId("detail-section-nav-rail");
+    expect(railNav).toHaveTextContent("On This Page");
+
+    const expectedLinks = [
+      ["Customer", "#customer-information"],
+      ["Overview", "#overview"],
+      ["Activity", "#activity"],
+      ["Tasks", "#tasks"],
+      ["Invoices", "#invoices"],
+      ["Accounting", "#accounting"],
+      ["Attachments", "#attachments"],
+      ["Communication", "#communication"],
+    ] as const;
+
+    for (const [label, href] of expectedLinks) {
+      expect(within(railNav).getByRole("link", { name: label })).toHaveAttribute("href", href);
+      expect(document.getElementById(href.slice(1))).toBeInTheDocument();
+    }
   });
 
   it("renders Create Estimate, View Estimates, and Edit Job links in Actions section", async () => {

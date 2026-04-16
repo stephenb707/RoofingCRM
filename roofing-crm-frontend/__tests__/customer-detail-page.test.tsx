@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, waitFor, fireEvent } from "./test-utils";
+import { render, screen, waitFor, fireEvent, within } from "./test-utils";
 import CustomerDetailPage from "@/app/app/customers/[customerId]/page";
 import * as customersApi from "@/lib/customersApi";
 import * as jobsApi from "@/lib/jobsApi";
@@ -77,6 +77,29 @@ describe("CustomerDetailPage", () => {
     expect(detailsIdx).toBeGreaterThanOrEqual(0);
     expect(actionsIdx).toBeGreaterThanOrEqual(0);
     expect(detailsIdx).toBeLessThan(actionsIdx);
+  });
+
+  it("renders a fixed left section rail with customer anchors", async () => {
+    render(<CustomerDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Jane Doe");
+    });
+
+    const railContainer = screen.getByTestId("customer-section-nav-rail-container");
+    expect(railContainer).toHaveClass("hidden", "lg:block", "lg:fixed", "lg:left-6");
+
+    const railNav = screen.getByTestId("detail-section-nav-rail");
+    const expectedLinks = [
+      ["Customer", "#customer-information"],
+      ["Related Jobs", "#related-jobs"],
+      ["Related Leads", "#related-leads"],
+    ] as const;
+
+    for (const [label, href] of expectedLinks) {
+      expect(within(railNav).getByRole("link", { name: label })).toHaveAttribute("href", href);
+      expect(document.getElementById(href.slice(1))).toBeInTheDocument();
+    }
   });
 
   it("clicking a related job row navigates to the job detail page", async () => {

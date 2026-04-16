@@ -8,6 +8,18 @@ import { CustomerDto, PageResponse } from "@/lib/types";
 jest.mock("@/lib/customersApi");
 const mockedCustomersApi = customersApi as jest.Mocked<typeof customersApi>;
 
+jest.mock("@/lib/preferencesApi", () => ({
+  getAppPreferences: jest.fn().mockResolvedValue({
+    dashboard: { widgets: [] },
+    jobsList: { visibleFields: [] },
+    leadsList: { visibleFields: [] },
+    customersList: { visibleFields: ["name", "phone", "email"] },
+    tasksList: { visibleFields: [] },
+    estimatesList: { visibleFields: [] },
+    updatedAt: null,
+  }),
+}));
+
 const mockPush = jest.fn();
 jest.mock("next/navigation", () => ({
   usePathname: () => "/app/customers",

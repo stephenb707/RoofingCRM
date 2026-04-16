@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import SettingsBackLink from "../SettingsBackLink";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuthReady } from "@/lib/AuthContext";
 import { getApiErrorMessage } from "@/lib/apiError";
@@ -381,9 +382,10 @@ export default function PipelineStatusSettingsPage() {
 
   if (!canManage) {
     return (
-      <div className="max-w-3xl">
-        <h1 className="text-2xl font-semibold text-slate-900">Pipeline settings</h1>
-        <p className="mt-2 text-slate-600">
+      <div className="max-w-3xl mx-auto">
+        <SettingsBackLink />
+        <h1 className="text-2xl font-bold text-slate-800">Pipeline Statuses</h1>
+        <p className="mt-1 text-sm text-slate-500">
           Only owners and admins can manage pipeline statuses. Ask an administrator for access.
         </p>
       </div>
@@ -391,10 +393,11 @@ export default function PipelineStatusSettingsPage() {
   }
 
   return (
-    <div className="max-w-4xl space-y-6" data-testid="pipeline-settings-page">
+    <div className="max-w-3xl mx-auto space-y-6" data-testid="pipeline-settings-page">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-900">Pipeline settings</h1>
-        <p className="mt-2 text-sm text-slate-600">
+        <SettingsBackLink />
+        <h1 className="text-2xl font-bold text-slate-800">Pipeline Statuses</h1>
+        <p className="mt-1 text-sm text-slate-500">
           Rename, reorder, and add custom statuses for leads and jobs. Changes apply to pipelines,
           lists, and status selectors after they refresh.
         </p>

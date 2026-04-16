@@ -12,6 +12,20 @@ const mockedDashboardApi = dashboardApi as jest.Mocked<typeof dashboardApi>;
 jest.mock("@/lib/pipelineStatusesApi");
 const mockedPipelineApi = pipelineStatusesApi as jest.Mocked<typeof pipelineStatusesApi>;
 
+jest.mock("@/lib/preferencesApi", () => ({
+  getAppPreferences: jest.fn().mockResolvedValue({
+    dashboard: {
+      widgets: ["metrics", "quickActions", "leadPipeline", "jobPipeline", "nextBestActions", "recentLeads", "upcomingJobs", "openTasks"],
+    },
+    jobsList: { visibleFields: [] },
+    leadsList: { visibleFields: [] },
+    customersList: { visibleFields: [] },
+    tasksList: { visibleFields: [] },
+    estimatesList: { visibleFields: [] },
+    updatedAt: null,
+  }),
+}));
+
 jest.mock("next/navigation", () => ({
   usePathname: () => "/app",
   useParams: () => ({}),
@@ -33,6 +47,10 @@ const mockSummary: DashboardSummaryDto = {
     QUOTE_SENT: 1,
     WON: 1,
     LOST: 1,
+  },
+  jobCountByStatus: {
+    SCHEDULED: 2,
+    IN_PROGRESS: 1,
   },
   jobsScheduledThisWeek: 2,
   unscheduledJobsCount: 1,

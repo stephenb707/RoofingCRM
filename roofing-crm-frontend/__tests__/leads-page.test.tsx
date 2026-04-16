@@ -20,6 +20,18 @@ const mockedLeadsApi = leadsApi as jest.Mocked<typeof leadsApi>;
 jest.mock("@/lib/pipelineStatusesApi");
 const mockedPipelineApi = pipelineStatusesApi as jest.Mocked<typeof pipelineStatusesApi>;
 
+jest.mock("@/lib/preferencesApi", () => ({
+  getAppPreferences: jest.fn().mockResolvedValue({
+    dashboard: { widgets: [] },
+    jobsList: { visibleFields: [] },
+    leadsList: { visibleFields: ["customer", "propertyAddress", "status", "source", "createdAt"] },
+    customersList: { visibleFields: [] },
+    tasksList: { visibleFields: [] },
+    estimatesList: { visibleFields: [] },
+    updatedAt: null,
+  }),
+}));
+
 const defNew = {
   id: "def-new",
   pipelineType: "LEAD" as const,

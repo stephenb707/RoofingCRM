@@ -23,6 +23,8 @@ public interface JobRepository extends JpaRepository<Job, UUID>, JpaSpecificatio
 
     long countByTenantAndArchivedFalse(Tenant tenant);
 
+    long countByTenantAndStatusDefinitionAndArchivedFalse(Tenant tenant, PipelineStatusDefinition statusDefinition);
+
     @Query("""
             select count(j) from Job j
             where j.tenant = :tenant

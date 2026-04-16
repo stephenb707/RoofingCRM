@@ -1,0 +1,8 @@
+eclipse.preferences.version=1
+org.eclipse.jdt.core.compiler.codegen.targetPlatform=21
+org.eclipse.jdt.core.compiler.compliance=21
+org.eclipse.jdt.core.compiler.release=enabled
+org.eclipse.jdt.core.compiler.source=21
+# JDT cannot verify @SuppressWarnings("null") when null-related checks are set to Ignore (defaults).
+# That produces info I1102 on many files. Maven/javac do not run this analysis.
+org.eclipse.jdt.core.compiler.problem.unusedWarningToken=ignore

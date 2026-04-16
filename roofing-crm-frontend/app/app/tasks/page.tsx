@@ -18,32 +18,43 @@ import { formatDateTime } from "@/lib/format";
 import { StatusBadge } from "@/components/StatusBadge";
 import { DatePicker } from "@/components/DatePicker";
 import { ClickableTableRow } from "@/components/ClickableTableRow";
+import { useVisibleFields } from "@/lib/useVisibleFields";
 import type { TaskStatus, TaskDto } from "@/lib/types";
 
 function TaskRelatedCell({ task }: { task: { leadId?: string | null; jobId?: string | null; customerId?: string | null } }) {
-  if (task.leadId) {
-    return (
-      <Link href={`/app/leads/${task.leadId}`} className="text-sky-600 hover:text-sky-700 text-sm">
-        Lead
-      </Link>
-    );
-  }
-  if (task.jobId) {
-    return (
-      <Link href={`/app/jobs/${task.jobId}`} className="text-sky-600 hover:text-sky-700 text-sm">
-        Job
-      </Link>
-    );
-  }
-  if (task.customerId) {
-    return (
-      <Link href={`/app/customers/${task.customerId}`} className="text-sky-600 hover:text-sky-700 text-sm">
-        Customer
-      </Link>
-    );
-  }
+  if (task.leadId) return <Link href={`/app/leads/${task.leadId}`} className="text-sky-600 hover:text-sky-700 text-sm">Lead</Link>;
+  if (task.jobId) return <Link href={`/app/jobs/${task.jobId}`} className="text-sky-600 hover:text-sky-700 text-sm">Job</Link>;
+  if (task.customerId) return <Link href={`/app/customers/${task.customerId}`} className="text-sky-600 hover:text-sky-700 text-sm">Customer</Link>;
   return <span className="text-slate-400 text-sm">—</span>;
 }
+
+function TaskFieldCell({ field, task }: { field: string; task: TaskDto }) {
+  switch (field) {
+    case "title":
+      return <td className="px-6 py-4"><span className="font-medium text-slate-800">{task.title || "—"}</span></td>;
+    case "status":
+      return <td className="px-6 py-4"><StatusBadge label={TASK_STATUS_LABELS[task.status]} className={TASK_STATUS_COLORS[task.status]} /></td>;
+    case "priority":
+      return <td className="px-6 py-4"><StatusBadge label={TASK_PRIORITY_LABELS[task.priority]} className={TASK_PRIORITY_COLORS[task.priority]} /></td>;
+    case "dueAt":
+      return <td className="px-6 py-4 text-sm text-slate-600">{task.dueAt ? formatDateTime(task.dueAt) : "—"}</td>;
+    case "assignedTo":
+      return <td className="px-6 py-4 text-sm text-slate-600">{task.assignedToName || "Unassigned"}</td>;
+    case "related":
+      return <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}><TaskRelatedCell task={task} /></td>;
+    default:
+      return null;
+  }
+}
+
+const FIELD_LABELS: Record<string, string> = {
+  title: "Title",
+  status: "Status",
+  priority: "Priority",
+  dueAt: "Due",
+  assignedTo: "Assignee",
+  related: "Related",
+};
 
 export default function TasksPage() {
   const { api, auth, ready } = useAuthReady();
@@ -52,22 +63,18 @@ export default function TasksPage() {
   const [dueBefore, setDueBefore] = useState("");
   const [page, setPage] = useState(0);
   const pageSize = 20;
+  const { visibleFields } = useVisibleFields("tasksList");
 
-  const filters = useMemo(
-    () => {
-      const dueBeforeIso = dueBefore
-        ? `${dueBefore}T23:59:59.999Z`
-        : undefined;
-      return {
-        status: statusFilter || undefined,
-        assignedToUserId: myTasksOnly && auth.userId ? auth.userId : undefined,
-        dueBefore: dueBeforeIso,
-        page,
-        size: pageSize,
-      };
-    },
-    [statusFilter, myTasksOnly, auth.userId, dueBefore, page]
-  );
+  const filters = useMemo(() => {
+    const dueBeforeIso = dueBefore ? `${dueBefore}T23:59:59.999Z` : undefined;
+    return {
+      status: statusFilter || undefined,
+      assignedToUserId: myTasksOnly && auth.userId ? auth.userId : undefined,
+      dueBefore: dueBeforeIso,
+      page,
+      size: pageSize,
+    };
+  }, [statusFilter, myTasksOnly, auth.userId, dueBefore, page]);
 
   const queryKey = useMemo(
     () => queryKeys.tasksList(auth.selectedTenantId, filters),
@@ -82,19 +89,11 @@ export default function TasksPage() {
   });
 
   const handleStatusChange = useCallback(
-    (e: React.ChangeEvent<HTMLSelectElement>) => {
-      setStatusFilter(e.target.value as TaskStatus | "");
-      setPage(0);
-    },
+    (e: React.ChangeEvent<HTMLSelectElement>) => { setStatusFilter(e.target.value as TaskStatus | ""); setPage(0); },
     []
   );
 
-  const handleClearFilters = useCallback(() => {
-    setStatusFilter("");
-    setMyTasksOnly(false);
-    setDueBefore("");
-    setPage(0);
-  }, []);
+  const handleClearFilters = useCallback(() => { setStatusFilter(""); setMyTasksOnly(false); setDueBefore(""); setPage(0); }, []);
 
   const tasks = data?.content ?? [];
   const totalPages = data?.totalPages ?? 0;
@@ -107,70 +106,28 @@ export default function TasksPage() {
           <h1 className="text-2xl font-bold text-slate-800">Tasks</h1>
           <p className="text-sm text-slate-500 mt-1">Manage tasks and follow-ups</p>
         </div>
-        <Link
-          href="/app/tasks/new"
-          className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
-        >
-          + New Task
-        </Link>
+        <Link href="/app/tasks/new" className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm">+ New Task</Link>
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 p-4 mb-6">
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-2">
-            <label htmlFor="status-filter" className="text-sm font-medium text-slate-700">
-              Status:
-            </label>
-            <select
-              id="status-filter"
-              value={statusFilter}
-              onChange={handleStatusChange}
-              className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
-            >
+            <label htmlFor="status-filter" className="text-sm font-medium text-slate-700">Status:</label>
+            <select id="status-filter" value={statusFilter} onChange={handleStatusChange} className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent">
               <option value="">All</option>
-              {TASK_STATUS_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
+              {TASK_STATUS_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
             </select>
           </div>
-
           <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={myTasksOnly}
-              onChange={(e) => {
-                setMyTasksOnly(e.target.checked);
-                setPage(0);
-              }}
-              className="rounded border-slate-300 text-sky-600 focus:ring-sky-500"
-            />
+            <input type="checkbox" checked={myTasksOnly} onChange={(e) => { setMyTasksOnly(e.target.checked); setPage(0); }} className="rounded border-slate-300 text-sky-600 focus:ring-sky-500" />
             <span className="text-sm font-medium text-slate-700">My tasks</span>
           </label>
-
           <div className="flex items-center gap-2 min-w-[200px]">
-            <label htmlFor="due-before" className="text-sm font-medium text-slate-700 shrink-0">
-              Due before:
-            </label>
-            <DatePicker
-              id="due-before"
-              value={dueBefore}
-              onChange={(v) => {
-                setDueBefore(v);
-                setPage(0);
-              }}
-              placeholder="Any date"
-            />
+            <label htmlFor="due-before" className="text-sm font-medium text-slate-700 shrink-0">Due before:</label>
+            <DatePicker id="due-before" value={dueBefore} onChange={(v) => { setDueBefore(v); setPage(0); }} placeholder="Any date" />
           </div>
-
           {hasFilters && (
-            <button
-              onClick={handleClearFilters}
-              className="text-sm text-slate-500 hover:text-slate-700 underline"
-            >
-              Clear filters
-            </button>
+            <button onClick={handleClearFilters} className="text-sm text-slate-500 hover:text-slate-700 underline">Clear filters</button>
           )}
         </div>
       </div>
@@ -186,11 +143,7 @@ export default function TasksPage() {
         <div className="bg-red-50 border border-red-200 rounded-xl p-6">
           <div className="flex items-start gap-3">
             <svg className="w-5 h-5 text-red-500 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-              <path
-                fillRule="evenodd"
-                d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                clipRule="evenodd"
-              />
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
             </svg>
             <div>
               <h3 className="text-sm font-medium text-red-800">Failed to load tasks</h3>
@@ -205,26 +158,12 @@ export default function TasksPage() {
         <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
           <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1.5}
-                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
-              />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
             </svg>
           </div>
-          <h3 className="text-lg font-medium text-slate-800 mb-1">
-            {hasFilters ? "No tasks match your filters" : "No tasks yet"}
-          </h3>
-          <p className="text-sm text-slate-500 mb-4">
-            {hasFilters ? "Try adjusting your filters or create a new task." : "Get started by adding your first task."}
-          </p>
-          <Link
-            href="/app/tasks/new"
-            className="inline-flex px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-sm font-medium rounded-lg transition-colors"
-          >
-            + New Task
-          </Link>
+          <h3 className="text-lg font-medium text-slate-800 mb-1">{hasFilters ? "No tasks match your filters" : "No tasks yet"}</h3>
+          <p className="text-sm text-slate-500 mb-4">{hasFilters ? "Try adjusting your filters or create a new task." : "Get started by adding your first task."}</p>
+          <Link href="/app/tasks/new" className="inline-flex px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-sm font-medium rounded-lg transition-colors">+ New Task</Link>
         </div>
       )}
 
@@ -234,47 +173,22 @@ export default function TasksPage() {
             <table className="min-w-full divide-y divide-slate-200">
               <thead className="bg-slate-50">
                 <tr>
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">Title</th>
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">Status</th>
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">Priority</th>
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">Due</th>
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">Assignee</th>
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">Related</th>
+                  {visibleFields.map((f) => (
+                    <th key={f} className={`${f === "related" ? "" : "text-left"} px-6 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider`}>
+                      {FIELD_LABELS[f] ?? f}
+                    </th>
+                  ))}
                   <th className="text-right px-6 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
                 {tasks.map((task: TaskDto) => (
-                  <ClickableTableRow
-                    key={task.taskId}
-                    href={`/app/tasks/${task.taskId}`}
-                    aria-label={`Open task: ${task.title || "Task"}`}
-                  >
-                    <td className="px-6 py-4">
-                      <span className="font-medium text-slate-800">{task.title || "—"}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <StatusBadge label={TASK_STATUS_LABELS[task.status]} className={TASK_STATUS_COLORS[task.status]} />
-                    </td>
-                    <td className="px-6 py-4">
-                      <StatusBadge label={TASK_PRIORITY_LABELS[task.priority]} className={TASK_PRIORITY_COLORS[task.priority]} />
-                    </td>
-                    <td className="px-6 py-4 text-sm text-slate-600">
-                      {task.dueAt ? formatDateTime(task.dueAt) : "—"}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-slate-600">
-                      {task.assignedToName || "Unassigned"}
-                    </td>
-                    <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
-                      <TaskRelatedCell task={task} />
-                    </td>
+                  <ClickableTableRow key={task.taskId} href={`/app/tasks/${task.taskId}`} aria-label={`Open task: ${task.title || "Task"}`}>
+                    {visibleFields.map((f) => (
+                      <TaskFieldCell key={f} field={f} task={task} />
+                    ))}
                     <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
-                      <Link
-                        href={`/app/tasks/${task.taskId}`}
-                        className="text-sm text-sky-600 hover:text-sky-700 font-medium"
-                      >
-                        View
-                      </Link>
+                      <Link href={`/app/tasks/${task.taskId}`} className="text-sm text-sky-600 hover:text-sky-700 font-medium">View</Link>
                     </td>
                   </ClickableTableRow>
                 ))}
@@ -288,20 +202,8 @@ export default function TasksPage() {
                 {isFetching ? <span className="text-slate-500">Loading…</span> : <>Page {page + 1} of {totalPages}</>}
               </p>
               <div className="flex gap-2">
-                <button
-                  onClick={() => setPage((p) => Math.max(0, p - 1))}
-                  disabled={page === 0}
-                  className="px-3 py-1.5 text-sm font-medium border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Previous
-                </button>
-                <button
-                  onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-                  disabled={page >= totalPages - 1}
-                  className="px-3 py-1.5 text-sm font-medium border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Next
-                </button>
+                <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0} className="px-3 py-1.5 text-sm font-medium border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">Previous</button>
+                <button onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} className="px-3 py-1.5 text-sm font-medium border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
               </div>
             </div>
           )}

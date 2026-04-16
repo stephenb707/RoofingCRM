@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, waitFor, fireEvent } from "./test-utils";
+import { render, screen, waitFor, fireEvent, within } from "./test-utils";
 import userEvent from "@testing-library/user-event";
 import LeadDetailPage from "@/app/app/leads/[leadId]/page";
 import * as leadsApi from "@/lib/leadsApi";
@@ -120,6 +120,33 @@ describe("LeadDetailPage", () => {
     await waitFor(() => {
       expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("John Doe");
     });
+  });
+
+  it("renders a fixed left section rail with lead anchors", async () => {
+    render(<LeadDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("John Doe");
+    });
+
+    const railContainer = screen.getByTestId("lead-section-nav-rail-container");
+    expect(railContainer).toHaveClass("hidden", "lg:block", "lg:fixed", "lg:left-6");
+
+    const railNav = screen.getByTestId("detail-section-nav-rail");
+    const expectedLinks = [
+      ["Customer", "#customer-information"],
+      ["Property Address", "#property-address"],
+      ["Activity", "#activity"],
+      ["Tasks", "#tasks"],
+      ["Notes", "#notes"],
+      ["Attachments", "#attachments"],
+      ["Communication", "#communication"],
+    ] as const;
+
+    for (const [label, href] of expectedLinks) {
+      expect(within(railNav).getByRole("link", { name: label })).toHaveAttribute("href", href);
+      expect(document.getElementById(href.slice(1))).toBeInTheDocument();
+    }
   });
 
   it("shows Convert to Job and Edit Lead buttons when lead is not LOST", async () => {

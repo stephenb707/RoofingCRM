@@ -753,6 +753,7 @@ export interface DashboardSummaryDto {
   invoiceCount: number;
   openTaskCount: number;
   leadCountByStatus: Record<string, number>;
+  jobCountByStatus: Record<string, number>;
   jobsScheduledThisWeek: number;
   unscheduledJobsCount: number;
   estimatesSentCount: number;
@@ -828,4 +829,24 @@ export interface SendCustomerPhotoReportEmailRequest {
 export interface SendCustomerPhotoReportEmailResponse {
   success: boolean;
   sentAt: string;
+}
+
+// App Preferences (tenant-level customization)
+export interface AppPreferencesDto {
+  dashboard: Record<string, unknown>;
+  jobsList: Record<string, unknown>;
+  leadsList: Record<string, unknown>;
+  customersList: Record<string, unknown>;
+  tasksList: Record<string, unknown>;
+  estimatesList: Record<string, unknown>;
+  updatedAt: string | null;
+}
+
+export interface UpdateAppPreferencesRequest {
+  dashboard?: Record<string, unknown>;
+  jobsList?: Record<string, unknown>;
+  leadsList?: Record<string, unknown>;
+  customersList?: Record<string, unknown>;
+  tasksList?: Record<string, unknown>;
+  estimatesList?: Record<string, unknown>;
 }

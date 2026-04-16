@@ -99,6 +99,14 @@ public class DashboardServiceImpl implements DashboardService {
         }
         dto.setLeadCountByStatus(byStatus);
 
+        LinkedHashMap<String, Long> jobsByStatus = new LinkedHashMap<>();
+        List<PipelineStatusDefinition> jobDefs = pipelineStatusDefinitionRepository
+                .findByTenantAndPipelineTypeAndActiveTrueAndArchivedFalseOrderBySortOrderAsc(tenant, PipelineType.JOB);
+        for (PipelineStatusDefinition def : jobDefs) {
+            jobsByStatus.put(def.getSystemKey(), jobRepository.countByTenantAndStatusDefinitionAndArchivedFalse(tenant, def));
+        }
+        dto.setJobCountByStatus(jobsByStatus);
+
         dto.setRecentLeads(
                 leadRepository
                         .findByTenantAndArchivedFalse(

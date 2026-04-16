@@ -175,14 +175,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </Link>
           {canManagePipelineSettings && (
             <Link
-              href="/app/settings/pipeline-statuses"
+              href="/app/settings"
               className={`px-4 py-3 text-sm font-medium transition-colors ${
                 pathname.startsWith("/app/settings")
                   ? "text-sky-600 border-b-2 border-sky-600"
                   : "text-slate-600 hover:text-slate-800 border-b-2 border-transparent"
               }`}
             >
-              Pipeline settings
+              Settings
             </Link>
           )}
         </div>
