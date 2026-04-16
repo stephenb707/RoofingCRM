@@ -3,10 +3,25 @@ import { render, screen, waitFor, mockAuthValue, within } from "./test-utils";
 import userEvent from "@testing-library/user-event";
 import PipelineStatusSettingsPage from "@/app/app/settings/pipeline-statuses/page";
 import * as pipelineStatusesApi from "@/lib/pipelineStatusesApi";
+import * as preferencesApi from "@/lib/preferencesApi";
+import type { AppPreferencesDto } from "@/lib/types";
 
 jest.mock("@/lib/pipelineStatusesApi");
+jest.mock("@/lib/preferencesApi");
 
 const mockedApi = pipelineStatusesApi as jest.Mocked<typeof pipelineStatusesApi>;
+const mockedPrefsApi = preferencesApi as jest.Mocked<typeof preferencesApi>;
+
+const basePrefsDto: AppPreferencesDto = {
+  dashboard: {},
+  jobsList: {},
+  leadsList: {},
+  customersList: {},
+  tasksList: {},
+  estimatesList: {},
+  pipeline: { defaultView: "leads" },
+  updatedAt: null,
+};
 
 jest.mock("next/navigation", () => ({
   useRouter: () => ({ push: jest.fn(), replace: jest.fn(), back: jest.fn() }),
@@ -90,6 +105,14 @@ describe("PipelineStatusSettingsPage", () => {
     mockedApi.reorderSettingsPipelineStatuses.mockResolvedValue(undefined);
     mockedApi.restoreDefaultPipelineStatuses.mockResolvedValue(undefined);
     mockedApi.deactivateSettingsPipelineStatus.mockResolvedValue(undefined);
+
+    mockedPrefsApi.getAppPreferences.mockResolvedValue({ ...basePrefsDto });
+    mockedPrefsApi.updateAppPreferences.mockImplementation(async (_api, body) => ({
+      ...basePrefsDto,
+      ...body,
+      pipeline: { ...(basePrefsDto.pipeline ?? {}), ...(body.pipeline ?? {}) },
+      updatedAt: "2026-01-01T00:00:00Z",
+    }));
   });
 
   it("renders lead and job status sections", async () => {
@@ -97,6 +120,10 @@ describe("PipelineStatusSettingsPage", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("pipeline-settings-page")).toBeInTheDocument();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("pipeline-default-view-settings")).toBeInTheDocument();
     });
 
     expect(screen.getByTestId("pipeline-settings-lead-section")).toBeInTheDocument();
@@ -165,11 +192,13 @@ describe("PipelineStatusSettingsPage", () => {
     const user = userEvent.setup();
     render(<PipelineStatusSettingsPage />);
 
+    const leadSection = screen.getByTestId("pipeline-settings-lead-section");
     await waitFor(() => {
-      expect(screen.getByTestId("pipeline-settings-lead-section")).toBeInTheDocument();
+      expect(within(leadSection).getAllByRole("button", { name: "Move down" }).length).toBeGreaterThan(
+        0
+      );
     });
 
-    const leadSection = screen.getByTestId("pipeline-settings-lead-section");
     const moveDownButtons = within(leadSection).getAllByRole("button", { name: "Move down" });
     await user.click(moveDownButtons[0]!);
 
@@ -215,5 +244,22 @@ describe("PipelineStatusSettingsPage", () => {
       ).toBeInTheDocument();
     });
     expect(mockedApi.listSettingsPipelineStatuses).not.toHaveBeenCalled();
+  });
+
+  it("saves default pipeline view via preferences API", async () => {
+    const user = userEvent.setup();
+    render(<PipelineStatusSettingsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("pipeline-default-view-combined")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByTestId("pipeline-default-view-combined"));
+
+    await waitFor(() => {
+      expect(mockedPrefsApi.updateAppPreferences).toHaveBeenCalledWith(expect.anything(), {
+        pipeline: { defaultView: "combined" },
+      });
+    });
   });
 });

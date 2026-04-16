@@ -59,6 +59,7 @@ public class AppPreferencesServiceImpl implements AppPreferencesService {
         if (request.getCustomersList() != null) merged.put("customersList", request.getCustomersList());
         if (request.getTasksList() != null) merged.put("tasksList", request.getTasksList());
         if (request.getEstimatesList() != null) merged.put("estimatesList", request.getEstimatesList());
+        if (request.getPipeline() != null) merged.put("pipeline", request.getPipeline());
         entity.setPreferences(merged);
 
         TenantAppPreferences saved = preferencesRepository.save(entity);
@@ -74,6 +75,7 @@ public class AppPreferencesServiceImpl implements AppPreferencesService {
         dto.setCustomersList(resolveSection(prefs, "customersList", AppPreferencesDefaults.customersList()));
         dto.setTasksList(resolveSection(prefs, "tasksList", AppPreferencesDefaults.tasksList()));
         dto.setEstimatesList(resolveSection(prefs, "estimatesList", AppPreferencesDefaults.estimatesList()));
+        dto.setPipeline(resolveSection(prefs, "pipeline", AppPreferencesDefaults.pipeline()));
         dto.setUpdatedAt(entity.getUpdatedAt());
         return dto;
     }
@@ -86,6 +88,7 @@ public class AppPreferencesServiceImpl implements AppPreferencesService {
         dto.setCustomersList(AppPreferencesDefaults.customersList());
         dto.setTasksList(AppPreferencesDefaults.tasksList());
         dto.setEstimatesList(AppPreferencesDefaults.estimatesList());
+        dto.setPipeline(AppPreferencesDefaults.pipeline());
         dto.setUpdatedAt(null);
         return dto;
     }

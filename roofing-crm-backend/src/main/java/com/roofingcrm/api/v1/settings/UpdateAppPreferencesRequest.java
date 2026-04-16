@@ -14,4 +14,5 @@ public class UpdateAppPreferencesRequest {
     private Map<String, Object> customersList;
     private Map<String, Object> tasksList;
     private Map<String, Object> estimatesList;
+    private Map<String, Object> pipeline;
 }

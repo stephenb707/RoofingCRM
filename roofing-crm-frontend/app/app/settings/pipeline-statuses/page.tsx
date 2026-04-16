@@ -17,6 +17,9 @@ import {
   type PipelineStatusDefinitionDto,
   type PipelineTypeApi,
 } from "@/lib/pipelineStatusesApi";
+import { useAppPreferences } from "@/lib/useAppPreferences";
+import type { PipelineViewId } from "@/lib/pipelineNav";
+import { parsePipelineDefaultView } from "@/lib/pipelineNav";
 
 function StatusRow({
   def,
@@ -366,6 +369,68 @@ function PipelineStatusSection({ pipelineType }: { pipelineType: PipelineTypeApi
   );
 }
 
+function DefaultPipelineViewPanel() {
+  const { prefs, isLoading, saving, mutate } = useAppPreferences();
+  const selected: PipelineViewId =
+    parsePipelineDefaultView(prefs?.pipeline?.defaultView) ?? "leads";
+
+  const choices: { id: PipelineViewId; label: string; description: string }[] = [
+    { id: "leads", label: "Leads", description: "Open the lead pipeline first." },
+    { id: "jobs", label: "Jobs", description: "Open the job pipeline first." },
+    {
+      id: "combined",
+      label: "Combined",
+      description: "Open both lead and job boards on one page.",
+    },
+  ];
+
+  return (
+    <section
+      className="bg-white border border-slate-200 rounded-lg shadow-sm p-5"
+      data-testid="pipeline-default-view-settings"
+    >
+      <h2 className="text-lg font-semibold text-slate-800">Default pipeline view</h2>
+      <p className="text-sm text-slate-500 mt-1">
+        Chooses where <strong>Pipeline</strong> goes from the dashboard or list pages. Bookmarked links to a
+        specific pipeline are not affected.
+      </p>
+      {isLoading ? (
+        <p className="text-sm text-slate-500 mt-4">Loading…</p>
+      ) : (
+        <div className="mt-4 flex flex-col gap-2" role="radiogroup" aria-label="Default pipeline view">
+          {choices.map((c) => {
+            const active = selected === c.id;
+            return (
+              <button
+                key={c.id}
+                type="button"
+                disabled={saving}
+                onClick={() => mutate({ pipeline: { defaultView: c.id } })}
+                className={`text-left rounded-lg border px-3 py-2.5 transition-colors ${
+                  active
+                    ? "border-sky-500 bg-sky-50 ring-1 ring-sky-500"
+                    : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                }`}
+                aria-checked={active}
+                role="radio"
+                data-testid={`pipeline-default-view-${c.id}`}
+              >
+                <div className="text-sm font-medium text-slate-800">{c.label}</div>
+                <div className="text-xs text-slate-500 mt-0.5">{c.description}</div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+      {saving ? (
+        <p className="text-xs text-slate-500 mt-2" role="status">
+          Saving…
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
 export default function PipelineStatusSettingsPage() {
   const { auth, ready } = useAuthReady();
   const currentTenant = auth.tenants.find((t) => t.tenantId === auth.selectedTenantId);
@@ -402,6 +467,8 @@ export default function PipelineStatusSettingsPage() {
           lists, and status selectors after they refresh.
         </p>
       </div>
+
+      <DefaultPipelineViewPanel />
 
       <PipelineStatusSection pipelineType="LEAD" />
       <PipelineStatusSection pipelineType="JOB" />

@@ -73,6 +73,7 @@ function QuickActionsWidget() {
         <Link href="/app/leads/new" className="inline-flex items-center px-4 py-2.5 rounded-lg bg-white border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50 transition-colors">New lead</Link>
         <Link href="/app/tasks/new" className="inline-flex items-center px-4 py-2.5 rounded-lg bg-white border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50 transition-colors">Create task</Link>
         <Link href="/app/schedule" className="inline-flex items-center px-4 py-2.5 rounded-lg bg-white border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50 transition-colors">Schedule</Link>
+        <Link href="/app/pipeline/combined" className="inline-flex items-center px-4 py-2.5 rounded-lg bg-white border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50 transition-colors">Combined pipeline</Link>
         <Link href="/app/jobs" className="inline-flex items-center px-4 py-2.5 rounded-lg bg-white border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50 transition-colors">Jobs &amp; estimates</Link>
         <Link href="/app/reports" className="inline-flex items-center px-4 py-2.5 rounded-lg bg-white border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50 transition-colors">Reports</Link>
       </div>
@@ -95,7 +96,7 @@ function LeadPipelineWidget({
     <section className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-sm font-semibold text-slate-800">Lead pipeline</h2>
-        <Link href="/app/leads/pipeline" className="text-xs text-sky-600 hover:text-sky-700">Open pipeline →</Link>
+        <Link href="/app/pipeline" className="text-xs text-sky-600 hover:text-sky-700">Open pipeline →</Link>
       </div>
       <div className="space-y-2">
         {sorted.map((def) => {
@@ -151,7 +152,7 @@ function JobPipelineWidget({
     <section className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-sm font-semibold text-slate-800">Job pipeline</h2>
-        <Link href="/app/jobs/pipeline" className="text-xs text-sky-600 hover:text-sky-700">Open pipeline →</Link>
+        <Link href="/app/pipeline" className="text-xs text-sky-600 hover:text-sky-700">Open pipeline →</Link>
       </div>
       <div className="space-y-2">
         {sorted.map((def) => {

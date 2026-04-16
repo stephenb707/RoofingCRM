@@ -62,6 +62,11 @@ public final class AppPreferencesDefaults {
         return m;
     }
 
+    /** Defaults: empty — frontend treats missing keys as legacy behavior. */
+    public static Map<String, Object> pipeline() {
+        return new LinkedHashMap<>();
+    }
+
     public static Map<String, Object> allDefaults() {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("dashboard", dashboard());
@@ -70,6 +75,7 @@ public final class AppPreferencesDefaults {
         m.put("customersList", customersList());
         m.put("tasksList", tasksList());
         m.put("estimatesList", estimatesList());
+        m.put("pipeline", pipeline());
         return m;
     }
 }

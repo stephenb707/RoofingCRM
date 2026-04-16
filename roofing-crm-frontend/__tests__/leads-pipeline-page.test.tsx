@@ -204,7 +204,23 @@ describe("LeadsPipelinePage", () => {
 
     const search = screen.getByLabelText(/search leads in pipeline/i);
     expect(search).toBeInTheDocument();
-    expect(search).toHaveAttribute("placeholder", "Search customer, address, phone…");
+    expect(search).toHaveAttribute("placeholder", "Search customer, address…");
+  });
+
+  it("renders pipeline view switcher with Leads active", async () => {
+    render(<LeadsPipelinePage />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("pipeline-view-switcher")).toBeInTheDocument();
+    });
+
+    const leadsTab = screen.getByTestId("pipeline-view-switch-leads");
+    expect(leadsTab).toHaveAttribute("aria-current", "page");
+    expect(screen.getByTestId("pipeline-view-switch-jobs")).toHaveAttribute("href", "/app/jobs/pipeline");
+    expect(screen.getByTestId("pipeline-view-switch-combined")).toHaveAttribute(
+      "href",
+      "/app/pipeline/combined"
+    );
   });
 
   it("filters cards by search input (customer name)", async () => {

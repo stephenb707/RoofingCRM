@@ -127,7 +127,11 @@ export default function JobsPage() {
         </div>
         <div className="flex gap-2">
           <Link
-            href={customerIdFromQuery ? `/app/jobs/pipeline?customerId=${encodeURIComponent(customerIdFromQuery)}` : "/app/jobs/pipeline"}
+            href={
+              customerIdFromQuery
+                ? `/app/jobs/pipeline?customerId=${encodeURIComponent(customerIdFromQuery)}`
+                : "/app/jobs/pipeline"
+            }
             className="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
           >
             Pipeline View

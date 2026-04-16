@@ -97,6 +97,15 @@ describe("JobsPipelinePage", () => {
       expect(screen.getByRole("heading", { name: /^Pipeline$/i })).toBeInTheDocument();
     });
 
+    await waitFor(() => {
+      expect(screen.getByTestId("pipeline-view-switcher")).toBeInTheDocument();
+    });
+    expect(screen.getByTestId("pipeline-view-switch-jobs")).toHaveAttribute("aria-current", "page");
+    expect(screen.getByTestId("pipeline-view-switch-combined")).toHaveAttribute(
+      "href",
+      "/app/pipeline/combined"
+    );
+
     expect(mockedPipelineApi.listPipelineStatuses).toHaveBeenCalledWith(expect.anything(), "JOB");
     expect(mockedJobsApi.listJobs).toHaveBeenCalledWith(
       expect.anything(),

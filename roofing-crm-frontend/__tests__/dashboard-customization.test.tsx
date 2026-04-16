@@ -121,15 +121,15 @@ describe("Dashboard renders widgets from preferences", () => {
     expect(headings).not.toContain("Open tasks");
   });
 
-  it("renders Job Pipeline widget with pipeline link", async () => {
+  it("renders Job Pipeline widget with generic pipeline hub link", async () => {
     render(<DashboardPage />);
     await waitFor(() => {
       const headings = getHeadingTexts();
       expect(headings).toContain("Job pipeline");
     });
     const pipelineLinks = screen.getAllByRole("link", { name: /Open pipeline/ });
-    const jobPipelineLink = pipelineLinks.find((el) => el.getAttribute("href") === "/app/jobs/pipeline");
-    expect(jobPipelineLink).toBeTruthy();
+    const hubLinks = pipelineLinks.filter((el) => el.getAttribute("href") === "/app/pipeline");
+    expect(hubLinks.length).toBeGreaterThanOrEqual(1);
   });
 
   it("only renders metrics and openTasks when configured", async () => {

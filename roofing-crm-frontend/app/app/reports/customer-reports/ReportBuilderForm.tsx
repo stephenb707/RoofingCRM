@@ -634,7 +634,7 @@ export function ReportBuilderForm({
                         >
                           {renderPhotoThumbnail(
                             attachmentId,
-                            attachment?.fileName,
+                            attachment?.fileName ?? undefined,
                             `selected-photo-thumbnail-${attachmentId}`,
                             `Selected ${attachment?.fileName ?? attachmentId}`
                           )}
@@ -736,7 +736,7 @@ export function ReportBuilderForm({
                             />
                             {renderPhotoThumbnail(
                               c.id,
-                              c.fileName,
+                              c.fileName ?? undefined,
                               `photo-thumbnail-${c.id}`,
                               c.fileName ?? "Attachment preview"
                             )}

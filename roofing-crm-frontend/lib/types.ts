@@ -839,6 +839,8 @@ export interface AppPreferencesDto {
   customersList: Record<string, unknown>;
   tasksList: Record<string, unknown>;
   estimatesList: Record<string, unknown>;
+  /** e.g. { defaultView: "leads" | "jobs" | "combined" } */
+  pipeline?: Record<string, unknown>;
   updatedAt: string | null;
 }
 
@@ -849,4 +851,5 @@ export interface UpdateAppPreferencesRequest {
   customersList?: Record<string, unknown>;
   tasksList?: Record<string, unknown>;
   estimatesList?: Record<string, unknown>;
+  pipeline?: Record<string, unknown>;
 }

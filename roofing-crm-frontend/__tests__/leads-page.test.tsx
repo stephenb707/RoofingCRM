@@ -167,6 +167,10 @@ describe("LeadsPage", () => {
       "href",
       "/app/leads/new"
     );
+    expect(screen.getByRole("link", { name: /pipeline view/i })).toHaveAttribute(
+      "href",
+      "/app/leads/pipeline"
+    );
   });
 
   it("filters leads by status when selecting from dropdown", async () => {

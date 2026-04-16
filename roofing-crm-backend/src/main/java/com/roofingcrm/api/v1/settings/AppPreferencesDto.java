@@ -15,5 +15,7 @@ public class AppPreferencesDto {
     private Map<String, Object> customersList;
     private Map<String, Object> tasksList;
     private Map<String, Object> estimatesList;
+    /** Pipeline UI preferences (e.g. default combined vs lead-only view). */
+    private Map<String, Object> pipeline;
     private Instant updatedAt;
 }

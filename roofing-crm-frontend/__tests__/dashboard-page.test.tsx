@@ -130,6 +130,10 @@ describe("DashboardPage", () => {
     expect(screen.getByRole("link", { name: /^new lead$/i })).toHaveAttribute("href", "/app/leads/new");
     expect(screen.getByRole("link", { name: /^create task$/i })).toHaveAttribute("href", "/app/tasks/new");
     expect(screen.getByRole("link", { name: /^schedule$/i })).toHaveAttribute("href", "/app/schedule");
+    expect(screen.getByRole("link", { name: /^combined pipeline$/i })).toHaveAttribute(
+      "href",
+      "/app/pipeline/combined"
+    );
     expect(screen.getByRole("link", { name: /jobs & estimates/i })).toHaveAttribute("href", "/app/jobs");
     expect(screen.getByRole("link", { name: /^reports$/i })).toHaveAttribute("href", "/app/reports");
   });

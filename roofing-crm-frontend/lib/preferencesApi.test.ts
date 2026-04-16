@@ -15,7 +15,8 @@ const mockPrefs: AppPreferencesDto = {
   leadsList: { visibleFields: ["customer", "status", "source"] },
   customersList: { visibleFields: ["name", "phone", "email"] },
   tasksList: { visibleFields: ["title", "status", "priority"] },
-  estimatesList: { visibleFields: ["title", "status", "total"] },
+   estimatesList: { visibleFields: ["title", "status", "total"] },
+  pipeline: {},
   updatedAt: null,
 };
 

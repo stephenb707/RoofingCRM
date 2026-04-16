@@ -60,6 +60,7 @@ class AppPreferencesServiceImplTest {
         assertNotNull(dto.getCustomersList());
         assertNotNull(dto.getTasksList());
         assertNotNull(dto.getEstimatesList());
+        assertNotNull(dto.getPipeline());
 
         @SuppressWarnings("unchecked")
         List<String> widgets = (List<String>) dto.getDashboard().get("widgets");
@@ -97,6 +98,7 @@ class AppPreferencesServiceImplTest {
         assertEquals(List.of("status"), jobFields);
 
         assertNotNull(dto.getLeadsList());
+        assertNotNull(dto.getPipeline());
     }
 
     @Test

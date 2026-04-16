@@ -15,7 +15,6 @@ public final class CustomerPhotoReportPresentationHelper {
 
     private static final DateTimeFormatter JOB_DATE_FORMAT =
             DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.US);
-    private static final ZoneId REPORT_DATE_ZONE = ZoneId.systemDefault();
 
     private CustomerPhotoReportPresentationHelper() {
     }
@@ -43,7 +42,9 @@ public final class CustomerPhotoReportPresentationHelper {
     }
 
     public static LocalDate resolveReportLocalDate(CustomerPhotoReport report) {
-        return resolveReportDate(report).atZone(REPORT_DATE_ZONE).toLocalDate();
+        // Use system default at call time (not a static cache) so tests and servers that change
+        // the default time zone see the expected local date.
+        return resolveReportDate(report).atZone(ZoneId.systemDefault()).toLocalDate();
     }
 
     public static String formatJobDisplay(Job job) {
