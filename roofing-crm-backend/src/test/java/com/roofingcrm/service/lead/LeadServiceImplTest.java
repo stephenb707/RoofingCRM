@@ -14,13 +14,15 @@ import com.roofingcrm.domain.entity.Tenant;
 import com.roofingcrm.domain.entity.TenantUserMembership;
 import com.roofingcrm.domain.entity.User;
 import com.roofingcrm.domain.enums.JobType;
-import com.roofingcrm.domain.enums.LeadStatus;
+import com.roofingcrm.domain.enums.PipelineType;
 import com.roofingcrm.domain.enums.UserRole;
 import com.roofingcrm.domain.repository.CustomerRepository;
 import com.roofingcrm.domain.repository.JobRepository;
+import com.roofingcrm.domain.repository.PipelineStatusDefinitionRepository;
 import com.roofingcrm.domain.repository.TenantRepository;
 import com.roofingcrm.domain.repository.TenantUserMembershipRepository;
 import com.roofingcrm.domain.repository.UserRepository;
+import com.roofingcrm.service.pipeline.PipelineStatusAdminService;
 import com.roofingcrm.service.exception.LeadConversionNotAllowedException;
 import com.roofingcrm.service.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
@@ -58,6 +60,12 @@ class LeadServiceImplTest extends AbstractIntegrationTest {
     @Autowired
     private TestDatabaseCleaner dbCleaner;
 
+    @Autowired
+    private PipelineStatusAdminService pipelineStatusAdminService;
+
+    @Autowired
+    private PipelineStatusDefinitionRepository pipelineStatusDefinitionRepository;
+
     @NonNull
     private UUID tenantId = Objects.requireNonNull(UUID.randomUUID());
     @NonNull
@@ -87,6 +95,16 @@ class LeadServiceImplTest extends AbstractIntegrationTest {
 
         this.tenantId = Objects.requireNonNull(tenant.getId());
         this.userId = Objects.requireNonNull(user.getId());
+
+        pipelineStatusAdminService.seedDefaultsForNewTenant(tenant);
+    }
+
+    private UUID leadStatusId(String systemKey) {
+        Tenant t = tenantRepository.findById(tenantId).orElseThrow();
+        return pipelineStatusDefinitionRepository
+                .findByTenantAndPipelineTypeAndSystemKeyAndArchivedFalse(t, PipelineType.LEAD, systemKey)
+                .orElseThrow()
+                .getId();
     }
 
     private AddressDto createPropertyAddress() {
@@ -115,7 +133,8 @@ class LeadServiceImplTest extends AbstractIntegrationTest {
 
         assertNotNull(dto.getId());
         assertNotNull(dto.getCustomerId());
-        assertEquals(LeadStatus.NEW, dto.getStatus());
+        assertEquals("NEW", dto.getStatusKey());
+        assertEquals("New", dto.getStatusLabel());
         assertEquals("Alice", dto.getCustomerFirstName());
         assertEquals("Roofer", dto.getCustomerLastName());
         assertEquals("alice@example.com", dto.getCustomerEmail());
@@ -144,10 +163,10 @@ class LeadServiceImplTest extends AbstractIntegrationTest {
         LeadDto lead2 = leadService.createLead(tenantId, userId, request2);
 
         // Update second lead to WON
-        leadService.updateLeadStatus(tenantId, userId, lead2.getId(), LeadStatus.WON, null);
+        leadService.updateLeadStatus(tenantId, userId, lead2.getId(), leadStatusId("WON"), null);
 
-        Page<LeadDto> newLeads = leadService.listLeads(tenantId, userId, LeadStatus.NEW, null, PageRequest.of(0, 10));
-        Page<LeadDto> wonLeads = leadService.listLeads(tenantId, userId, LeadStatus.WON, null, PageRequest.of(0, 10));
+        Page<LeadDto> newLeads = leadService.listLeads(tenantId, userId, leadStatusId("NEW"), null, PageRequest.of(0, 10));
+        Page<LeadDto> wonLeads = leadService.listLeads(tenantId, userId, leadStatusId("WON"), null, PageRequest.of(0, 10));
 
         assertEquals(1, newLeads.getTotalElements());
         LeadDto firstNew = newLeads.getContent().get(0);
@@ -182,11 +201,12 @@ class LeadServiceImplTest extends AbstractIntegrationTest {
         LeadDto lead = leadService.createLead(tenantId, userId, request);
 
         UpdateLeadStatusRequest statusRequest = new UpdateLeadStatusRequest();
-        statusRequest.setStatus(LeadStatus.LOST);
+        statusRequest.setStatusDefinitionId(leadStatusId("LOST"));
 
-        LeadDto updated = leadService.updateLeadStatus(tenantId, userId, lead.getId(), statusRequest.getStatus(), null);
+        LeadDto updated = leadService.updateLeadStatus(
+                tenantId, userId, lead.getId(), statusRequest.getStatusDefinitionId(), null);
 
-        assertEquals(LeadStatus.LOST, updated.getStatus());
+        assertEquals("LOST", updated.getStatusKey());
     }
 
     @Test
@@ -279,7 +299,7 @@ class LeadServiceImplTest extends AbstractIntegrationTest {
         LeadDto lead = leadService.createLead(tenantId, userId, leadRequest);
 
         // Update lead to a convertible status
-        leadService.updateLeadStatus(tenantId, userId, lead.getId(), LeadStatus.QUOTE_SENT, null);
+        leadService.updateLeadStatus(tenantId, userId, lead.getId(), leadStatusId("QUOTE_SENT"), null);
 
         // Convert to job
         ConvertLeadToJobRequest convertRequest = new ConvertLeadToJobRequest();
@@ -299,6 +319,7 @@ class LeadServiceImplTest extends AbstractIntegrationTest {
         assertEquals("convert@example.com", job.getCustomerEmail());
         assertEquals("555-9999", job.getCustomerPhone());
         assertEquals(JobType.REPLACEMENT, job.getType());
+        assertEquals("SCHEDULED", job.getStatusKey());
         assertEquals(convertRequest.getScheduledStartDate(), job.getScheduledStartDate());
         assertEquals("Team Alpha", job.getCrewName());
         assertEquals("Converted from lead", job.getInternalNotes());
@@ -312,7 +333,7 @@ class LeadServiceImplTest extends AbstractIntegrationTest {
 
         // Assert lead status updated to WON
         LeadDto updatedLead = leadService.getLead(tenantId, userId, lead.getId());
-        assertEquals(LeadStatus.WON, updatedLead.getStatus());
+        assertEquals("WON", updatedLead.getStatusKey());
     }
 
     @Test
@@ -366,7 +387,7 @@ class LeadServiceImplTest extends AbstractIntegrationTest {
         LeadDto lead = leadService.createLead(tenantId, userId, leadRequest);
 
         // Mark lead as LOST
-        leadService.updateLeadStatus(tenantId, userId, lead.getId(), LeadStatus.LOST, null);
+        leadService.updateLeadStatus(tenantId, userId, lead.getId(), leadStatusId("LOST"), null);
 
         // Attempt conversion
         ConvertLeadToJobRequest convertRequest = new ConvertLeadToJobRequest();

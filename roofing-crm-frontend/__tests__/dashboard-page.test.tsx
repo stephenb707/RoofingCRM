@@ -1,11 +1,30 @@
 import React from "react";
+import { AxiosError } from "axios";
 import { render, screen, waitFor } from "./test-utils";
 import DashboardPage from "@/app/app/page";
 import * as dashboardApi from "@/lib/dashboardApi";
+import * as pipelineStatusesApi from "@/lib/pipelineStatusesApi";
 import type { DashboardSummaryDto } from "@/lib/types";
 
 jest.mock("@/lib/dashboardApi");
 const mockedDashboardApi = dashboardApi as jest.Mocked<typeof dashboardApi>;
+
+jest.mock("@/lib/pipelineStatusesApi");
+const mockedPipelineApi = pipelineStatusesApi as jest.Mocked<typeof pipelineStatusesApi>;
+
+jest.mock("@/lib/preferencesApi", () => ({
+  getAppPreferences: jest.fn().mockResolvedValue({
+    dashboard: {
+      widgets: ["metrics", "quickActions", "leadPipeline", "jobPipeline", "nextBestActions", "recentLeads", "upcomingJobs", "openTasks"],
+    },
+    jobsList: { visibleFields: [] },
+    leadsList: { visibleFields: [] },
+    customersList: { visibleFields: [] },
+    tasksList: { visibleFields: [] },
+    estimatesList: { visibleFields: [] },
+    updatedAt: null,
+  }),
+}));
 
 jest.mock("next/navigation", () => ({
   usePathname: () => "/app",
@@ -29,6 +48,10 @@ const mockSummary: DashboardSummaryDto = {
     WON: 1,
     LOST: 1,
   },
+  jobCountByStatus: {
+    SCHEDULED: 2,
+    IN_PROGRESS: 1,
+  },
   jobsScheduledThisWeek: 2,
   unscheduledJobsCount: 1,
   estimatesSentCount: 1,
@@ -37,7 +60,8 @@ const mockSummary: DashboardSummaryDto = {
   recentLeads: [
     {
       id: "lead-1",
-      status: "NEW",
+      statusKey: "NEW",
+      statusLabel: "New",
       customerLabel: "Pat Smith",
       propertyLine1: "100 Oak St",
       updatedAt: "2026-04-01T12:00:00Z",
@@ -46,7 +70,8 @@ const mockSummary: DashboardSummaryDto = {
   upcomingJobs: [
     {
       id: "job-1",
-      status: "SCHEDULED",
+      statusKey: "SCHEDULED",
+      statusLabel: "Scheduled",
       scheduledStartDate: "2026-04-12",
       propertyLine1: "200 Pine Rd",
       customerLabel: "Pat Smith",
@@ -69,6 +94,22 @@ describe("DashboardPage", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockedDashboardApi.getDashboardSummary.mockResolvedValue(mockSummary);
+    mockedPipelineApi.listPipelineStatuses.mockResolvedValue([
+      { id: "d1", pipelineType: "LEAD", systemKey: "NEW", label: "New", sortOrder: 0, builtIn: true, active: true },
+      { id: "d2", pipelineType: "LEAD", systemKey: "CONTACTED", label: "Contacted", sortOrder: 1, builtIn: true, active: true },
+      {
+        id: "d3",
+        pipelineType: "LEAD",
+        systemKey: "INSPECTION_SCHEDULED",
+        label: "Inspection",
+        sortOrder: 2,
+        builtIn: true,
+        active: true,
+      },
+      { id: "d4", pipelineType: "LEAD", systemKey: "QUOTE_SENT", label: "Quote sent", sortOrder: 3, builtIn: true, active: true },
+      { id: "d5", pipelineType: "LEAD", systemKey: "WON", label: "Won", sortOrder: 4, builtIn: true, active: true },
+      { id: "d6", pipelineType: "LEAD", systemKey: "LOST", label: "Lost", sortOrder: 5, builtIn: true, active: true },
+    ]);
   });
 
   it("renders dashboard title and loads summary", async () => {
@@ -89,6 +130,10 @@ describe("DashboardPage", () => {
     expect(screen.getByRole("link", { name: /^new lead$/i })).toHaveAttribute("href", "/app/leads/new");
     expect(screen.getByRole("link", { name: /^create task$/i })).toHaveAttribute("href", "/app/tasks/new");
     expect(screen.getByRole("link", { name: /^schedule$/i })).toHaveAttribute("href", "/app/schedule");
+    expect(screen.getByRole("link", { name: /^combined pipeline$/i })).toHaveAttribute(
+      "href",
+      "/app/pipeline/combined"
+    );
     expect(screen.getByRole("link", { name: /jobs & estimates/i })).toHaveAttribute("href", "/app/jobs");
     expect(screen.getByRole("link", { name: /^reports$/i })).toHaveAttribute("href", "/app/reports");
   });
@@ -111,6 +156,43 @@ describe("DashboardPage", () => {
         "href",
         "/app/tasks/task-1"
       );
+    });
+  });
+
+  it("does not show session-expired copy for non-401 dashboard errors", async () => {
+    mockedDashboardApi.getDashboardSummary.mockRejectedValue(
+      new AxiosError("fail", "ERR_BAD_RESPONSE", undefined, undefined, {
+        status: 500,
+        statusText: "Internal Server Error",
+        data: { message: "Could not aggregate dashboard" },
+        headers: {},
+        config: {} as never,
+      })
+    );
+
+    render(<DashboardPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/could not aggregate dashboard/i)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/session expired/i)).not.toBeInTheDocument();
+  });
+
+  it("shows session-expired copy for 401 from dashboard summary", async () => {
+    mockedDashboardApi.getDashboardSummary.mockRejectedValue(
+      new AxiosError("Unauthorized", "ERR_BAD_REQUEST", undefined, undefined, {
+        status: 401,
+        statusText: "Unauthorized",
+        data: {},
+        headers: {},
+        config: {} as never,
+      })
+    );
+
+    render(<DashboardPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/session expired/i)).toBeInTheDocument();
     });
   });
 });

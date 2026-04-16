@@ -15,9 +15,14 @@ export interface AttachmentSectionProps {
   attachments: AttachmentDto[];
   onUpload: (file: File, options?: UploadOptions) => void | Promise<void>;
   onDownload: (attachmentId: string, fileName: string) => void | Promise<void>;
+  onDelete?: (attachmentId: string, fileName: string) => void | Promise<void>;
   isLoading?: boolean;
   isUploading?: boolean;
+  deletingAttachmentId?: string | null;
   errorMessage?: string | null;
+  previewUrls?: Record<string, string>;
+  loadingPreviewIds?: string[];
+  scrollableList?: boolean;
 }
 
 export function AttachmentSection({
@@ -25,9 +30,14 @@ export function AttachmentSection({
   attachments,
   onUpload,
   onDownload,
+  onDelete,
   isLoading = false,
   isUploading = false,
+  deletingAttachmentId = null,
   errorMessage = null,
+  previewUrls = {},
+  loadingPreviewIds = [],
+  scrollableList = false,
 }: AttachmentSectionProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedTag, setSelectedTag] = useState<AttachmentTag>("OTHER");
@@ -43,6 +53,34 @@ export function AttachmentSection({
       setDescription("");
       e.target.value = "";
     }
+  };
+
+  const renderPreview = (attachment: AttachmentDto) => {
+    const isImage = (attachment.contentType ?? "").toLowerCase().startsWith("image/");
+    if (!isImage) {
+      return null;
+    }
+    const previewUrl = previewUrls[attachment.id];
+    const isLoadingPreview = loadingPreviewIds.includes(attachment.id);
+    return (
+      <div
+        data-testid={`attachment-thumbnail-${attachment.id}`}
+        className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md border border-slate-200 bg-slate-100"
+      >
+        {previewUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={previewUrl}
+            alt={attachment.fileName ?? "Attachment preview"}
+            className="h-full w-full object-cover"
+          />
+        ) : isLoadingPreview ? (
+          <span className="text-[10px] text-slate-400">Loading…</span>
+        ) : (
+          <span className="text-[10px] text-slate-400">No preview</span>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -98,38 +136,54 @@ export function AttachmentSection({
       ) : attachments.length === 0 ? (
         <p className="text-sm text-slate-500">No attachments yet.</p>
       ) : (
-        <ul className="space-y-2">
-          {attachments.map((a) => (
-            <li
-              key={a.id}
-              className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0"
-            >
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm font-medium text-slate-800 truncate">
-                    {a.fileName ?? "Unnamed"}
-                  </span>
-                  {a.tag && (
-                    <span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600 shrink-0">
-                      {TAG_LABELS[a.tag] ?? a.tag}
-                    </span>
-                  )}
-                </div>
-                <span className="text-xs text-slate-500">
-                  {formatFileSize(a.fileSize)}
-                  {a.contentType ? ` · ${a.contentType}` : ""}
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => onDownload(a.id, a.fileName ?? a.id)}
-                className="ml-3 px-3 py-1.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg shrink-0"
+        <div
+          data-testid="attachments-scroll-region"
+          className={scrollableList ? "max-h-80 overflow-y-auto pr-2 overscroll-contain" : undefined}
+        >
+          <ul className="space-y-2">
+            {attachments.map((a) => (
+              <li
+                key={a.id}
+                className="flex items-center justify-between gap-3 py-2 border-b border-slate-100 last:border-0"
               >
-                Download
-              </button>
-            </li>
-          ))}
-        </ul>
+                {renderPreview(a)}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-medium text-slate-800 truncate">
+                      {a.fileName ?? "Unnamed"}
+                    </span>
+                    {a.tag && (
+                      <span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600 shrink-0">
+                        {TAG_LABELS[a.tag] ?? a.tag}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-xs text-slate-500">
+                    {formatFileSize(a.fileSize)}
+                    {a.contentType ? ` · ${a.contentType}` : ""}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onDownload(a.id, a.fileName ?? a.id)}
+                  className="ml-3 px-3 py-1.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg shrink-0"
+                >
+                  Download
+                </button>
+                {onDelete && (
+                  <button
+                    type="button"
+                    onClick={() => onDelete(a.id, a.fileName ?? a.id)}
+                    disabled={deletingAttachmentId === a.id}
+                    className="ml-2 px-3 py-1.5 text-sm font-medium text-red-700 bg-white border border-red-200 hover:bg-red-50 rounded-lg shrink-0 disabled:opacity-60"
+                  >
+                    {deletingAttachmentId === a.id ? "Deleting…" : "Delete"}
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </div>
   );

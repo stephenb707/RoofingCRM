@@ -5,14 +5,16 @@ import com.roofingcrm.api.v1.job.CreateJobRequest;
 import com.roofingcrm.api.v1.job.UpdateJobRequest;
 import com.roofingcrm.domain.entity.Customer;
 import com.roofingcrm.domain.entity.Job;
+import com.roofingcrm.domain.entity.PipelineStatusDefinition;
 import com.roofingcrm.domain.entity.Tenant;
 import com.roofingcrm.domain.enums.ActivityEntityType;
 import com.roofingcrm.domain.enums.ActivityEventType;
-import com.roofingcrm.domain.enums.JobStatus;
 import com.roofingcrm.domain.enums.JobType;
+import com.roofingcrm.domain.enums.PipelineType;
 import com.roofingcrm.domain.repository.CustomerRepository;
 import com.roofingcrm.domain.repository.JobRepository;
 import com.roofingcrm.domain.repository.LeadRepository;
+import com.roofingcrm.domain.repository.PipelineStatusDefinitionRepository;
 import com.roofingcrm.service.activity.ActivityEventService;
 import com.roofingcrm.service.tenant.TenantAccessService;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,6 +46,8 @@ class JobServiceImplUnitTest {
     private LeadRepository leadRepository;
     @Mock
     private ActivityEventService activityEventService;
+    @Mock
+    private PipelineStatusDefinitionRepository definitionRepository;
 
     private JobServiceImpl service;
 
@@ -53,11 +57,13 @@ class JobServiceImplUnitTest {
     private UUID tenantId;
     private UUID userId;
     private UUID jobId;
+    private PipelineStatusDefinition scheduledDef;
+    private PipelineStatusDefinition unscheduledDef;
 
     @BeforeEach
     void setUp() {
         service = new JobServiceImpl(
-                tenantAccessService, jobRepository, customerRepository, leadRepository, activityEventService);
+                tenantAccessService, jobRepository, customerRepository, leadRepository, activityEventService, definitionRepository);
 
         tenant = new Tenant();
         tenant.setId(UUID.randomUUID());
@@ -65,6 +71,25 @@ class JobServiceImplUnitTest {
 
         userId = UUID.randomUUID();
         jobId = UUID.randomUUID();
+
+        scheduledDef = new PipelineStatusDefinition();
+        scheduledDef.setId(UUID.randomUUID());
+        scheduledDef.setTenant(tenant);
+        scheduledDef.setPipelineType(PipelineType.JOB);
+        scheduledDef.setSystemKey("SCHEDULED");
+        scheduledDef.setLabel("Scheduled");
+
+        unscheduledDef = new PipelineStatusDefinition();
+        unscheduledDef.setId(UUID.randomUUID());
+        unscheduledDef.setTenant(tenant);
+        unscheduledDef.setPipelineType(PipelineType.JOB);
+        unscheduledDef.setSystemKey("UNSCHEDULED");
+        unscheduledDef.setLabel("Unscheduled");
+
+        lenient().when(definitionRepository.findByTenantAndPipelineTypeAndSystemKeyAndArchivedFalse(
+                eq(tenant), eq(PipelineType.JOB), eq("SCHEDULED"))).thenReturn(Optional.of(scheduledDef));
+        lenient().when(definitionRepository.findByTenantAndPipelineTypeAndSystemKeyAndArchivedFalse(
+                eq(tenant), eq(PipelineType.JOB), eq("UNSCHEDULED"))).thenReturn(Optional.of(unscheduledDef));
 
         customer = new Customer();
         customer.setId(UUID.randomUUID());
@@ -76,7 +101,7 @@ class JobServiceImplUnitTest {
         job.setId(jobId);
         job.setTenant(tenant);
         job.setCustomer(customer);
-        job.setStatus(JobStatus.SCHEDULED);
+        job.setStatusDefinition(scheduledDef);
         job.setJobType(JobType.REPLACEMENT);
         job.setScheduledStartDate(LocalDate.of(2026, 1, 15));
         job.setScheduledEndDate(LocalDate.of(2026, 1, 17));
@@ -92,7 +117,7 @@ class JobServiceImplUnitTest {
         savedJob.setId(jobId);
         savedJob.setTenant(tenant);
         savedJob.setCustomer(customer);
-        savedJob.setStatus(JobStatus.SCHEDULED);
+        savedJob.setStatusDefinition(scheduledDef);
         savedJob.setJobType(JobType.REPLACEMENT);
         savedJob.setScheduledStartDate(LocalDate.of(2026, 1, 20));
         savedJob.setScheduledEndDate(LocalDate.of(2026, 1, 22));
@@ -126,7 +151,7 @@ class JobServiceImplUnitTest {
         savedJob.setId(jobId);
         savedJob.setTenant(tenant);
         savedJob.setCustomer(customer);
-        savedJob.setStatus(JobStatus.SCHEDULED);
+        savedJob.setStatusDefinition(scheduledDef);
         savedJob.setJobType(JobType.REPLACEMENT);
         savedJob.setScheduledStartDate(job.getScheduledStartDate());
         savedJob.setScheduledEndDate(job.getScheduledEndDate());
@@ -174,12 +199,12 @@ class JobServiceImplUnitTest {
         Job saved = jobCaptor.getValue();
         assertEquals(LocalDate.of(2026, 2, 10), saved.getScheduledStartDate());
         assertEquals(LocalDate.of(2026, 2, 10), saved.getScheduledEndDate());
-        assertEquals(JobStatus.SCHEDULED, saved.getStatus());
+        assertEquals("SCHEDULED", saved.getStatusDefinition().getSystemKey());
     }
 
     @Test
     void updateJob_unscheduledToScheduled_flipsStatusToScheduled() {
-        job.setStatus(JobStatus.UNSCHEDULED);
+        job.setStatusDefinition(unscheduledDef);
         job.setScheduledStartDate(null);
         job.setScheduledEndDate(null);
 
@@ -190,7 +215,7 @@ class JobServiceImplUnitTest {
         savedJob.setId(jobId);
         savedJob.setTenant(tenant);
         savedJob.setCustomer(customer);
-        savedJob.setStatus(JobStatus.SCHEDULED);
+        savedJob.setStatusDefinition(scheduledDef);
         savedJob.setScheduledStartDate(LocalDate.of(2026, 2, 15));
         savedJob.setScheduledEndDate(LocalDate.of(2026, 2, 15));
         savedJob.setUpdatedByUserId(userId);
@@ -205,7 +230,7 @@ class JobServiceImplUnitTest {
         ArgumentCaptor<Job> captor = ArgumentCaptor.forClass(Job.class);
         verify(jobRepository).save(captor.capture());
         Job saved = captor.getValue();
-        assertEquals(JobStatus.SCHEDULED, saved.getStatus());
+        assertEquals("SCHEDULED", saved.getStatusDefinition().getSystemKey());
         assertEquals(LocalDate.of(2026, 2, 15), saved.getScheduledStartDate());
     }
 
@@ -218,7 +243,7 @@ class JobServiceImplUnitTest {
         savedJob.setId(jobId);
         savedJob.setTenant(tenant);
         savedJob.setCustomer(customer);
-        savedJob.setStatus(JobStatus.UNSCHEDULED);
+        savedJob.setStatusDefinition(unscheduledDef);
         savedJob.setScheduledStartDate(null);
         savedJob.setScheduledEndDate(null);
         savedJob.setUpdatedByUserId(userId);
@@ -232,7 +257,7 @@ class JobServiceImplUnitTest {
         ArgumentCaptor<Job> captor = ArgumentCaptor.forClass(Job.class);
         verify(jobRepository).save(captor.capture());
         Job saved = captor.getValue();
-        assertEquals(JobStatus.UNSCHEDULED, saved.getStatus());
+        assertEquals("UNSCHEDULED", saved.getStatusDefinition().getSystemKey());
         assertNull(saved.getScheduledStartDate());
         assertNull(saved.getScheduledEndDate());
     }
@@ -246,7 +271,7 @@ class JobServiceImplUnitTest {
         savedJob.setId(jobId);
         savedJob.setTenant(tenant);
         savedJob.setCustomer(customer);
-        savedJob.setStatus(JobStatus.SCHEDULED);
+        savedJob.setStatusDefinition(scheduledDef);
         savedJob.setScheduledStartDate(LocalDate.of(2026, 2, 20));
         savedJob.setScheduledEndDate(LocalDate.of(2026, 2, 22));
         savedJob.setUpdatedByUserId(userId);
@@ -261,12 +286,12 @@ class JobServiceImplUnitTest {
         ArgumentCaptor<Job> captor = ArgumentCaptor.forClass(Job.class);
         verify(jobRepository).save(captor.capture());
         Job saved = captor.getValue();
-        assertEquals(JobStatus.SCHEDULED, saved.getStatus());
+        assertEquals("SCHEDULED", saved.getStatusDefinition().getSystemKey());
     }
 
     @Test
     void updateJob_unscheduledStaysUnscheduled_idempotent() {
-        job.setStatus(JobStatus.UNSCHEDULED);
+        job.setStatusDefinition(unscheduledDef);
         job.setScheduledStartDate(null);
         job.setScheduledEndDate(null);
 
@@ -277,7 +302,7 @@ class JobServiceImplUnitTest {
         savedJob.setId(jobId);
         savedJob.setTenant(tenant);
         savedJob.setCustomer(customer);
-        savedJob.setStatus(JobStatus.UNSCHEDULED);
+        savedJob.setStatusDefinition(unscheduledDef);
         savedJob.setScheduledStartDate(null);
         savedJob.setScheduledEndDate(null);
         savedJob.setUpdatedByUserId(userId);
@@ -291,6 +316,6 @@ class JobServiceImplUnitTest {
         ArgumentCaptor<Job> captor = ArgumentCaptor.forClass(Job.class);
         verify(jobRepository).save(captor.capture());
         Job saved = captor.getValue();
-        assertEquals(JobStatus.UNSCHEDULED, saved.getStatus());
+        assertEquals("UNSCHEDULED", saved.getStatusDefinition().getSystemKey());
     }
 }

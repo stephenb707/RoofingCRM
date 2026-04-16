@@ -1,6 +1,5 @@
 package com.roofingcrm.domain.entity;
 
-import com.roofingcrm.domain.enums.JobStatus;
 import com.roofingcrm.domain.enums.JobType;
 import com.roofingcrm.domain.value.Address;
 import jakarta.persistence.*;
@@ -18,7 +17,7 @@ import java.time.LocalDate;
 @Entity
 @Table(name = "jobs",
         indexes = {
-                @Index(name = "idx_job_tenant_status", columnList = "tenant_id, status"),
+                @Index(name = "idx_job_tenant_status_def", columnList = "tenant_id, status_definition_id"),
                 @Index(name = "idx_job_tenant_customer", columnList = "tenant_id, customer_id")
         })
 @Getter
@@ -35,9 +34,9 @@ public class Job extends TenantAuditedEntity {
     private Lead lead;
 
     @NotNull
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 50)
-    private JobStatus status;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "status_definition_id", nullable = false)
+    private PipelineStatusDefinition statusDefinition;
 
     @NotNull
     @Enumerated(EnumType.STRING)

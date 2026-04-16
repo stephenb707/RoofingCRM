@@ -1,6 +1,5 @@
 package com.roofingcrm.api.v1.job;
 
-import com.roofingcrm.domain.enums.JobStatus;
 import com.roofingcrm.domain.enums.JobType;
 import com.roofingcrm.security.AuthenticatedUser;
 import com.roofingcrm.service.job.JobService;
@@ -53,9 +52,12 @@ class JobScheduleControllerTest {
         UUID tenantId = UUID.randomUUID();
         UUID jobId = UUID.randomUUID();
 
+        UUID scheduledDefId = UUID.randomUUID();
         JobDto dto = new JobDto();
         dto.setId(jobId);
-        dto.setStatus(JobStatus.SCHEDULED);
+        dto.setStatusDefinitionId(scheduledDefId);
+        dto.setStatusKey("SCHEDULED");
+        dto.setStatusLabel("Scheduled");
         dto.setType(JobType.REPLACEMENT);
         dto.setScheduledStartDate(LocalDate.of(2026, 1, 15));
         dto.setScheduledEndDate(LocalDate.of(2026, 1, 17));
@@ -78,7 +80,7 @@ class JobScheduleControllerTest {
                 .andExpect(jsonPath("$").isArray())
                 .andExpect(jsonPath("$.length()", is(1)))
                 .andExpect(jsonPath("$[0].id", is(jobId.toString())))
-                .andExpect(jsonPath("$[0].status", is("SCHEDULED")))
+                .andExpect(jsonPath("$[0].statusKey", is("SCHEDULED")))
                 .andExpect(jsonPath("$[0].customerFirstName", is("Jane")));
 
         verify(jobService).listSchedule(
@@ -90,18 +92,19 @@ class JobScheduleControllerTest {
     @Test
     void listSchedule_withFilters_passesParamsCorrectly() throws Exception {
         UUID tenantId = UUID.randomUUID();
+        UUID scheduledDefId = UUID.randomUUID();
 
         when(jobService.listSchedule(
                 eq(tenantId), eq(userId),
                 eq(LocalDate.of(2026, 1, 6)), eq(LocalDate.of(2026, 1, 12)),
-                eq(JobStatus.SCHEDULED), eq("Alpha"), eq(false)))
+                eq(scheduledDefId), eq("Alpha"), eq(false)))
                 .thenReturn(List.of());
 
         mockMvc.perform(get("/api/v1/jobs/schedule")
                         .header("X-Tenant-Id", tenantId.toString())
                         .param("from", "2026-01-06")
                         .param("to", "2026-01-12")
-                        .param("status", "SCHEDULED")
+                        .param("statusDefinitionId", scheduledDefId.toString())
                         .param("crewName", "Alpha")
                         .param("includeUnscheduled", "false"))
                 .andExpect(status().isOk())
@@ -110,6 +113,6 @@ class JobScheduleControllerTest {
         verify(jobService).listSchedule(
                 eq(tenantId), eq(userId),
                 eq(LocalDate.of(2026, 1, 6)), eq(LocalDate.of(2026, 1, 12)),
-                eq(JobStatus.SCHEDULED), eq("Alpha"), eq(false));
+                eq(scheduledDefId), eq("Alpha"), eq(false));
     }
 }

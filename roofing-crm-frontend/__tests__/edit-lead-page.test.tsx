@@ -19,7 +19,10 @@ const mockedLeadsApi = leadsApi as jest.Mocked<typeof leadsApi>;
 const mockLead: LeadDto = {
   id: "lead-1",
   customerId: "cust-1",
-  status: "NEW",
+  statusDefinitionId: "def-new",
+  statusKey: "NEW",
+  statusLabel: "New",
+  pipelinePosition: 0,
   source: "WEBSITE",
   leadNotes: "Original notes",
   propertyAddress: { line1: "123 Main St", line2: "", city: "Denver", state: "CO", zip: "80202" },

@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, waitFor, fireEvent } from "./test-utils";
+import { render, screen, waitFor, fireEvent, within } from "./test-utils";
 import userEvent from "@testing-library/user-event";
 import JobDetailPage from "@/app/app/jobs/[jobId]/page";
 import * as jobsApi from "@/lib/jobsApi";
@@ -10,6 +10,7 @@ import * as tasksApi from "@/lib/tasksApi";
 import * as activityApi from "@/lib/activityApi";
 import * as invoicesApi from "@/lib/invoicesApi";
 import * as accountingApi from "@/lib/accountingApi";
+import * as pipelineStatusesApi from "@/lib/pipelineStatusesApi";
 import { JobDto } from "@/lib/types";
 
 jest.mock("@/lib/jobsApi");
@@ -20,6 +21,7 @@ jest.mock("@/lib/attachmentsApi");
 jest.mock("@/lib/communicationLogsApi");
 jest.mock("@/lib/tasksApi");
 jest.mock("@/lib/activityApi");
+jest.mock("@/lib/pipelineStatusesApi");
 const mockPush = jest.fn();
 jest.mock("next/navigation", () => ({
   useRouter: () => ({ push: mockPush, replace: jest.fn(), back: jest.fn() }),
@@ -36,12 +38,35 @@ const mockedTasksApi = tasksApi as jest.Mocked<typeof tasksApi>;
 const mockedActivityApi = activityApi as jest.Mocked<typeof activityApi>;
 const mockedInvoicesApi = invoicesApi as jest.Mocked<typeof invoicesApi>;
 const mockedAccountingApi = accountingApi as jest.Mocked<typeof accountingApi>;
+const mockedPipelineApi = pipelineStatusesApi as jest.Mocked<typeof pipelineStatusesApi>;
+
+const defScheduled = {
+  id: "def-scheduled",
+  pipelineType: "JOB" as const,
+  systemKey: "SCHEDULED",
+  label: "Scheduled",
+  sortOrder: 1,
+  builtIn: true,
+  active: true,
+};
+
+const defInProgress = {
+  id: "def-in-progress",
+  pipelineType: "JOB" as const,
+  systemKey: "IN_PROGRESS",
+  label: "In Progress",
+  sortOrder: 2,
+  builtIn: true,
+  active: true,
+};
 
 const mockJob: JobDto = {
   id: "job-1",
   customerId: "cust-1",
   leadId: null,
-  status: "SCHEDULED",
+  statusDefinitionId: defScheduled.id,
+  statusKey: "SCHEDULED",
+  statusLabel: "Scheduled",
   type: "REPLACEMENT",
   propertyAddress: { line1: "123 Main St", city: "Denver", state: "CO", zip: "80202" },
   scheduledStartDate: "2024-06-01",
@@ -58,6 +83,15 @@ describe("JobDetailPage", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockPush.mockClear();
+    Object.defineProperty(URL, "createObjectURL", {
+      value: jest.fn(() => "blob:attachment-preview"),
+      configurable: true,
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      value: jest.fn(),
+      configurable: true,
+    });
+    mockedPipelineApi.listPipelineStatuses.mockResolvedValue([defScheduled, defInProgress]);
     mockedJobsApi.getJob.mockResolvedValue(mockJob);
     mockedEstimatesApi.listEstimatesForJob.mockResolvedValue([]);
     mockedAttachmentsApi.listJobAttachments.mockResolvedValue([]);
@@ -96,6 +130,31 @@ describe("JobDetailPage", () => {
     mockedAccountingApi.listJobReceipts.mockResolvedValue([]);
   });
 
+  it("clicking an invoice row navigates to invoice detail", async () => {
+    mockedInvoicesApi.listInvoicesForJob.mockResolvedValue([
+      {
+        id: "inv-1",
+        invoiceNumber: "INV-1",
+        status: "DRAFT",
+        total: 500,
+        jobId: "job-1",
+        estimateId: "est-1",
+        issuedAt: "2024-01-01T00:00:00Z",
+        dueAt: null,
+        sentAt: null,
+        paidAt: null,
+        items: [],
+      },
+    ]);
+
+    render(<JobDetailPage />);
+
+    const row = await screen.findByTestId("invoice-row-inv-1");
+    fireEvent.click(row);
+
+    expect(mockPush).toHaveBeenCalledWith("/app/invoices/inv-1");
+  });
+
   it("renders job overview and status", async () => {
     render(<JobDetailPage />);
 
@@ -106,6 +165,38 @@ describe("JobDetailPage", () => {
     expect(screen.getByText("Replacement")).toBeInTheDocument();
     expect(screen.getByText("Crew A")).toBeInTheDocument();
     expect(screen.getByText("Some notes")).toBeInTheDocument();
+  });
+
+  it("renders a fixed left section rail with matching anchors", async () => {
+    render(<JobDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("123 Main St, Denver, CO, 80202")).toBeInTheDocument();
+    });
+
+    expect(screen.queryByTestId("detail-section-nav-sidebar")).not.toBeInTheDocument();
+
+    const railContainer = screen.getByTestId("job-section-nav-rail-container");
+    expect(railContainer).toHaveClass("hidden", "lg:block", "lg:fixed", "lg:left-6");
+
+    const railNav = screen.getByTestId("detail-section-nav-rail");
+    expect(railNav).toHaveTextContent("On This Page");
+
+    const expectedLinks = [
+      ["Customer", "#customer-information"],
+      ["Overview", "#overview"],
+      ["Activity", "#activity"],
+      ["Tasks", "#tasks"],
+      ["Invoices", "#invoices"],
+      ["Accounting", "#accounting"],
+      ["Attachments", "#attachments"],
+      ["Communication", "#communication"],
+    ] as const;
+
+    for (const [label, href] of expectedLinks) {
+      expect(within(railNav).getByRole("link", { name: label })).toHaveAttribute("href", href);
+      expect(document.getElementById(href.slice(1))).toBeInTheDocument();
+    }
   });
 
   it("renders Create Estimate, View Estimates, and Edit Job links in Actions section", async () => {
@@ -260,7 +351,12 @@ describe("JobDetailPage", () => {
   });
 
   it("calls updateJobStatus when clicking a status button", async () => {
-    mockedJobsApi.updateJobStatus.mockResolvedValue({ ...mockJob, status: "IN_PROGRESS" });
+    mockedJobsApi.updateJobStatus.mockResolvedValue({
+      ...mockJob,
+      statusDefinitionId: defInProgress.id,
+      statusKey: "IN_PROGRESS",
+      statusLabel: "In Progress",
+    });
 
     render(<JobDetailPage />);
 
@@ -275,7 +371,7 @@ describe("JobDetailPage", () => {
       expect(mockedJobsApi.updateJobStatus).toHaveBeenCalledWith(
         expect.anything(),
         "job-1",
-        "IN_PROGRESS"
+        defInProgress.id
       );
     });
   });
@@ -331,6 +427,62 @@ describe("JobDetailPage", () => {
     await waitFor(() => {
       expect(mockedAttachmentsApi.uploadJobAttachment).toHaveBeenCalled();
     });
+  });
+
+  it("deleting an attachment confirms and calls deleteAttachment", async () => {
+    jest.spyOn(window, "confirm").mockReturnValue(true);
+    mockedAttachmentsApi.listJobAttachments.mockResolvedValue([
+      {
+        id: "att-1",
+        fileName: "damage.jpg",
+        contentType: "image/jpeg",
+        fileSize: 100,
+        leadId: null,
+        jobId: "job-1",
+        tag: "DAMAGE",
+        createdAt: "2024-01-01T00:00:00Z",
+        updatedAt: "2024-01-01T00:00:00Z",
+      },
+    ]);
+    mockedAttachmentsApi.deleteAttachment.mockResolvedValue(undefined);
+
+    render(<JobDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("damage.jpg")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /delete/i }));
+
+    await waitFor(() => {
+      expect(mockedAttachmentsApi.deleteAttachment).toHaveBeenCalledWith(expect.anything(), "att-1");
+    });
+  });
+
+  it("renders image attachment thumbnails and scrollable attachments list", async () => {
+    mockedAttachmentsApi.listJobAttachments.mockResolvedValue([
+      {
+        id: "att-1",
+        fileName: "damage.jpg",
+        contentType: "image/jpeg",
+        fileSize: 100,
+        leadId: null,
+        jobId: "job-1",
+        tag: "DAMAGE",
+        createdAt: "2024-01-01T00:00:00Z",
+        updatedAt: "2024-01-01T00:00:00Z",
+      },
+    ]);
+    mockedAttachmentsApi.downloadAttachment.mockResolvedValue(new Blob(["image"], { type: "image/jpeg" }));
+
+    render(<JobDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("attachment-thumbnail-att-1")).toBeInTheDocument();
+      expect(screen.getByAltText("damage.jpg")).toBeInTheDocument();
+    });
+    expect(screen.getByTestId("attachments-scroll-region").className).toMatch(/max-h-80/);
+    expect(screen.getByTestId("attachments-scroll-region").className).toMatch(/overflow-y-auto/);
   });
 
   it("adding communication log calls addJobCommunicationLog", async () => {

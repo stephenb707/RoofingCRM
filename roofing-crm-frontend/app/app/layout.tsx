@@ -35,6 +35,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const currentTenant = auth.tenants.find(
     (t) => t.tenantId === auth.selectedTenantId
   );
+  const canManagePipelineSettings =
+    currentTenant?.role === "OWNER" || currentTenant?.role === "ADMIN";
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
@@ -58,7 +60,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
           <div>
             <div className="font-semibold text-slate-800 text-sm">
-              Viva Roofing CRM
+              Viva CRM
             </div>
             {currentTenant && (
               <div className="text-xs text-slate-500">
@@ -171,6 +173,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           >
             Team
           </Link>
+          {canManagePipelineSettings && (
+            <Link
+              href="/app/settings"
+              className={`px-4 py-3 text-sm font-medium transition-colors ${
+                pathname.startsWith("/app/settings")
+                  ? "text-sky-600 border-b-2 border-sky-600"
+                  : "text-slate-600 hover:text-slate-800 border-b-2 border-transparent"
+              }`}
+            >
+              Settings
+            </Link>
+          )}
         </div>
       </nav>
 

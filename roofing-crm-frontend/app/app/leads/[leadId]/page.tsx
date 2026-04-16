@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -8,12 +8,10 @@ import { useAuthReady } from "@/lib/AuthContext";
 import { getLead, updateLeadStatus, convertLeadToJob } from "@/lib/leadsApi";
 import { getCustomer } from "@/lib/customersApi";
 import { getApiErrorMessage } from "@/lib/apiError";
-import {
-  LEAD_STATUSES,
-  STATUS_LABELS,
-  STATUS_COLORS,
-  SOURCE_LABELS,
-} from "@/lib/leadsConstants";
+import { SOURCE_LABELS } from "@/lib/leadsConstants";
+import { listPipelineStatuses } from "@/lib/pipelineStatusesApi";
+import type { PipelineStatusDefinitionDto } from "@/lib/pipelineStatusesApi";
+import { leadStatusBadgeClass } from "@/lib/pipelineStatusVisuals";
 import { queryKeys } from "@/lib/queryKeys";
 import { formatAddress, formatDateTime, formatPhone } from "@/lib/format";
 import { listLeadAttachments, uploadLeadAttachment, downloadAttachment } from "@/lib/attachmentsApi";
@@ -27,15 +25,17 @@ import { ActivitySection } from "@/components/ActivitySection";
 import { TasksSection } from "@/components/TasksSection";
 import { StatusBadge } from "@/components/StatusBadge";
 import { NextBestActions } from "@/components/NextBestActions";
+import { DetailSectionNav, type DetailSectionNavItem } from "@/components/JobDetailSectionNav";
 import { JOB_TYPES, JOB_TYPE_LABELS } from "@/lib/jobsConstants";
 import {
-  LeadStatus,
   CreateCommunicationLogRequest,
   ConvertLeadToJobRequest,
   JobType,
   AttachmentTag,
 } from "@/lib/types";
 import { PREFERRED_CONTACT_LABELS } from "@/lib/preferredContactConstants";
+
+const SECTION_SCROLL_MARGIN_CLASS = "scroll-mt-24";
 
 export default function LeadDetailPage() {
   const params = useParams();
@@ -44,7 +44,7 @@ export default function LeadDetailPage() {
   const { api, auth, ready } = useAuthReady();
   const queryClient = useQueryClient();
 
-  const [selectedStatus, setSelectedStatus] = useState<LeadStatus | null>(null);
+  const [selectedStatusId, setSelectedStatusId] = useState<string | null>(null);
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [commLogError, setCommLogError] = useState<string | null>(null);
@@ -59,6 +59,32 @@ export default function LeadDetailPage() {
     queryFn: () => getLead(api, leadId),
     enabled: ready && !!leadId,
   });
+
+  const pipelineDefsKey = queryKeys.pipelineStatuses(auth.selectedTenantId, "LEAD");
+  const { data: leadDefs = [] } = useQuery({
+    queryKey: pipelineDefsKey,
+    queryFn: () => listPipelineStatuses(api, "LEAD"),
+    enabled: ready,
+  });
+
+  const sortedLeadDefs = useMemo(
+    () => [...leadDefs].filter((d) => d.active).sort((a, b) => a.sortOrder - b.sortOrder),
+    [leadDefs]
+  );
+  const sectionNavItems = useMemo<DetailSectionNavItem[]>(
+    () => [
+      { id: "customer-information", label: "Customer", icon: "customer" },
+      { id: "property-address", label: "Property Address", icon: "location" },
+      { id: "activity", label: "Activity", icon: "activity" },
+      { id: "tasks", label: "Tasks", icon: "tasks" },
+      ...(lead?.leadNotes ? [{ id: "notes", label: "Notes", icon: "notes" as const }] : []),
+      { id: "attachments", label: "Attachments", icon: "attachments" },
+      { id: "communication", label: "Communication", icon: "communication" },
+    ],
+    [lead?.leadNotes]
+  );
+  const sectionIds = useMemo(() => sectionNavItems.map((item) => item.id), [sectionNavItems]);
+  const [activeSectionId, setActiveSectionId] = useState<string | null>(sectionNavItems[0]?.id ?? null);
 
   const { data: customer } = useQuery({
     queryKey: queryKeys.customer(auth.selectedTenantId, lead?.customerId ?? ""),
@@ -89,13 +115,97 @@ export default function LeadDetailPage() {
   };
 
   useEffect(() => {
-    if (lead) setSelectedStatus(lead.status);
+    if (lead) setSelectedStatusId(lead.statusDefinitionId);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sync only when server status changes
-  }, [lead?.status]);
+  }, [lead?.statusDefinitionId]);
+
+  useEffect(() => {
+    if (sectionNavItems.length === 0) {
+      setActiveSectionId(null);
+      return;
+    }
+
+    if (!activeSectionId || !sectionIds.includes(activeSectionId)) {
+      setActiveSectionId(sectionNavItems[0].id);
+    }
+  }, [activeSectionId, sectionIds, sectionNavItems]);
+
+  const scrollToSection = useCallback((id: string, behavior: ScrollBehavior = "smooth") => {
+    if (typeof window === "undefined" || !sectionIds.includes(id)) {
+      return;
+    }
+
+    document.getElementById(id)?.scrollIntoView({ behavior, block: "start" });
+  }, [sectionIds]);
+
+  const handleSectionNavigate = useCallback((id: string) => {
+    setActiveSectionId(id);
+    if (typeof window !== "undefined") {
+      window.history.replaceState(null, "", `#${id}`);
+    }
+    scrollToSection(id);
+  }, [scrollToSection]);
+
+  useEffect(() => {
+    const scrollToHashSection = () => {
+      if (typeof window === "undefined") return;
+      const id = window.location.hash.replace(/^#/, "");
+      if (!id || !sectionIds.includes(id)) {
+        return;
+      }
+
+      setActiveSectionId(id);
+      requestAnimationFrame(() => {
+        scrollToSection(id, "smooth");
+      });
+    };
+
+    scrollToHashSection();
+    window.addEventListener("hashchange", scrollToHashSection);
+    return () => window.removeEventListener("hashchange", scrollToHashSection);
+  }, [scrollToSection, sectionIds]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || sectionIds.length === 0) {
+      return;
+    }
+
+    const elements = sectionIds
+      .map((id) => document.getElementById(id))
+      .filter((element): element is HTMLElement => Boolean(element));
+
+    if (elements.length === 0) {
+      return;
+    }
+
+    if (typeof IntersectionObserver === "undefined") {
+      setActiveSectionId((current) => current ?? sectionIds[0]);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visibleEntries = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+
+        if (visibleEntries.length > 0) {
+          setActiveSectionId(visibleEntries[0].target.id);
+        }
+      },
+      {
+        rootMargin: "-20% 0px -65% 0px",
+        threshold: [0.1, 0.25, 0.5],
+      }
+    );
+
+    elements.forEach((element) => observer.observe(element));
+    return () => observer.disconnect();
+  }, [sectionIds]);
 
   const statusMutation = useMutation({
-    mutationFn: async (newStatus: LeadStatus) => {
-      return updateLeadStatus(api, leadId, newStatus);
+    mutationFn: async (statusDefinitionId: string) => {
+      return updateLeadStatus(api, leadId, statusDefinitionId);
     },
     onSuccess: () => {
       setUpdateError(null);
@@ -105,14 +215,14 @@ export default function LeadDetailPage() {
     onError: (err: unknown) => {
       console.error("Failed to update lead status:", err);
       setUpdateError(getApiErrorMessage(err, "Failed to update status. Please try again."));
-      if (lead) setSelectedStatus(lead.status);
+      if (lead) setSelectedStatusId(lead.statusDefinitionId);
     },
   });
 
-  const handleStatusChange = (newStatus: LeadStatus) => {
-    if (newStatus !== lead?.status) {
-      setSelectedStatus(newStatus);
-      statusMutation.mutate(newStatus);
+  const handleStatusChange = (statusDefinitionId: string) => {
+    if (statusDefinitionId !== lead?.statusDefinitionId) {
+      setSelectedStatusId(statusDefinitionId);
+      statusMutation.mutate(statusDefinitionId);
     }
   };
 
@@ -250,7 +360,20 @@ export default function LeadDetailPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="mx-auto max-w-7xl lg:pl-60">
+      <div
+        className="hidden lg:block lg:fixed lg:top-[8.5rem] lg:left-6 lg:z-10 lg:w-52"
+        data-testid="lead-section-nav-rail-container"
+      >
+        <DetailSectionNav
+          items={sectionNavItems}
+          activeSectionId={activeSectionId}
+          onNavigate={handleSectionNavigate}
+          className="max-h-[calc(100vh-10rem)] overflow-y-auto"
+        />
+      </div>
+
+      <div className="mx-auto max-w-6xl">
       {/* Back Link & Header */}
       <div className="mb-6">
         <Link
@@ -280,9 +403,9 @@ export default function LeadDetailPage() {
             <p className="text-sm text-slate-500 mt-1">Lead Details</p>
           </div>
           <span
-            className={`inline-flex px-3 py-1.5 text-sm font-medium rounded-full border ${STATUS_COLORS[lead.status]}`}
+            className={`inline-flex px-3 py-1.5 text-sm font-medium rounded-full border ${leadStatusBadgeClass(lead.statusKey)}`}
           >
-            {STATUS_LABELS[lead.status]}
+            {lead.statusLabel}
           </span>
         </div>
       </div>
@@ -310,28 +433,38 @@ export default function LeadDetailPage() {
         </div>
       )}
 
+      <div className="mb-6 lg:hidden">
+        <DetailSectionNav
+          items={sectionNavItems}
+          activeSectionId={activeSectionId}
+          onNavigate={handleSectionNavigate}
+          variant="inline"
+        />
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
           {/* Customer Information */}
-          <div className="bg-white rounded-xl border border-slate-200 p-6">
-            <h2 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
-              <svg
-                className="w-5 h-5 text-slate-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                />
-              </svg>
-              Customer Information
-            </h2>
-            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <section id="customer-information" className={SECTION_SCROLL_MARGIN_CLASS}>
+            <div className="bg-white rounded-xl border border-slate-200 p-6">
+              <h2 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                <svg
+                  className="w-5 h-5 text-slate-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                  />
+                </svg>
+                Customer Information
+              </h2>
+              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <dt className="text-xs font-medium text-slate-500 uppercase tracking-wider">
                   Name
@@ -368,44 +501,12 @@ export default function LeadDetailPage() {
                       : "—"}
                 </dd>
               </div>
-            </dl>
-          </div>
+              </dl>
+            </div>
+          </section>
 
           {/* Property Address */}
-          <div className="bg-white rounded-xl border border-slate-200 p-6">
-            <h2 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
-              <svg
-                className="w-5 h-5 text-slate-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-                />
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-                />
-              </svg>
-              Property Address
-            </h2>
-            <p className="text-sm text-slate-800">{formatAddress(lead.propertyAddress)}</p>
-          </div>
-
-          {/* Activity */}
-          <ActivitySection entityType="LEAD" entityId={leadId} />
-
-          {/* Tasks */}
-          <TasksSection entityType="lead" entityId={leadId} />
-
-          {/* Notes */}
-          {lead.leadNotes && (
+          <section id="property-address" className={SECTION_SCROLL_MARGIN_CLASS}>
             <div className="bg-white rounded-xl border border-slate-200 p-6">
               <h2 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
                 <svg
@@ -418,46 +519,91 @@ export default function LeadDetailPage() {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     strokeWidth={2}
-                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                  />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
                   />
                 </svg>
-                Notes
+                Property Address
               </h2>
-              <p className="text-sm text-slate-700 whitespace-pre-wrap">
-                {lead.leadNotes}
-              </p>
+              <p className="text-sm text-slate-800">{formatAddress(lead.propertyAddress)}</p>
             </div>
+          </section>
+
+          {/* Activity */}
+          <section id="activity" className={SECTION_SCROLL_MARGIN_CLASS}>
+            <ActivitySection entityType="LEAD" entityId={leadId} />
+          </section>
+
+          {/* Tasks */}
+          <section id="tasks" className={SECTION_SCROLL_MARGIN_CLASS}>
+            <TasksSection entityType="lead" entityId={leadId} />
+          </section>
+
+          {/* Notes */}
+          {lead.leadNotes && (
+            <section id="notes" className={SECTION_SCROLL_MARGIN_CLASS}>
+              <div className="bg-white rounded-xl border border-slate-200 p-6">
+                <h2 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                  <svg
+                    className="w-5 h-5 text-slate-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
+                  </svg>
+                  Notes
+                </h2>
+                <p className="text-sm text-slate-700 whitespace-pre-wrap">
+                  {lead.leadNotes}
+                </p>
+              </div>
+            </section>
           )}
 
           {/* Attachments */}
-          <AttachmentSection
-            title="Attachments"
-            attachments={attachmentsQuery.data ?? []}
-            onUpload={(file, options) =>
-              uploadAttachmentMutation.mutate({ file, tag: options?.tag, description: options?.description })
-            }
-            onDownload={handleDownloadAttachment}
-            isLoading={attachmentsQuery.isLoading}
-            isUploading={uploadAttachmentMutation.isPending}
-            errorMessage={attachmentError}
-          />
+          <section id="attachments" className={SECTION_SCROLL_MARGIN_CLASS}>
+            <AttachmentSection
+              title="Attachments"
+              attachments={attachmentsQuery.data ?? []}
+              onUpload={(file, options) =>
+                uploadAttachmentMutation.mutate({ file, tag: options?.tag, description: options?.description })
+              }
+              onDownload={handleDownloadAttachment}
+              isLoading={attachmentsQuery.isLoading}
+              isUploading={uploadAttachmentMutation.isPending}
+              errorMessage={attachmentError}
+            />
+          </section>
 
           {/* Communication Logs */}
-          <CommunicationLogSection
-            title="Communication Logs"
-            logs={commLogsQuery.data ?? []}
-            onAdd={(payload) => addCommLogMutation.mutate(payload)}
-            isLoading={commLogsQuery.isLoading}
-            isSubmitting={addCommLogMutation.isPending}
-            errorMessage={commLogError}
-          />
+          <section id="communication" className={SECTION_SCROLL_MARGIN_CLASS}>
+            <CommunicationLogSection
+              title="Communication Logs"
+              logs={commLogsQuery.data ?? []}
+              onAdd={(payload) => addCommLogMutation.mutate(payload)}
+              isLoading={commLogsQuery.isLoading}
+              isSubmitting={addCommLogMutation.isPending}
+              errorMessage={commLogError}
+            />
+          </section>
         </div>
 
         {/* Sidebar */}
         <div className="space-y-6">
           <NextBestActions
             entityType="lead"
-            status={lead.status}
+            status={lead.statusKey}
             leadId={leadId}
             leadConvertedJobId={lead.convertedJobId ?? null}
             customerId={lead.customerId ?? null}
@@ -476,20 +622,20 @@ export default function LeadDetailPage() {
             )}
 
             <div className="space-y-2">
-              {LEAD_STATUSES.map((status) => (
+              {sortedLeadDefs.map((def: PipelineStatusDefinitionDto) => (
                 <button
-                  key={status}
-                  onClick={() => handleStatusChange(status)}
+                  key={def.id}
+                  onClick={() => handleStatusChange(def.id)}
                   disabled={statusMutation.isPending}
                   className={`w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                    selectedStatus === status
-                      ? STATUS_COLORS[status] + " border"
+                    selectedStatusId === def.id
+                      ? leadStatusBadgeClass(def.systemKey) + " border"
                       : "bg-slate-50 text-slate-700 hover:bg-slate-100 border border-transparent"
                   } ${statusMutation.isPending ? "opacity-60 cursor-not-allowed" : ""}`}
                 >
                   <div className="flex items-center justify-between">
-                    <span>{STATUS_LABELS[status]}</span>
-                    {selectedStatus === status && (
+                    <span>{def.label}</span>
+                    {selectedStatusId === def.id && (
                       <svg
                         className="w-4 h-4"
                         fill="currentColor"
@@ -534,11 +680,12 @@ export default function LeadDetailPage() {
           </div>
 
           {/* Lead Details */}
-          <div className="bg-white rounded-xl border border-slate-200 p-6">
-            <h2 className="text-lg font-semibold text-slate-800 mb-4">
-              Lead Details
-            </h2>
-            <dl className="space-y-3">
+          <section id="lead-details" className={SECTION_SCROLL_MARGIN_CLASS}>
+            <div className="bg-white rounded-xl border border-slate-200 p-6">
+              <h2 className="text-lg font-semibold text-slate-800 mb-4">
+                Lead Details
+              </h2>
+              <dl className="space-y-3">
               <div>
                 <dt className="text-xs font-medium text-slate-500 uppercase tracking-wider">
                   Source
@@ -563,8 +710,9 @@ export default function LeadDetailPage() {
                   {formatDateTime(lead.updatedAt)}
                 </dd>
               </div>
-            </dl>
-          </div>
+              </dl>
+            </div>
+          </section>
           
           {/* Actions */}
           <div className="bg-white rounded-xl border border-slate-200 p-6">
@@ -593,7 +741,7 @@ export default function LeadDetailPage() {
                     View Job
                   </Link>
                 </>
-              ) : lead.status !== "LOST" ? (
+              ) : lead.statusKey !== "LOST" ? (
                 <button
                   type="button"
                   onClick={() => setShowConvertModal(true)}
@@ -669,6 +817,7 @@ export default function LeadDetailPage() {
           )}
         </div>
       </div>
+    </div>
     </div>
   );
 }

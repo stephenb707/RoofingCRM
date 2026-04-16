@@ -72,4 +72,69 @@ describe("AttachmentSection", () => {
       description: "Roof damage photo",
     });
   });
+
+  it("renders delete action and calls onDelete", async () => {
+    const onDelete = jest.fn();
+    const onDownload = jest.fn();
+
+    render(
+      <AttachmentSection
+        title="Attachments"
+        attachments={[
+          {
+            id: "att-1",
+            fileName: "damage.jpg",
+            contentType: "image/jpeg",
+            fileSize: 1024,
+            tag: "DAMAGE",
+            leadId: null,
+            jobId: "job-1",
+          },
+        ]}
+        onUpload={jest.fn()}
+        onDownload={onDownload}
+        onDelete={onDelete}
+      />
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: /delete/i }));
+    expect(onDelete).toHaveBeenCalledWith("att-1", "damage.jpg");
+  });
+
+  it("renders image thumbnails and scrollable list styling when provided", () => {
+    render(
+      <AttachmentSection
+        title="Attachments"
+        attachments={[
+          {
+            id: "att-1",
+            fileName: "damage.jpg",
+            contentType: "image/jpeg",
+            fileSize: 1024,
+            tag: "DAMAGE",
+            leadId: null,
+            jobId: "job-1",
+          },
+          {
+            id: "att-2",
+            fileName: "notes.pdf",
+            contentType: "application/pdf",
+            fileSize: 2048,
+            tag: "OTHER",
+            leadId: null,
+            jobId: "job-1",
+          },
+        ]}
+        previewUrls={{ "att-1": "blob:image-preview" }}
+        scrollableList
+        onUpload={jest.fn()}
+        onDownload={jest.fn()}
+      />
+    );
+
+    expect(screen.getByTestId("attachments-scroll-region").className).toMatch(/max-h-80/);
+    expect(screen.getByTestId("attachments-scroll-region").className).toMatch(/overflow-y-auto/);
+    expect(screen.getByTestId("attachment-thumbnail-att-1")).toBeInTheDocument();
+    expect(screen.getByAltText("damage.jpg")).toBeInTheDocument();
+  });
 });

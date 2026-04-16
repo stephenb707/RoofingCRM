@@ -3,35 +3,36 @@ package com.roofingcrm.service.lead;
 import com.roofingcrm.api.v1.common.AddressDto;
 import com.roofingcrm.api.v1.common.PickerItemDto;
 import com.roofingcrm.api.v1.job.JobDto;
+import com.roofingcrm.api.v1.lead.ConvertLeadToJobRequest;
 import com.roofingcrm.api.v1.lead.CreateLeadRequest;
 import com.roofingcrm.api.v1.lead.LeadDto;
 import com.roofingcrm.api.v1.lead.NewLeadCustomerRequest;
 import com.roofingcrm.api.v1.lead.UpdateLeadRequest;
-import com.roofingcrm.api.v1.lead.ConvertLeadToJobRequest;
 import com.roofingcrm.domain.entity.Customer;
 import com.roofingcrm.domain.entity.Job;
 import com.roofingcrm.domain.entity.Lead;
+import com.roofingcrm.domain.entity.PipelineStatusDefinition;
 import com.roofingcrm.domain.entity.Tenant;
 import com.roofingcrm.domain.enums.ActivityEntityType;
 import com.roofingcrm.domain.enums.ActivityEventType;
-import com.roofingcrm.service.activity.ActivityEventService;
-import com.roofingcrm.domain.enums.JobStatus;
 import com.roofingcrm.domain.enums.LeadSource;
-import com.roofingcrm.domain.enums.LeadStatus;
+import com.roofingcrm.domain.enums.PipelineType;
 import com.roofingcrm.domain.enums.UserRole;
 import com.roofingcrm.domain.repository.CustomerRepository;
 import com.roofingcrm.domain.repository.JobRepository;
 import com.roofingcrm.domain.repository.LeadRepository;
+import com.roofingcrm.domain.repository.PipelineStatusDefinitionRepository;
 import com.roofingcrm.domain.value.Address;
+import com.roofingcrm.service.activity.ActivityEventService;
 import com.roofingcrm.service.audit.AuditSupport;
 import com.roofingcrm.service.exception.LeadConversionNotAllowedException;
 import com.roofingcrm.service.exception.ResourceNotFoundException;
 import com.roofingcrm.service.tenant.TenantAccessService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.lang.NonNull;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -53,18 +54,21 @@ public class LeadServiceImpl implements LeadService {
     private final CustomerRepository customerRepository;
     private final JobRepository jobRepository;
     private final ActivityEventService activityEventService;
+    private final PipelineStatusDefinitionRepository definitionRepository;
 
     @Autowired
     public LeadServiceImpl(TenantAccessService tenantAccessService,
                            LeadRepository leadRepository,
                            CustomerRepository customerRepository,
                            JobRepository jobRepository,
-                           ActivityEventService activityEventService) {
+                           ActivityEventService activityEventService,
+                           PipelineStatusDefinitionRepository definitionRepository) {
         this.tenantAccessService = tenantAccessService;
         this.leadRepository = leadRepository;
         this.customerRepository = customerRepository;
         this.jobRepository = jobRepository;
         this.activityEventService = activityEventService;
+        this.definitionRepository = definitionRepository;
     }
 
     @Override
@@ -80,11 +84,12 @@ public class LeadServiceImpl implements LeadService {
         lead.setCustomer(customer);
         AuditSupport.touchForCreate(lead, userId);
 
-        lead.setStatus(LeadStatus.NEW);
+        PipelineStatusDefinition newStatus = requireLeadDefByKey(tenant, "NEW");
+        lead.setStatusDefinition(newStatus);
         lead.setSource(request.getSource() != null ? request.getSource() : LeadSource.OTHER);
         lead.setLeadNotes(request.getLeadNotes());
 
-        int maxPos = leadRepository.findMaxPipelinePositionByTenantAndStatusAndArchivedFalse(tenant, LeadStatus.NEW);
+        int maxPos = leadRepository.findMaxPipelinePositionByTenantAndStatusDefinitionAndArchivedFalse(tenant, newStatus);
         lead.setPipelinePosition(maxPos + 1);
 
         Address propertyAddress = new Address();
@@ -141,14 +146,21 @@ public class LeadServiceImpl implements LeadService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<LeadDto> listLeads(@NonNull UUID tenantId, @NonNull UUID userId, LeadStatus statusFilter, UUID customerId, @NonNull Pageable pageable) {
+    public Page<LeadDto> listLeads(
+            @NonNull UUID tenantId,
+            @NonNull UUID userId,
+            UUID statusDefinitionIdFilter,
+            UUID customerId,
+            @NonNull Pageable pageable) {
         Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
 
         Page<Lead> page;
-        if (statusFilter != null && customerId != null) {
-            page = leadRepository.findByTenantAndStatusAndCustomerIdAndArchivedFalse(tenant, statusFilter, customerId, pageable);
-        } else if (statusFilter != null) {
-            page = leadRepository.findByTenantAndStatusAndArchivedFalse(tenant, statusFilter, pageable);
+        if (statusDefinitionIdFilter != null && customerId != null) {
+            PipelineStatusDefinition def = requireLeadDef(tenant, statusDefinitionIdFilter);
+            page = leadRepository.findByTenantAndStatusDefinitionAndCustomerIdAndArchivedFalse(tenant, def, customerId, pageable);
+        } else if (statusDefinitionIdFilter != null) {
+            PipelineStatusDefinition def = requireLeadDef(tenant, statusDefinitionIdFilter);
+            page = leadRepository.findByTenantAndStatusDefinitionAndArchivedFalse(tenant, def, pageable);
         } else if (customerId != null) {
             page = leadRepository.findByTenantAndCustomerIdAndArchivedFalse(tenant, customerId, pageable);
         } else {
@@ -159,7 +171,8 @@ public class LeadServiceImpl implements LeadService {
     }
 
     @Override
-    public LeadDto updateLeadStatus(@NonNull UUID tenantId, @NonNull UUID userId, UUID leadId, LeadStatus newStatus, Integer position) {
+    public LeadDto updateLeadStatus(
+            @NonNull UUID tenantId, @NonNull UUID userId, UUID leadId, UUID newStatusDefinitionId, Integer position) {
         tenantAccessService.requireAnyRole(tenantId, userId, Objects.requireNonNull(Set.of(UserRole.OWNER, UserRole.ADMIN, UserRole.SALES)),
                 "You do not have permission to edit the lead pipeline.");
         Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
@@ -167,14 +180,19 @@ public class LeadServiceImpl implements LeadService {
         Lead lead = leadRepository.findByIdAndTenantAndArchivedFalse(leadId, tenant)
                 .orElseThrow(() -> new ResourceNotFoundException("Lead not found"));
 
-        LeadStatus oldStatus = lead.getStatus();
-        boolean statusChanged = oldStatus != newStatus;
+        PipelineStatusDefinition newDef = requireLeadDef(tenant, newStatusDefinitionId);
+        if (!newDef.isActive()) {
+            throw new IllegalArgumentException("Target status is not active.");
+        }
+        PipelineStatusDefinition oldDef = lead.getStatusDefinition();
+        boolean statusChanged = !oldDef.getId().equals(newDef.getId());
 
         if (!statusChanged && position == null) {
             return toDto(lead);
         }
 
-        List<Lead> oldColumn = leadRepository.findByTenantAndStatusAndArchivedFalseOrderByPipelinePositionAscCreatedAtAsc(tenant, oldStatus);
+        List<Lead> oldColumn = leadRepository
+                .findByTenantAndStatusDefinitionAndArchivedFalseOrderByPipelinePositionAscCreatedAtAsc(tenant, oldDef);
         List<Lead> oldList = new ArrayList<>(oldColumn);
         oldList.removeIf(l -> Objects.equals(l.getId(), leadId));
 
@@ -183,9 +201,10 @@ public class LeadServiceImpl implements LeadService {
         }
 
         if (statusChanged) {
-            lead.setStatus(newStatus);
+            lead.setStatusDefinition(newDef);
             AuditSupport.touchForUpdate(lead, userId);
-            List<Lead> newColumn = leadRepository.findByTenantAndStatusAndArchivedFalseOrderByPipelinePositionAscCreatedAtAsc(tenant, newStatus);
+            List<Lead> newColumn = leadRepository
+                    .findByTenantAndStatusDefinitionAndArchivedFalseOrderByPipelinePositionAscCreatedAtAsc(tenant, newDef);
             List<Lead> newList = new ArrayList<>(newColumn);
             int insertIdx = (position != null && position >= 0 && position <= newList.size()) ? position : newList.size();
             newList.add(insertIdx, lead);
@@ -197,11 +216,12 @@ public class LeadServiceImpl implements LeadService {
 
             Map<String, Object> meta = new HashMap<>();
             meta.put("leadId", leadId);
-            meta.put("fromStatus", oldStatus.name());
-            meta.put("toStatus", newStatus.name());
+            meta.put("fromStatus", oldDef.getSystemKey());
+            meta.put("toStatus", newDef.getSystemKey());
             activityEventService.recordEvent(tenant, userId, ActivityEntityType.LEAD,
                     Objects.requireNonNull(lead.getId()),
-                    ActivityEventType.LEAD_STATUS_CHANGED, "Lead status changed from " + oldStatus + " to " + newStatus, meta);
+                    ActivityEventType.LEAD_STATUS_CHANGED,
+                    "Lead status changed from " + oldDef.getLabel() + " to " + newDef.getLabel(), meta);
         } else {
             AuditSupport.touchForUpdate(lead, userId);
             List<Lead> sameList = new ArrayList<>(oldColumn);
@@ -226,11 +246,10 @@ public class LeadServiceImpl implements LeadService {
         Lead lead = leadRepository.findByIdAndTenantAndArchivedFalse(leadId, tenant)
                 .orElseThrow(() -> new ResourceNotFoundException("Lead not found"));
 
-        if (lead.getStatus() == LeadStatus.LOST) {
+        if ("LOST".equals(lead.getStatusDefinition().getSystemKey())) {
             throw new LeadConversionNotAllowedException("Cannot convert a lost lead to a job");
         }
 
-        // Check for existing job (idempotency)
         Optional<Job> existingJob = jobRepository.findByTenantAndLeadIdAndArchivedFalse(tenant, leadId);
         if (existingJob.isPresent()) {
             return toJobDto(existingJob.get());
@@ -241,7 +260,6 @@ public class LeadServiceImpl implements LeadService {
             throw new IllegalArgumentException("Lead has no associated customer");
         }
 
-        // Create new job
         Job job = new Job();
         job.setTenant(tenant);
         job.setCustomer(customer);
@@ -250,11 +268,13 @@ public class LeadServiceImpl implements LeadService {
         job.setJobType(request.getType());
         job.setScheduledStartDate(request.getScheduledStartDate());
         job.setScheduledEndDate(request.getScheduledEndDate());
-        job.setStatus(request.getScheduledStartDate() != null ? JobStatus.SCHEDULED : JobStatus.UNSCHEDULED);
+        PipelineStatusDefinition jobStatus = request.getScheduledStartDate() != null
+                ? requireJobDefByKey(tenant, "SCHEDULED")
+                : requireJobDefByKey(tenant, "UNSCHEDULED");
+        job.setStatusDefinition(jobStatus);
         job.setAssignedCrew(request.getCrewName());
         job.setJobNotes(request.getInternalNotes());
 
-        // Copy property address from lead
         if (lead.getPropertyAddress() != null) {
             Address propertyAddress = new Address();
             copyAddress(lead.getPropertyAddress(), propertyAddress);
@@ -263,9 +283,9 @@ public class LeadServiceImpl implements LeadService {
 
         Job saved = jobRepository.save(job);
 
-        // Update lead status to WON and assign pipeline position in WON column
-        int maxPos = leadRepository.findMaxPipelinePositionByTenantAndStatusAndArchivedFalse(tenant, LeadStatus.WON);
-        lead.setStatus(LeadStatus.WON);
+        PipelineStatusDefinition won = requireLeadDefByKey(tenant, "WON");
+        int maxPos = leadRepository.findMaxPipelinePositionByTenantAndStatusDefinitionAndArchivedFalse(tenant, won);
+        lead.setStatusDefinition(won);
         lead.setPipelinePosition(maxPos + 1);
         AuditSupport.touchForUpdate(lead, userId);
         leadRepository.save(lead);
@@ -288,6 +308,23 @@ public class LeadServiceImpl implements LeadService {
         String qNorm = (q == null || q.isBlank()) ? null : q.trim();
         List<Lead> leads = leadRepository.searchForPicker(tenant, qNorm, PageRequest.of(0, capped));
         return leads.stream().map(this::leadToPickerItem).toList();
+    }
+
+    private PipelineStatusDefinition requireLeadDef(Tenant tenant, UUID id) {
+        return definitionRepository.findByIdAndTenantAndArchivedFalse(id, tenant)
+                .orElseThrow(() -> new ResourceNotFoundException("Status not found"));
+    }
+
+    private PipelineStatusDefinition requireLeadDefByKey(Tenant tenant, String systemKey) {
+        return definitionRepository
+                .findByTenantAndPipelineTypeAndSystemKeyAndArchivedFalse(tenant, PipelineType.LEAD, systemKey)
+                .orElseThrow(() -> new ResourceNotFoundException("Lead pipeline is not configured for this tenant."));
+    }
+
+    private PipelineStatusDefinition requireJobDefByKey(Tenant tenant, String systemKey) {
+        return definitionRepository
+                .findByTenantAndPipelineTypeAndSystemKeyAndArchivedFalse(tenant, PipelineType.JOB, systemKey)
+                .orElseThrow(() -> new ResourceNotFoundException("Job pipeline is not configured for this tenant."));
     }
 
     private PickerItemDto leadToPickerItem(Lead l) {
@@ -348,7 +385,10 @@ public class LeadServiceImpl implements LeadService {
     private LeadDto toDto(Lead entity, UUID convertedJobId) {
         LeadDto dto = new LeadDto();
         dto.setId(entity.getId());
-        dto.setStatus(entity.getStatus());
+        PipelineStatusDefinition sd = entity.getStatusDefinition();
+        dto.setStatusDefinitionId(sd.getId());
+        dto.setStatusKey(sd.getSystemKey());
+        dto.setStatusLabel(sd.getLabel());
         dto.setSource(entity.getSource());
         dto.setPipelinePosition(entity.getPipelinePosition());
         dto.setLeadNotes(entity.getLeadNotes());
@@ -391,7 +431,10 @@ public class LeadServiceImpl implements LeadService {
     private JobDto toJobDto(Job entity) {
         JobDto dto = new JobDto();
         dto.setId(entity.getId());
-        dto.setStatus(entity.getStatus());
+        PipelineStatusDefinition sd = entity.getStatusDefinition();
+        dto.setStatusDefinitionId(sd.getId());
+        dto.setStatusKey(sd.getSystemKey());
+        dto.setStatusLabel(sd.getLabel());
         dto.setType(entity.getJobType());
         dto.setScheduledStartDate(entity.getScheduledStartDate());
         dto.setScheduledEndDate(entity.getScheduledEndDate());

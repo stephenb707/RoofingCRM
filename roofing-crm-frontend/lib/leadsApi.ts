@@ -6,12 +6,12 @@ import {
   UpdateLeadStatusRequest,
   ConvertLeadToJobRequest,
   JobDto,
-  LeadStatus,
   PageResponse,
 } from "./types";
 
 export interface ListLeadsParams {
-  status?: LeadStatus | null;
+  /** Filter by pipeline status definition id (UUID). */
+  statusDefinitionId?: string | null;
   customerId?: string | null;
   page?: number;
   size?: number;
@@ -26,8 +26,8 @@ export async function listLeads(
 ): Promise<PageResponse<LeadDto>> {
   const queryParams: Record<string, string | number> = {};
 
-  if (params.status) {
-    queryParams.status = params.status;
+  if (params.statusDefinitionId != null && params.statusDefinitionId !== "") {
+    queryParams.statusDefinitionId = params.statusDefinitionId;
   }
   if (params.customerId != null && params.customerId !== "") {
     queryParams.customerId = params.customerId;
@@ -111,10 +111,10 @@ export async function updateLead(
 export async function updateLeadStatus(
   api: AxiosInstance,
   leadId: string,
-  status: LeadStatus,
+  statusDefinitionId: string,
   position?: number
 ): Promise<LeadDto> {
-  const payload: UpdateLeadStatusRequest = { status };
+  const payload: UpdateLeadStatusRequest = { statusDefinitionId };
   if (position !== undefined) {
     payload.position = position;
   }

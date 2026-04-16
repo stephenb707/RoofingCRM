@@ -77,7 +77,7 @@ export default function LoginPage() {
               />
             </svg>
           </div>
-          <h1 className="text-2xl font-bold text-slate-800">Viva Roofing CRM</h1>
+          <h1 className="text-2xl font-bold text-slate-800">Viva CRM</h1>
           <p className="text-sm text-slate-500 mt-1">Sign in to your account</p>
         </div>
 

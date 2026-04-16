@@ -1,8 +1,6 @@
 package com.roofingcrm.api.v1.report;
 
-import com.roofingcrm.domain.enums.JobStatus;
 import com.roofingcrm.domain.enums.LeadSource;
-import com.roofingcrm.domain.enums.LeadStatus;
 import com.roofingcrm.security.SecurityUtils;
 import com.roofingcrm.service.report.ReportService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,13 +27,13 @@ public class ReportController {
     @GetMapping(value = "/leads.csv", produces = "text/csv; charset=utf-8")
     public ResponseEntity<byte[]> exportLeadsCsv(
             @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
-            @RequestParam(value = "status", required = false) LeadStatus status,
+            @RequestParam(value = "statusDefinitionId", required = false) UUID statusDefinitionId,
             @RequestParam(value = "source", required = false) LeadSource source,
             @RequestParam(value = "limit", defaultValue = "2000") int limit) {
 
         UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
         int capped = Math.min(Math.max(limit, 1), 5000);
-        byte[] csv = reportService.exportLeadsCsv(userId, tenantId, status, source, capped);
+        byte[] csv = reportService.exportLeadsCsv(userId, tenantId, statusDefinitionId, source, capped);
 
         String filename = "leads-" + LocalDate.now() + ".csv";
         return ResponseEntity.ok()
@@ -47,12 +45,12 @@ public class ReportController {
     @GetMapping(value = "/jobs.csv", produces = "text/csv; charset=utf-8")
     public ResponseEntity<byte[]> exportJobsCsv(
             @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
-            @RequestParam(value = "status", required = false) JobStatus status,
+            @RequestParam(value = "statusDefinitionId", required = false) UUID statusDefinitionId,
             @RequestParam(value = "limit", defaultValue = "2000") int limit) {
 
         UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
         int capped = Math.min(Math.max(limit, 1), 5000);
-        byte[] csv = reportService.exportJobsCsv(userId, tenantId, status, capped);
+        byte[] csv = reportService.exportJobsCsv(userId, tenantId, statusDefinitionId, capped);
 
         String filename = "jobs-" + LocalDate.now() + ".csv";
         return ResponseEntity.ok()

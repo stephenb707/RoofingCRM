@@ -25,6 +25,8 @@ public class DashboardSummaryDto {
 
     private Map<String, Long> leadCountByStatus = new LinkedHashMap<>();
 
+    private Map<String, Long> jobCountByStatus = new LinkedHashMap<>();
+
     private long jobsScheduledThisWeek;
 
     private long unscheduledJobsCount;

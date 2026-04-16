@@ -15,6 +15,18 @@ jest.mock("next/navigation", () => ({
 jest.mock("@/lib/tasksApi");
 const mockedTasksApi = tasksApi as jest.Mocked<typeof tasksApi>;
 
+jest.mock("@/lib/preferencesApi", () => ({
+  getAppPreferences: jest.fn().mockResolvedValue({
+    dashboard: { widgets: [] },
+    jobsList: { visibleFields: [] },
+    leadsList: { visibleFields: [] },
+    customersList: { visibleFields: [] },
+    tasksList: { visibleFields: ["title", "status", "priority", "dueAt", "assignedTo", "related"] },
+    estimatesList: { visibleFields: [] },
+    updatedAt: null,
+  }),
+}));
+
 const mockTask: TaskDto = {
   taskId: "task-1",
   title: "Follow up call",

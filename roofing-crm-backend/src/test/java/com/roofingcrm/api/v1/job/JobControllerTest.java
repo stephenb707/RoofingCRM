@@ -2,7 +2,6 @@ package com.roofingcrm.api.v1.job;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.roofingcrm.api.v1.common.AddressDto;
-import com.roofingcrm.domain.enums.JobStatus;
 import com.roofingcrm.domain.enums.JobType;
 import com.roofingcrm.security.AuthenticatedUser;
 import com.roofingcrm.service.job.JobService;
@@ -73,7 +72,9 @@ class JobControllerTest {
         JobDto responseDto = new JobDto();
         responseDto.setId(UUID.randomUUID());
         responseDto.setCustomerId(customerId);
-        responseDto.setStatus(JobStatus.SCHEDULED);
+        responseDto.setStatusDefinitionId(UUID.randomUUID());
+        responseDto.setStatusKey("SCHEDULED");
+        responseDto.setStatusLabel("Scheduled");
         responseDto.setType(JobType.REPLACEMENT);
         responseDto.setCreatedAt(Instant.now());
 
@@ -85,7 +86,7 @@ class JobControllerTest {
                         .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
                         .content(Objects.requireNonNull(objectMapper.writeValueAsString(req))))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.status", is("SCHEDULED")))
+                .andExpect(jsonPath("$.statusKey", is("SCHEDULED")))
                 .andExpect(jsonPath("$.type", is("REPLACEMENT")));
     }
 
@@ -96,7 +97,9 @@ class JobControllerTest {
 
         JobDto dto = new JobDto();
         dto.setId(jobId);
-        dto.setStatus(JobStatus.SCHEDULED);
+        dto.setStatusDefinitionId(UUID.randomUUID());
+        dto.setStatusKey("SCHEDULED");
+        dto.setStatusLabel("Scheduled");
         dto.setType(JobType.REPAIR);
         dto.setCreatedAt(Instant.now());
         dto.setCustomerFirstName("Jane");
@@ -108,7 +111,7 @@ class JobControllerTest {
                         .header("X-Tenant-Id", tenantId.toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id", is(jobId.toString())))
-                .andExpect(jsonPath("$.status", is("SCHEDULED")))
+                .andExpect(jsonPath("$.statusKey", is("SCHEDULED")))
                 .andExpect(jsonPath("$.customerFirstName", is("Jane")))
                 .andExpect(jsonPath("$.customerLastName", is("Doe")));
     }
@@ -132,16 +135,19 @@ class JobControllerTest {
     void updateJobStatus_returnsOk() throws Exception {
         UUID tenantId = UUID.randomUUID();
         UUID jobId = UUID.randomUUID();
+        UUID inProgressId = UUID.randomUUID();
 
         UpdateJobStatusRequest req = new UpdateJobStatusRequest();
-        req.setStatus(JobStatus.IN_PROGRESS);
+        req.setStatusDefinitionId(inProgressId);
 
         JobDto responseDto = new JobDto();
         responseDto.setId(jobId);
-        responseDto.setStatus(JobStatus.IN_PROGRESS);
+        responseDto.setStatusDefinitionId(inProgressId);
+        responseDto.setStatusKey("IN_PROGRESS");
+        responseDto.setStatusLabel("In Progress");
         responseDto.setCreatedAt(Instant.now());
 
-        when(jobService.updateJobStatus(eq(tenantId), eq(userId), eq(jobId), eq(JobStatus.IN_PROGRESS)))
+        when(jobService.updateJobStatus(eq(tenantId), eq(userId), eq(jobId), eq(inProgressId)))
                 .thenReturn(responseDto);
 
         mockMvc.perform(post("/api/v1/jobs/{id}/status", jobId)
@@ -149,6 +155,6 @@ class JobControllerTest {
                         .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
                         .content(Objects.requireNonNull(objectMapper.writeValueAsString(req))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status", is("IN_PROGRESS")));
+                .andExpect(jsonPath("$.statusKey", is("IN_PROGRESS")));
     }
 }

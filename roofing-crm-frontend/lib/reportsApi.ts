@@ -1,5 +1,5 @@
 import type { AxiosInstance } from "axios";
-import type { LeadStatus, LeadSource, JobStatus } from "./types";
+import type { LeadSource } from "./types";
 
 const LIMIT_OPTIONS = [500, 2000, 5000] as const;
 
@@ -29,10 +29,11 @@ export function triggerBrowserDownload(blob: Blob, filename: string): void {
 
 export async function downloadLeadsCsv(
   api: AxiosInstance,
-  params: { status?: LeadStatus; source?: LeadSource; limit?: number }
+  params: { statusDefinitionId?: string; source?: LeadSource; limit?: number }
 ): Promise<{ blob: Blob; filename: string }> {
   const searchParams = new URLSearchParams();
-  if (params.status) searchParams.set("status", params.status);
+  if (params.statusDefinitionId)
+    searchParams.set("statusDefinitionId", params.statusDefinitionId);
   if (params.source) searchParams.set("source", params.source);
   if (params.limit != null) searchParams.set("limit", String(params.limit));
   const query = searchParams.toString();
@@ -49,10 +50,11 @@ export async function downloadLeadsCsv(
 
 export async function downloadJobsCsv(
   api: AxiosInstance,
-  params: { status?: JobStatus; limit?: number }
+  params: { statusDefinitionId?: string; limit?: number }
 ): Promise<{ blob: Blob; filename: string }> {
   const searchParams = new URLSearchParams();
-  if (params.status) searchParams.set("status", params.status);
+  if (params.statusDefinitionId)
+    searchParams.set("statusDefinitionId", params.statusDefinitionId);
   if (params.limit != null) searchParams.set("limit", String(params.limit));
   const query = searchParams.toString();
   const url = `/api/v1/reports/jobs.csv${query ? `?${query}` : ""}`;

@@ -102,7 +102,12 @@ export interface AddressDto {
 export interface LeadDto {
   id: string;
   customerId: string | null;
-  status: LeadStatus;
+  /** Target pipeline column / persisted FK. */
+  statusDefinitionId: string;
+  /** Stable key: built-in enum name or custom id from backend. */
+  statusKey: string;
+  /** Tenant-configured display label. */
+  statusLabel: string;
   source: LeadSource | null;
   leadNotes: string | null;
   propertyAddress: AddressDto | null;
@@ -136,7 +141,7 @@ export interface CreateLeadRequest {
 }
 
 export interface UpdateLeadStatusRequest {
-  status: LeadStatus;
+  statusDefinitionId: string;
   position?: number;
 }
 
@@ -178,7 +183,9 @@ export interface JobDto {
   id: string;
   customerId: string | null;
   leadId: string | null;
-  status: JobStatus;
+  statusDefinitionId: string;
+  statusKey: string;
+  statusLabel: string;
   type: JobType;
   propertyAddress: AddressDto | null;
   scheduledStartDate: string | null;
@@ -215,7 +222,7 @@ export interface CreateJobRequest {
 }
 
 export interface UpdateJobStatusRequest {
-  status: JobStatus;
+  statusDefinitionId: string;
 }
 
 // Estimate-related types
@@ -712,7 +719,8 @@ export interface CreateNoteRequest {
 // Dashboard (GET /api/v1/dashboard/summary)
 export interface DashboardLeadSnippetDto {
   id: string;
-  status: LeadStatus;
+  statusKey: string;
+  statusLabel: string;
   customerLabel: string;
   propertyLine1?: string | null;
   updatedAt: string;
@@ -720,7 +728,8 @@ export interface DashboardLeadSnippetDto {
 
 export interface DashboardJobSnippetDto {
   id: string;
-  status: JobStatus;
+  statusKey: string;
+  statusLabel: string;
   scheduledStartDate?: string | null;
   propertyLine1?: string | null;
   customerLabel: string;
@@ -744,6 +753,7 @@ export interface DashboardSummaryDto {
   invoiceCount: number;
   openTaskCount: number;
   leadCountByStatus: Record<string, number>;
+  jobCountByStatus: Record<string, number>;
   jobsScheduledThisWeek: number;
   unscheduledJobsCount: number;
   estimatesSentCount: number;
@@ -752,4 +762,94 @@ export interface DashboardSummaryDto {
   recentLeads: DashboardLeadSnippetDto[];
   upcomingJobs: DashboardJobSnippetDto[];
   openTasks: DashboardTaskSnippetDto[];
+}
+
+/** Customer-facing photo + text report (inspection, before/after, scope). */
+export interface CustomerPhotoReportSectionPhotoDto {
+  attachmentId: string;
+  sortOrder: number;
+}
+
+export interface CustomerPhotoReportSectionDto {
+  id?: string;
+  sortOrder: number;
+  title: string;
+  body?: string | null;
+  photos: CustomerPhotoReportSectionPhotoDto[];
+}
+
+export interface CustomerPhotoReportDto {
+  id: string;
+  customerId: string;
+  customerName: string;
+  customerEmail?: string | null;
+  jobId?: string | null;
+  jobDisplayName?: string | null;
+  title: string;
+  reportType?: string | null;
+  summary?: string | null;
+  sections: CustomerPhotoReportSectionDto[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CustomerPhotoReportSummaryDto {
+  id: string;
+  title: string;
+  reportType?: string | null;
+  customerId: string;
+  customerName: string;
+  jobId?: string | null;
+  jobDisplayName?: string | null;
+  updatedAt?: string;
+}
+
+export interface CustomerPhotoReportSectionRequest {
+  title: string;
+  body?: string | null;
+  attachmentIds: string[];
+}
+
+export interface UpsertCustomerPhotoReportRequest {
+  customerId: string;
+  jobId?: string | null;
+  title: string;
+  reportType?: string | null;
+  summary?: string | null;
+  sections: CustomerPhotoReportSectionRequest[];
+}
+
+export interface SendCustomerPhotoReportEmailRequest {
+  recipientEmail: string;
+  recipientName?: string;
+  subject?: string;
+  message?: string;
+}
+
+export interface SendCustomerPhotoReportEmailResponse {
+  success: boolean;
+  sentAt: string;
+}
+
+// App Preferences (tenant-level customization)
+export interface AppPreferencesDto {
+  dashboard: Record<string, unknown>;
+  jobsList: Record<string, unknown>;
+  leadsList: Record<string, unknown>;
+  customersList: Record<string, unknown>;
+  tasksList: Record<string, unknown>;
+  estimatesList: Record<string, unknown>;
+  /** e.g. { defaultView: "leads" | "jobs" | "combined" } */
+  pipeline?: Record<string, unknown>;
+  updatedAt: string | null;
+}
+
+export interface UpdateAppPreferencesRequest {
+  dashboard?: Record<string, unknown>;
+  jobsList?: Record<string, unknown>;
+  leadsList?: Record<string, unknown>;
+  customersList?: Record<string, unknown>;
+  tasksList?: Record<string, unknown>;
+  estimatesList?: Record<string, unknown>;
+  pipeline?: Record<string, unknown>;
 }

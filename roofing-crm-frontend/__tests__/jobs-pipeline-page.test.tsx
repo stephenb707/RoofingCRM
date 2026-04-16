@@ -2,10 +2,14 @@ import React from "react";
 import { render, screen, waitFor, fireEvent } from "./test-utils";
 import JobsPipelinePage from "@/app/app/jobs/pipeline/page";
 import * as jobsApi from "@/lib/jobsApi";
+import * as pipelineStatusesApi from "@/lib/pipelineStatusesApi";
 import { JobDto, PageResponse } from "@/lib/types";
 
 jest.mock("@/lib/jobsApi");
 const mockedJobsApi = jobsApi as jest.Mocked<typeof jobsApi>;
+
+jest.mock("@/lib/pipelineStatusesApi");
+const mockedPipelineApi = pipelineStatusesApi as jest.Mocked<typeof pipelineStatusesApi>;
 
 jest.mock("next/navigation", () => ({
   useRouter: () => ({ push: jest.fn(), replace: jest.fn(), back: jest.fn() }),
@@ -14,11 +18,33 @@ jest.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
+const defUnscheduled = {
+  id: "def-unsched",
+  pipelineType: "JOB" as const,
+  systemKey: "UNSCHEDULED",
+  label: "Unscheduled",
+  sortOrder: 0,
+  builtIn: true,
+  active: true,
+};
+
+const defScheduled = {
+  id: "def-sched",
+  pipelineType: "JOB" as const,
+  systemKey: "SCHEDULED",
+  label: "Scheduled",
+  sortOrder: 1,
+  builtIn: true,
+  active: true,
+};
+
 const baseJob: JobDto = {
   id: "job-1",
   customerId: "cust-1",
   leadId: null,
-  status: "UNSCHEDULED",
+  statusDefinitionId: defUnscheduled.id,
+  statusKey: "UNSCHEDULED",
+  statusLabel: "Unscheduled",
   type: "REPLACEMENT",
   propertyAddress: { line1: "123 Main St", city: "Denver", state: "CO" },
   scheduledStartDate: null,
@@ -35,7 +61,9 @@ const baseJob: JobDto = {
 const jobScheduled: JobDto = {
   ...baseJob,
   id: "job-2",
-  status: "SCHEDULED",
+  statusDefinitionId: defScheduled.id,
+  statusKey: "SCHEDULED",
+  statusLabel: "Scheduled",
   scheduledStartDate: "2024-06-01",
   scheduledEndDate: "2024-06-01",
   propertyAddress: { line1: "456 Oak Ave", city: "Boulder", state: "CO" },
@@ -59,18 +87,29 @@ describe("JobsPipelinePage", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockedJobsApi.listJobs.mockResolvedValue(pipelineResponse);
+    mockedPipelineApi.listPipelineStatuses.mockResolvedValue([defUnscheduled, defScheduled]);
   });
 
-  it("loads jobs and renders a column per status with grouped cards", async () => {
+  it("loads definitions and renders a column per definition with jobs grouped by statusDefinitionId", async () => {
     render(<JobsPipelinePage />);
 
     await waitFor(() => {
       expect(screen.getByRole("heading", { name: /^Pipeline$/i })).toBeInTheDocument();
     });
 
+    await waitFor(() => {
+      expect(screen.getByTestId("pipeline-view-switcher")).toBeInTheDocument();
+    });
+    expect(screen.getByTestId("pipeline-view-switch-jobs")).toHaveAttribute("aria-current", "page");
+    expect(screen.getByTestId("pipeline-view-switch-combined")).toHaveAttribute(
+      "href",
+      "/app/pipeline/combined"
+    );
+
+    expect(mockedPipelineApi.listPipelineStatuses).toHaveBeenCalledWith(expect.anything(), "JOB");
     expect(mockedJobsApi.listJobs).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ page: 0, size: 200, status: null })
+      expect.objectContaining({ page: 0, size: 200 })
     );
 
     expect(screen.getByRole("heading", { name: "Unscheduled" })).toBeInTheDocument();
@@ -78,10 +117,23 @@ describe("JobsPipelinePage", () => {
     expect(screen.getByText("Alice Smith")).toBeInTheDocument();
     expect(screen.getByText("Bob Jones")).toBeInTheDocument();
 
-    const unschedCol = screen.getByTestId("job-pipeline-col-UNSCHEDULED");
-    const schedCol = screen.getByTestId("job-pipeline-col-SCHEDULED");
+    const unschedCol = screen.getByTestId(`job-pipeline-col-${defUnscheduled.id}`);
+    const schedCol = screen.getByTestId(`job-pipeline-col-${defScheduled.id}`);
     expect(unschedCol).toHaveTextContent("1 jobs");
     expect(schedCol).toHaveTextContent("1 jobs");
+  });
+
+  it("uses tenant-configured labels on columns", async () => {
+    mockedPipelineApi.listPipelineStatuses.mockResolvedValue([
+      { ...defUnscheduled, label: "Not yet on calendar" },
+      defScheduled,
+    ]);
+
+    render(<JobsPipelinePage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Not yet on calendar" })).toBeInTheDocument();
+    });
   });
 
   it("shows customer phone on cards when present", async () => {
@@ -125,7 +177,7 @@ describe("JobsPipelinePage", () => {
     expect(screen.getByTestId("job-pipeline-card-job-1")).toHaveClass("cursor-grab");
   });
 
-  it("shows status badge on each card", async () => {
+  it("shows statusLabel on each card", async () => {
     render(<JobsPipelinePage />);
 
     await waitFor(() => {

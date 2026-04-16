@@ -2,9 +2,13 @@ import React from "react";
 import { render, screen, waitFor, fireEvent } from "./test-utils";
 import ReportsPage from "@/app/app/reports/page";
 import * as reportsApi from "@/lib/reportsApi";
+import * as pipelineStatusesApi from "@/lib/pipelineStatusesApi";
 
 jest.mock("@/lib/reportsApi");
 const mockedReportsApi = reportsApi as jest.Mocked<typeof reportsApi>;
+
+jest.mock("@/lib/pipelineStatusesApi");
+const mockedPipelineApi = pipelineStatusesApi as jest.Mocked<typeof pipelineStatusesApi>;
 
 describe("ReportsPage", () => {
   const mockBlob = new Blob(["a,b\n1,2"], { type: "text/csv" });
@@ -12,6 +16,32 @@ describe("ReportsPage", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockedPipelineApi.listPipelineStatuses.mockImplementation((_api, type) => {
+      if (type === "LEAD") {
+        return Promise.resolve([
+          {
+            id: "lead-new",
+            pipelineType: "LEAD",
+            systemKey: "NEW",
+            label: "New",
+            sortOrder: 0,
+            builtIn: true,
+            active: true,
+          },
+        ]);
+      }
+      return Promise.resolve([
+        {
+          id: "job-completed",
+          pipelineType: "JOB",
+          systemKey: "COMPLETED",
+          label: "Completed",
+          sortOrder: 0,
+          builtIn: true,
+          active: true,
+        },
+      ]);
+    });
     mockedReportsApi.getPaidInvoiceYears.mockResolvedValue([]);
     mockedReportsApi.downloadAccountingJobsExcel.mockResolvedValue({
       blob: new Blob(["xlsx"], {
@@ -31,12 +61,26 @@ describe("ReportsPage", () => {
       expect(screen.getByText("Reports")).toBeInTheDocument();
     });
 
+    const headings = screen.getAllByRole("heading", { level: 2 });
+    expect(headings.map((h) => h.textContent)).toEqual([
+      "Customer photo reports",
+      "Accounting Report",
+      "Paid Invoices Annual Report",
+      "Jobs Export",
+      "Pipeline / Leads Export",
+    ]);
+
     expect(screen.getByText("Pipeline / Leads Export")).toBeInTheDocument();
     expect(screen.getByText("Jobs Export")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Download Leads CSV/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Download Jobs CSV/i })).toBeInTheDocument();
     expect(screen.getByText("Accounting Report")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Download Excel/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Customer photo reports/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Open photo reports/i })).toHaveAttribute(
+      "href",
+      "/app/reports/customer-reports"
+    );
   });
 
   it("calls downloadLeadsCsv with selected filters when clicking Download Leads CSV", async () => {
@@ -50,7 +94,7 @@ describe("ReportsPage", () => {
 
     const leadsStatusSelect = document.getElementById("leads-status");
     if (!leadsStatusSelect) throw new Error("leads-status not found");
-    fireEvent.change(leadsStatusSelect, { target: { value: "NEW" } });
+    fireEvent.change(leadsStatusSelect, { target: { value: "lead-new" } });
 
     const sourceSelect = document.getElementById("leads-source");
     if (!sourceSelect) throw new Error("leads-source not found");
@@ -63,7 +107,7 @@ describe("ReportsPage", () => {
       expect(mockedReportsApi.downloadLeadsCsv).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({
-          status: "NEW",
+          statusDefinitionId: "lead-new",
           source: "WEBSITE",
         })
       );
@@ -79,9 +123,9 @@ describe("ReportsPage", () => {
       expect(screen.getByText("Jobs Export")).toBeInTheDocument();
     });
 
-    const statusComboboxes = screen.getAllByRole("combobox", { name: /status/i });
-    const jobsStatusSelect = statusComboboxes[1];
-    fireEvent.change(jobsStatusSelect, { target: { value: "COMPLETED" } });
+    const jobsStatusSelect = document.getElementById("jobs-status");
+    if (!jobsStatusSelect) throw new Error("jobs-status not found");
+    fireEvent.change(jobsStatusSelect, { target: { value: "job-completed" } });
 
     const downloadBtn = screen.getByRole("button", { name: /Download Jobs CSV/i });
     fireEvent.click(downloadBtn);
@@ -90,7 +134,7 @@ describe("ReportsPage", () => {
       expect(mockedReportsApi.downloadJobsCsv).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({
-          status: "COMPLETED",
+          statusDefinitionId: "job-completed",
         })
       );
     });

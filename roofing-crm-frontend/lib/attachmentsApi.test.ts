@@ -5,6 +5,7 @@ import {
   listJobAttachments,
   uploadJobAttachment,
   downloadAttachment,
+  deleteAttachment,
 } from "./attachmentsApi";
 import type { AttachmentDto } from "./types";
 
@@ -12,6 +13,7 @@ describe("attachmentsApi", () => {
   const mockApi = {
     get: jest.fn(),
     post: jest.fn(),
+    delete: jest.fn(),
   } as unknown as AxiosInstance;
 
   beforeEach(() => {
@@ -137,6 +139,17 @@ describe("attachmentsApi", () => {
         { responseType: "blob" }
       );
       expect(mockApi.get).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("deleteAttachment", () => {
+    it("calls DELETE with correct URL", async () => {
+      (mockApi.delete as jest.Mock).mockResolvedValue({});
+
+      await deleteAttachment(mockApi, "att-1");
+
+      expect(mockApi.delete).toHaveBeenCalledWith("/api/v1/attachments/att-1");
+      expect(mockApi.delete).toHaveBeenCalledTimes(1);
     });
   });
 });

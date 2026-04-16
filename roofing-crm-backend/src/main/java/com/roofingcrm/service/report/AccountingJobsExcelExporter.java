@@ -102,7 +102,7 @@ public class AccountingJobsExcelExporter {
                 setText(row.createCell(c++), rowData.job().getId() != null ? rowData.job().getId().toString() : "", textStyle);
                 setText(row.createCell(c++), AccountingJobsReportService.jobLabel(rowData.job()), textStyle);
                 setText(row.createCell(c++), AccountingJobsReportService.customerName(rowData.job()), textStyle);
-                setText(row.createCell(c++), AccountingJobsReportService.humanizeEnum(rowData.job().getStatus()), textStyle);
+                setText(row.createCell(c++), rowData.job().getStatusDefinition().getLabel(), textStyle);
 
                 var s = rowData.summary();
                 setCurrency(row.createCell(c++), s.getAgreedAmount(), currencyStyle);

@@ -7,15 +7,17 @@ import com.roofingcrm.api.v1.dashboard.DashboardTaskSnippetDto;
 import com.roofingcrm.domain.entity.Customer;
 import com.roofingcrm.domain.entity.Job;
 import com.roofingcrm.domain.entity.Lead;
+import com.roofingcrm.domain.entity.PipelineStatusDefinition;
 import com.roofingcrm.domain.entity.Task;
 import com.roofingcrm.domain.entity.Tenant;
 import com.roofingcrm.domain.enums.EstimateStatus;
-import com.roofingcrm.domain.enums.LeadStatus;
+import com.roofingcrm.domain.enums.PipelineType;
 import com.roofingcrm.domain.repository.CustomerRepository;
 import com.roofingcrm.domain.repository.EstimateRepository;
 import com.roofingcrm.domain.repository.InvoiceRepository;
 import com.roofingcrm.domain.repository.JobRepository;
 import com.roofingcrm.domain.repository.LeadRepository;
+import com.roofingcrm.domain.repository.PipelineStatusDefinitionRepository;
 import com.roofingcrm.domain.repository.TaskRepository;
 import com.roofingcrm.domain.repository.spec.TaskSpecifications;
 import com.roofingcrm.service.tenant.TenantAccessService;
@@ -30,6 +32,7 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.temporal.TemporalAdjusters;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -44,6 +47,7 @@ public class DashboardServiceImpl implements DashboardService {
     private final EstimateRepository estimateRepository;
     private final InvoiceRepository invoiceRepository;
     private final TaskRepository taskRepository;
+    private final PipelineStatusDefinitionRepository pipelineStatusDefinitionRepository;
 
     @Autowired
     public DashboardServiceImpl(
@@ -53,7 +57,8 @@ public class DashboardServiceImpl implements DashboardService {
             JobRepository jobRepository,
             EstimateRepository estimateRepository,
             InvoiceRepository invoiceRepository,
-            TaskRepository taskRepository) {
+            TaskRepository taskRepository,
+            PipelineStatusDefinitionRepository pipelineStatusDefinitionRepository) {
         this.tenantAccessService = tenantAccessService;
         this.customerRepository = customerRepository;
         this.leadRepository = leadRepository;
@@ -61,6 +66,7 @@ public class DashboardServiceImpl implements DashboardService {
         this.estimateRepository = estimateRepository;
         this.invoiceRepository = invoiceRepository;
         this.taskRepository = taskRepository;
+        this.pipelineStatusDefinitionRepository = pipelineStatusDefinitionRepository;
     }
 
     @Override
@@ -86,10 +92,20 @@ public class DashboardServiceImpl implements DashboardService {
                 jobRepository.countScheduledInDateRange(tenant, weekStart, weekEnd));
 
         LinkedHashMap<String, Long> byStatus = new LinkedHashMap<>();
-        for (LeadStatus st : LeadStatus.values()) {
-            byStatus.put(st.name(), leadRepository.countByTenantAndStatusAndArchivedFalse(tenant, st));
+        List<PipelineStatusDefinition> leadDefs = pipelineStatusDefinitionRepository
+                .findByTenantAndPipelineTypeAndActiveTrueAndArchivedFalseOrderBySortOrderAsc(tenant, PipelineType.LEAD);
+        for (PipelineStatusDefinition def : leadDefs) {
+            byStatus.put(def.getSystemKey(), leadRepository.countByTenantAndStatusDefinitionAndArchivedFalse(tenant, def));
         }
         dto.setLeadCountByStatus(byStatus);
+
+        LinkedHashMap<String, Long> jobsByStatus = new LinkedHashMap<>();
+        List<PipelineStatusDefinition> jobDefs = pipelineStatusDefinitionRepository
+                .findByTenantAndPipelineTypeAndActiveTrueAndArchivedFalseOrderBySortOrderAsc(tenant, PipelineType.JOB);
+        for (PipelineStatusDefinition def : jobDefs) {
+            jobsByStatus.put(def.getSystemKey(), jobRepository.countByTenantAndStatusDefinitionAndArchivedFalse(tenant, def));
+        }
+        dto.setJobCountByStatus(jobsByStatus);
 
         dto.setRecentLeads(
                 leadRepository
@@ -127,7 +143,9 @@ public class DashboardServiceImpl implements DashboardService {
     private DashboardLeadSnippetDto toLeadSnippet(Lead l) {
         DashboardLeadSnippetDto d = new DashboardLeadSnippetDto();
         d.setId(l.getId());
-        d.setStatus(l.getStatus());
+        PipelineStatusDefinition sd = l.getStatusDefinition();
+        d.setStatusKey(sd.getSystemKey());
+        d.setStatusLabel(sd.getLabel());
         d.setCustomerLabel(formatCustomerName(l.getCustomer()));
         if (l.getPropertyAddress() != null && l.getPropertyAddress().getLine1() != null) {
             d.setPropertyLine1(l.getPropertyAddress().getLine1());
@@ -139,7 +157,9 @@ public class DashboardServiceImpl implements DashboardService {
     private DashboardJobSnippetDto toJobSnippet(Job j) {
         DashboardJobSnippetDto d = new DashboardJobSnippetDto();
         d.setId(j.getId());
-        d.setStatus(j.getStatus());
+        PipelineStatusDefinition sd = j.getStatusDefinition();
+        d.setStatusKey(sd.getSystemKey());
+        d.setStatusLabel(sd.getLabel());
         d.setScheduledStartDate(j.getScheduledStartDate());
         if (j.getPropertyAddress() != null && j.getPropertyAddress().getLine1() != null) {
             d.setPropertyLine1(j.getPropertyAddress().getLine1());

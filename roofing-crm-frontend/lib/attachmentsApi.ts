@@ -75,3 +75,13 @@ export async function downloadAttachment(
   });
   return data;
 }
+
+/**
+ * Delete (archive) an attachment.
+ */
+export async function deleteAttachment(
+  api: AxiosInstance,
+  attachmentId: string
+): Promise<void> {
+  await api.delete(`/api/v1/attachments/${attachmentId}`);
+}

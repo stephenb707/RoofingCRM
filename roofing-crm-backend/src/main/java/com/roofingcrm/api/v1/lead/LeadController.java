@@ -2,7 +2,6 @@ package com.roofingcrm.api.v1.lead;
 
 import com.roofingcrm.api.v1.common.PickerItemDto;
 import com.roofingcrm.api.v1.job.JobDto;
-import com.roofingcrm.domain.enums.LeadStatus;
 import com.roofingcrm.security.SecurityUtils;
 import com.roofingcrm.service.lead.LeadService;
 import jakarta.validation.Valid;
@@ -76,12 +75,12 @@ public class LeadController {
     @GetMapping
     public ResponseEntity<Page<LeadDto>> listLeads(
             @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
-            @RequestParam(value = "status", required = false) LeadStatus status,
+            @RequestParam(value = "statusDefinitionId", required = false) UUID statusDefinitionId,
             @RequestParam(value = "customerId", required = false) UUID customerId,
             @PageableDefault(size = 20) @NonNull Pageable pageable) {
 
         UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
-        Page<LeadDto> page = leadService.listLeads(tenantId, userId, status, customerId, pageable);
+        Page<LeadDto> page = leadService.listLeads(tenantId, userId, statusDefinitionId, customerId, pageable);
         return ResponseEntity.ok(page);
     }
 
@@ -92,7 +91,8 @@ public class LeadController {
             @Valid @RequestBody UpdateLeadStatusRequest request) {
 
         UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
-        LeadDto updated = leadService.updateLeadStatus(tenantId, userId, leadId, request.getStatus(), request.getPosition());
+        LeadDto updated = leadService.updateLeadStatus(
+                tenantId, userId, leadId, request.getStatusDefinitionId(), request.getPosition());
         return ResponseEntity.ok(updated);
     }
 

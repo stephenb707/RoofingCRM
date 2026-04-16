@@ -7,20 +7,22 @@ import com.roofingcrm.api.v1.communication.CreateCommunicationLogRequest;
 import com.roofingcrm.domain.entity.Customer;
 import com.roofingcrm.domain.entity.Job;
 import com.roofingcrm.domain.entity.Lead;
+import com.roofingcrm.domain.entity.PipelineStatusDefinition;
 import com.roofingcrm.domain.entity.Tenant;
 import com.roofingcrm.domain.entity.TenantUserMembership;
 import com.roofingcrm.domain.entity.User;
-import com.roofingcrm.domain.enums.JobStatus;
 import com.roofingcrm.domain.enums.JobType;
 import com.roofingcrm.domain.enums.LeadSource;
-import com.roofingcrm.domain.enums.LeadStatus;
+import com.roofingcrm.domain.enums.PipelineType;
 import com.roofingcrm.domain.enums.UserRole;
 import com.roofingcrm.domain.repository.CustomerRepository;
 import com.roofingcrm.domain.repository.JobRepository;
 import com.roofingcrm.domain.repository.LeadRepository;
+import com.roofingcrm.domain.repository.PipelineStatusDefinitionRepository;
 import com.roofingcrm.domain.repository.TenantRepository;
 import com.roofingcrm.domain.repository.TenantUserMembershipRepository;
 import com.roofingcrm.domain.repository.UserRepository;
+import com.roofingcrm.service.pipeline.PipelineStatusAdminService;
 import com.roofingcrm.service.tenant.TenantAccessDeniedException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -60,6 +62,12 @@ class CommunicationLogServiceImplTest extends AbstractIntegrationTest {
     @Autowired
     private TestDatabaseCleaner dbCleaner;
 
+    @Autowired
+    private PipelineStatusAdminService pipelineStatusAdminService;
+
+    @Autowired
+    private PipelineStatusDefinitionRepository pipelineStatusDefinitionRepository;
+
     @NonNull
     private UUID tenantId = Objects.requireNonNull(UUID.randomUUID());
     @NonNull
@@ -91,6 +99,8 @@ class CommunicationLogServiceImplTest extends AbstractIntegrationTest {
         membership.setRole(UserRole.OWNER);
         membershipRepository.save(membership);
 
+        pipelineStatusAdminService.seedDefaultsForNewTenant(tenant);
+
         Customer customer = new Customer();
         customer.setTenant(tenant);
         customer.setFirstName("John");
@@ -99,10 +109,16 @@ class CommunicationLogServiceImplTest extends AbstractIntegrationTest {
         customer.setUpdatedByUserId(user.getId());
         customer = customerRepository.save(customer);
 
+        PipelineStatusDefinition newLead = pipelineStatusDefinitionRepository
+                .findByTenantAndPipelineTypeAndSystemKeyAndArchivedFalse(tenant, PipelineType.LEAD, "NEW")
+                .orElseThrow();
+        PipelineStatusDefinition scheduledJob = pipelineStatusDefinitionRepository
+                .findByTenantAndPipelineTypeAndSystemKeyAndArchivedFalse(tenant, PipelineType.JOB, "SCHEDULED")
+                .orElseThrow();
         Lead lead = new Lead();
         lead.setTenant(tenant);
         lead.setCustomer(customer);
-        lead.setStatus(LeadStatus.NEW);
+        lead.setStatusDefinition(newLead);
         lead.setSource(LeadSource.WEBSITE);
         lead.setCreatedByUserId(user.getId());
         lead.setUpdatedByUserId(user.getId());
@@ -111,7 +127,7 @@ class CommunicationLogServiceImplTest extends AbstractIntegrationTest {
         Job job = new Job();
         job.setTenant(tenant);
         job.setCustomer(customer);
-        job.setStatus(JobStatus.SCHEDULED);
+        job.setStatusDefinition(scheduledJob);
         job.setJobType(JobType.REPLACEMENT);
         job.setCreatedByUserId(user.getId());
         job.setUpdatedByUserId(user.getId());

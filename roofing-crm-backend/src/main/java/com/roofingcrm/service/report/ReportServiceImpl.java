@@ -2,9 +2,11 @@ package com.roofingcrm.service.report;
 
 import com.roofingcrm.domain.entity.Job;
 import com.roofingcrm.domain.entity.Lead;
+import com.roofingcrm.domain.entity.PipelineStatusDefinition;
 import com.roofingcrm.domain.entity.Tenant;
 import com.roofingcrm.domain.repository.JobRepository;
 import com.roofingcrm.domain.repository.LeadRepository;
+import com.roofingcrm.domain.repository.PipelineStatusDefinitionRepository;
 import com.roofingcrm.domain.value.Address;
 import com.roofingcrm.service.tenant.TenantAccessService;
 import com.roofingcrm.util.CsvUtils;
@@ -23,9 +25,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
-import com.roofingcrm.domain.enums.JobStatus;
 import com.roofingcrm.domain.enums.LeadSource;
-import com.roofingcrm.domain.enums.LeadStatus;
 
 @Service
 public class ReportServiceImpl implements ReportService {
@@ -33,28 +33,36 @@ public class ReportServiceImpl implements ReportService {
     private final TenantAccessService tenantAccessService;
     private final LeadRepository leadRepository;
     private final JobRepository jobRepository;
+    private final PipelineStatusDefinitionRepository definitionRepository;
 
     @Autowired
     public ReportServiceImpl(TenantAccessService tenantAccessService,
                              LeadRepository leadRepository,
-                             JobRepository jobRepository) {
+                             JobRepository jobRepository,
+                             PipelineStatusDefinitionRepository definitionRepository) {
         this.tenantAccessService = tenantAccessService;
         this.leadRepository = leadRepository;
         this.jobRepository = jobRepository;
+        this.definitionRepository = definitionRepository;
     }
 
     @Override
     @Transactional(readOnly = true)
-    public byte[] exportLeadsCsv(UUID userId, UUID tenantId, LeadStatus status, LeadSource source, int limit) {
+    public byte[] exportLeadsCsv(UUID userId, UUID tenantId, UUID statusDefinitionId, LeadSource source, int limit) {
         int capped = Math.min(Math.max(limit, 1), 5000);
         Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(Objects.requireNonNull(tenantId), Objects.requireNonNull(userId));
 
         Pageable pageable = PageRequest.of(0, capped, Sort.by(Sort.Direction.DESC, "createdAt"));
         List<Lead> leads;
-        if (status != null && source != null) {
-            leads = leadRepository.findByTenantAndStatusAndSourceAndArchivedFalse(tenant, status, source, pageable).getContent();
-        } else if (status != null) {
-            leads = leadRepository.findByTenantAndStatusAndArchivedFalse(tenant, status, pageable).getContent();
+        PipelineStatusDefinition statusDef = null;
+        if (statusDefinitionId != null) {
+            statusDef = definitionRepository.findByIdAndTenantAndArchivedFalse(statusDefinitionId, tenant)
+                    .orElseThrow(() -> new com.roofingcrm.service.exception.ResourceNotFoundException("Status not found"));
+        }
+        if (statusDef != null && source != null) {
+            leads = leadRepository.findByTenantAndStatusDefinitionAndSourceAndArchivedFalse(tenant, statusDef, source, pageable).getContent();
+        } else if (statusDef != null) {
+            leads = leadRepository.findByTenantAndStatusDefinitionAndArchivedFalse(tenant, statusDef, pageable).getContent();
         } else if (source != null) {
             leads = leadRepository.findByTenantAndSourceAndArchivedFalse(tenant, source, pageable).getContent();
         } else {
@@ -91,7 +99,7 @@ public class ReportServiceImpl implements ReportService {
                     .append(CsvUtils.cell(customerPhone)).append(",")
                     .append(CsvUtils.cell(propertyAddress)).append(",")
                     .append(CsvUtils.cell(humanizeEnum(lead.getSource()))).append(",")
-                    .append(CsvUtils.cell(humanizeEnum(lead.getStatus()))).append(",")
+                    .append(CsvUtils.cell(lead.getStatusDefinition().getLabel())).append(",")
                     .append(CsvUtils.cell(toFriendlyTimestamp(lead.getCreatedAt()))).append(",")
                     .append(CsvUtils.cell(toFriendlyTimestamp(lead.getUpdatedAt()))).append(",")
                     .append(convertedJobId)
@@ -103,14 +111,16 @@ public class ReportServiceImpl implements ReportService {
 
     @Override
     @Transactional(readOnly = true)
-    public byte[] exportJobsCsv(UUID userId, UUID tenantId, JobStatus status, int limit) {
+    public byte[] exportJobsCsv(UUID userId, UUID tenantId, UUID statusDefinitionId, int limit) {
         int capped = Math.min(Math.max(limit, 1), 5000);
         Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(Objects.requireNonNull(tenantId), Objects.requireNonNull(userId));
 
         Pageable pageable = PageRequest.of(0, capped, Sort.by(Sort.Direction.DESC, "createdAt"));
         List<Job> jobs;
-        if (status != null) {
-            jobs = jobRepository.findByTenantAndStatusAndArchivedFalse(tenant, status, pageable).getContent();
+        if (statusDefinitionId != null) {
+            PipelineStatusDefinition def = definitionRepository.findByIdAndTenantAndArchivedFalse(statusDefinitionId, tenant)
+                    .orElseThrow(() -> new com.roofingcrm.service.exception.ResourceNotFoundException("Status not found"));
+            jobs = jobRepository.findByTenantAndStatusDefinitionAndArchivedFalse(tenant, def, pageable).getContent();
         } else {
             jobs = jobRepository.findByTenantAndArchivedFalse(tenant, pageable).getContent();
         }
@@ -136,7 +146,7 @@ public class ReportServiceImpl implements ReportService {
                     .append(CsvUtils.cell(customerPhone)).append(",")
                     .append(CsvUtils.cell(propertyAddress)).append(",")
                     .append(CsvUtils.cell(humanizeEnum(job.getJobType()))).append(",")
-                    .append(CsvUtils.cell(humanizeEnum(job.getStatus()))).append(",")
+                    .append(CsvUtils.cell(job.getStatusDefinition().getLabel())).append(",")
                     .append(CsvUtils.cell(schedStart)).append(",")
                     .append(CsvUtils.cell(schedEnd)).append(",")
                     .append(CsvUtils.cell(actualStart)).append(",")

@@ -1,7 +1,6 @@
 package com.roofingcrm.api.v1.dashboard;
 
 import com.roofingcrm.api.GlobalExceptionHandler;
-import com.roofingcrm.domain.enums.LeadStatus;
 import com.roofingcrm.security.AuthenticatedUser;
 import com.roofingcrm.service.dashboard.DashboardService;
 import org.junit.jupiter.api.BeforeEach;
@@ -62,7 +61,7 @@ class DashboardControllerTest {
         body.setInvoiceCount(1);
         body.setOpenTaskCount(7);
         Map<String, Long> byStatus = new LinkedHashMap<>();
-        byStatus.put(LeadStatus.NEW.name(), 2L);
+        byStatus.put("NEW", 2L);
         body.setLeadCountByStatus(byStatus);
         body.setJobsScheduledThisWeek(1);
         body.setUnscheduledJobsCount(2);

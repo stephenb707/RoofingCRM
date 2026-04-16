@@ -1,7 +1,6 @@
 package com.roofingcrm.api.v1.schedule;
 
 import com.roofingcrm.api.v1.job.JobDto;
-import com.roofingcrm.domain.enums.JobStatus;
 import com.roofingcrm.domain.enums.JobType;
 import com.roofingcrm.security.AuthenticatedUser;
 import com.roofingcrm.service.job.JobService;
@@ -64,7 +63,9 @@ class ScheduleControllerTest {
 
         JobDto dto = new JobDto();
         dto.setId(jobId);
-        dto.setStatus(JobStatus.SCHEDULED);
+        dto.setStatusDefinitionId(UUID.randomUUID());
+        dto.setStatusKey("SCHEDULED");
+        dto.setStatusLabel("Scheduled");
         dto.setType(JobType.REPLACEMENT);
         dto.setScheduledStartDate(LocalDate.of(2026, 1, 3));
         dto.setScheduledEndDate(LocalDate.of(2026, 1, 5));
@@ -89,7 +90,7 @@ class ScheduleControllerTest {
                 .andExpect(jsonPath("$.content").isArray())
                 .andExpect(jsonPath("$.content.length()", is(1)))
                 .andExpect(jsonPath("$.content[0].id", is(jobId.toString())))
-                .andExpect(jsonPath("$.content[0].status", is("SCHEDULED")))
+                .andExpect(jsonPath("$.content[0].statusKey", is("SCHEDULED")))
                 .andExpect(jsonPath("$.content[0].customerFirstName", is("Jane")));
     }
 

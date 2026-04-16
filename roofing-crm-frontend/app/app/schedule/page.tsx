@@ -31,11 +31,8 @@ import {
 import { useAuthReady } from "@/lib/AuthContext";
 import { listJobSchedule, updateJob } from "@/lib/jobsApi";
 import { getApiErrorMessage } from "@/lib/apiError";
-import {
-  JOB_STATUSES,
-  JOB_STATUS_LABELS,
-  JOB_TYPE_LABELS,
-} from "@/lib/jobsConstants";
+import { JOB_TYPE_LABELS } from "@/lib/jobsConstants";
+import { listPipelineStatuses } from "@/lib/pipelineStatusesApi";
 import { queryKeys } from "@/lib/queryKeys";
 import {
   formatDate,
@@ -44,7 +41,7 @@ import {
 } from "@/lib/format";
 import { DatePickerField } from "@/components/DatePickerField";
 import { computeScheduleUpdate, applyOptimisticSchedulingTagChange } from "@/lib/scheduleDnd";
-import type { JobDto, JobStatus } from "@/lib/types";
+import type { JobDto } from "@/lib/types";
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 const MAX_JOBS_VISIBLE_PER_DAY = 3;
@@ -83,7 +80,7 @@ export default function SchedulePage() {
   const focusJobId = searchParams.get("focusJob");
 
   const [viewMonth, setViewMonth] = useState(() => startOfMonth(new Date()));
-  const [statusFilter, setStatusFilter] = useState<JobStatus | "">("");
+  const [statusFilter, setStatusFilter] = useState<string>("");
   const [crewFilter, setCrewFilter] = useState("");
   const [includeUnscheduled, setIncludeUnscheduled] = useState(true);
 
@@ -112,13 +109,20 @@ export default function SchedulePage() {
     includeUnscheduled
   );
 
+  const pipelineStatusesKey = queryKeys.pipelineStatuses(auth.selectedTenantId, "JOB");
+  const { data: jobPipelineDefs = [] } = useQuery({
+    queryKey: pipelineStatusesKey,
+    queryFn: () => listPipelineStatuses(api, "JOB"),
+    enabled: ready && !!auth.selectedTenantId,
+  });
+
   const { data: jobs = [], isLoading, isError, error } = useQuery({
     queryKey: scheduleKey,
     queryFn: () =>
       listJobSchedule(api, {
         from: rangeFrom,
         to: rangeTo,
-        status: statusFilter || undefined,
+        statusDefinitionId: statusFilter || null,
         crewName: crewFilter || undefined,
         includeUnscheduled,
       }),
@@ -166,7 +170,7 @@ export default function SchedulePage() {
         if (!old) return old;
         return old.map((j) => {
           if (j.id !== variables.jobId) return j;
-          const updated = applyOptimisticSchedulingTagChange(j, scheduleUpdate);
+          const updated = applyOptimisticSchedulingTagChange(j, scheduleUpdate, jobPipelineDefs);
           if (variables.crewName !== undefined) {
             updated.crewName = variables.crewName ?? null;
           }
@@ -367,17 +371,17 @@ export default function SchedulePage() {
             <select
               id="schedule-status"
               value={statusFilter}
-              onChange={(e) =>
-                setStatusFilter(e.target.value as JobStatus | "")
-              }
+              onChange={(e) => setStatusFilter(e.target.value)}
               className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
             >
               <option value="">All</option>
-              {JOB_STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {JOB_STATUS_LABELS[s]}
-                </option>
-              ))}
+              {jobPipelineDefs
+                .filter((d) => d.active)
+                .map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.label}
+                  </option>
+                ))}
             </select>
           </div>
           <div>
@@ -901,7 +905,7 @@ function ScheduleCardCompactContent({ job }: { job: JobDto }) {
       <div className="flex items-center gap-1 flex-wrap text-[10px]">
         <span className="font-medium text-slate-500">{JOB_TYPE_LABELS[job.type]}</span>
         <span className="text-slate-400">·</span>
-        <span className="text-slate-500">{job.status}</span>
+        <span className="text-slate-500">{job.statusLabel}</span>
       </div>
       <p className="font-medium text-slate-800 truncate text-xs">
         {customerName}
@@ -962,7 +966,7 @@ function JobScheduleCard({
             <div className="flex items-center gap-1 flex-wrap text-xs">
               <span className="font-medium text-slate-500">{JOB_TYPE_LABELS[job.type]}</span>
               <span className="text-slate-400">·</span>
-              <span className="text-slate-500">{job.status}</span>
+              <span className="text-slate-500">{job.statusLabel}</span>
             </div>
             <p className={`font-medium text-slate-800 truncate ${titleCls}`}>
               {customerName}

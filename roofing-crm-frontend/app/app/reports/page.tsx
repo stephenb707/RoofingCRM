@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import Link from "next/link";
+import { useState, useCallback, useEffect, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useAuthReady } from "@/lib/AuthContext";
 import {
   downloadAccountingJobsExcel,
@@ -11,30 +13,23 @@ import {
   triggerBrowserDownload,
   LIMIT_OPTIONS,
 } from "@/lib/reportsApi";
-import {
-  LEAD_STATUSES,
-  STATUS_LABELS,
-  LEAD_SOURCES,
-  SOURCE_LABELS,
-} from "@/lib/leadsConstants";
-import {
-  JOB_STATUSES,
-  JOB_STATUS_LABELS,
-} from "@/lib/jobsConstants";
-import type { LeadStatus, LeadSource, JobStatus } from "@/lib/types";
+import { LEAD_SOURCES, SOURCE_LABELS } from "@/lib/leadsConstants";
+import { listPipelineStatuses } from "@/lib/pipelineStatusesApi";
+import { queryKeys } from "@/lib/queryKeys";
+import type { LeadSource } from "@/lib/types";
 
 export default function ReportsPage() {
-  const { api, ready } = useAuthReady();
+  const { api, auth, ready } = useAuthReady();
   const [leadsLoading, setLeadsLoading] = useState(false);
   const [jobsLoading, setJobsLoading] = useState(false);
   const [leadsError, setLeadsError] = useState<string | null>(null);
   const [jobsError, setJobsError] = useState<string | null>(null);
 
-  const [leadsStatus, setLeadsStatus] = useState<LeadStatus | "">("");
+  const [leadsStatusDefinitionId, setLeadsStatusDefinitionId] = useState<string>("");
   const [leadsSource, setLeadsSource] = useState<LeadSource | "">("");
   const [leadsLimit, setLeadsLimit] = useState(2000);
 
-  const [jobsStatus, setJobsStatus] = useState<JobStatus | "">("");
+  const [jobsStatusDefinitionId, setJobsStatusDefinitionId] = useState<string>("");
   const [jobsLimit, setJobsLimit] = useState(2000);
 
   const [invoiceYears, setInvoiceYears] = useState<number[] | null>(null);
@@ -47,13 +42,35 @@ export default function ReportsPage() {
   const [accountingXlsxLoading, setAccountingXlsxLoading] = useState(false);
   const [accountingXlsxError, setAccountingXlsxError] = useState<string | null>(null);
 
+  const { data: leadDefs = [] } = useQuery({
+    queryKey: queryKeys.pipelineStatuses(auth.selectedTenantId, "LEAD"),
+    queryFn: () => listPipelineStatuses(api, "LEAD"),
+    enabled: ready && !!auth.selectedTenantId,
+  });
+
+  const { data: jobDefs = [] } = useQuery({
+    queryKey: queryKeys.pipelineStatuses(auth.selectedTenantId, "JOB"),
+    queryFn: () => listPipelineStatuses(api, "JOB"),
+    enabled: ready && !!auth.selectedTenantId,
+  });
+
+  const sortedLeadDefs = useMemo(
+    () => [...leadDefs].filter((d) => d.active).sort((a, b) => a.sortOrder - b.sortOrder),
+    [leadDefs]
+  );
+
+  const sortedJobDefs = useMemo(
+    () => [...jobDefs].filter((d) => d.active).sort((a, b) => a.sortOrder - b.sortOrder),
+    [jobDefs]
+  );
+
   const handleDownloadLeads = useCallback(async () => {
     if (!ready) return;
     setLeadsError(null);
     setLeadsLoading(true);
     try {
       const { blob, filename } = await downloadLeadsCsv(api, {
-        status: leadsStatus || undefined,
+        statusDefinitionId: leadsStatusDefinitionId || undefined,
         source: leadsSource || undefined,
         limit: leadsLimit,
       });
@@ -63,7 +80,7 @@ export default function ReportsPage() {
     } finally {
       setLeadsLoading(false);
     }
-  }, [api, ready, leadsStatus, leadsSource, leadsLimit]);
+  }, [api, ready, leadsStatusDefinitionId, leadsSource, leadsLimit]);
 
   const handleDownloadJobs = useCallback(async () => {
     if (!ready) return;
@@ -71,7 +88,7 @@ export default function ReportsPage() {
     setJobsLoading(true);
     try {
       const { blob, filename } = await downloadJobsCsv(api, {
-        status: jobsStatus || undefined,
+        statusDefinitionId: jobsStatusDefinitionId || undefined,
         limit: jobsLimit,
       });
       triggerBrowserDownload(blob, filename);
@@ -80,7 +97,7 @@ export default function ReportsPage() {
     } finally {
       setJobsLoading(false);
     }
-  }, [api, ready, jobsStatus, jobsLimit]);
+  }, [api, ready, jobsStatusDefinitionId, jobsLimit]);
 
   useEffect(() => {
     if (!ready) return;
@@ -160,129 +177,39 @@ export default function ReportsPage() {
     <div className="max-w-4xl mx-auto">
       <h1 className="text-2xl font-bold text-slate-800 mb-6">Reports</h1>
 
-      {/* Leads Export */}
+      {/* Customer photo reports */}
       <div className="bg-white rounded-xl border border-slate-200 p-6 mb-6">
-        <h2 className="text-lg font-semibold text-slate-800 mb-4">
-          Pipeline / Leads Export
-        </h2>
-        <div className="flex flex-wrap items-end gap-4 mb-4">
-          <div>
-            <label htmlFor="leads-status" className="block text-sm font-medium text-slate-700 mb-1">
-              Status
-            </label>
-            <select
-              id="leads-status"
-              value={leadsStatus}
-              onChange={(e) => setLeadsStatus(e.target.value as LeadStatus | "")}
-              className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-            >
-              <option value="">All</option>
-              {LEAD_STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {STATUS_LABELS[s]}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label htmlFor="leads-source" className="block text-sm font-medium text-slate-700 mb-1">
-              Source
-            </label>
-            <select
-              id="leads-source"
-              value={leadsSource}
-              onChange={(e) => setLeadsSource(e.target.value as LeadSource | "")}
-              className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-            >
-              <option value="">All</option>
-              {LEAD_SOURCES.map((s) => (
-                <option key={s} value={s}>
-                  {SOURCE_LABELS[s]}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label htmlFor="leads-limit" className="block text-sm font-medium text-slate-700 mb-1">
-              Limit
-            </label>
-            <select
-              id="leads-limit"
-              value={leadsLimit}
-              onChange={(e) => setLeadsLimit(Number(e.target.value))}
-              className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-            >
-              {LIMIT_OPTIONS.map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
-            </select>
-          </div>
-          <button
-            onClick={handleDownloadLeads}
-            disabled={leadsLoading}
-            className="px-4 py-2 bg-sky-600 hover:bg-sky-700 disabled:bg-sky-400 text-white text-sm font-medium rounded-lg transition-colors"
-          >
-            {leadsLoading ? "Downloading…" : "Download Leads CSV"}
-          </button>
-        </div>
-        {leadsError && (
-          <p className="text-sm text-red-600">{leadsError}</p>
-        )}
+        <h2 className="text-lg font-semibold text-slate-800 mb-2">Customer photo reports</h2>
+        <p className="text-sm text-slate-600 mb-4">
+          Create customer-facing reports with photos and text, ideal for inspections, before and after
+          documentation, scope explanations, and recommendations. Build sections, pull in job or customer
+          photos, then download or email a polished PDF.
+        </p>
+        <Link
+          href="/app/reports/customer-reports"
+          className="inline-flex items-center px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+        >
+          Open photo reports
+        </Link>
       </div>
 
-      {/* Jobs Export */}
+      {/* Accounting / job profitability (Excel) */}
       <div className="bg-white rounded-xl border border-slate-200 p-6">
-        <h2 className="text-lg font-semibold text-slate-800 mb-4">
-          Jobs Export
-        </h2>
-        <div className="flex flex-wrap items-end gap-4 mb-4">
-          <div>
-            <label htmlFor="jobs-status" className="block text-sm font-medium text-slate-700 mb-1">
-              Status
-            </label>
-            <select
-              id="jobs-status"
-              value={jobsStatus}
-              onChange={(e) => setJobsStatus(e.target.value as JobStatus | "")}
-              className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-            >
-              <option value="">All</option>
-              {JOB_STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {JOB_STATUS_LABELS[s]}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label htmlFor="jobs-limit" className="block text-sm font-medium text-slate-700 mb-1">
-              Limit
-            </label>
-            <select
-              id="jobs-limit"
-              value={jobsLimit}
-              onChange={(e) => setJobsLimit(Number(e.target.value))}
-              className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-            >
-              {LIMIT_OPTIONS.map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
-            </select>
-          </div>
-          <button
-            onClick={handleDownloadJobs}
-            disabled={jobsLoading}
-            className="px-4 py-2 bg-sky-600 hover:bg-sky-700 disabled:bg-sky-400 text-white text-sm font-medium rounded-lg transition-colors"
-          >
-            {jobsLoading ? "Downloading…" : "Download Jobs CSV"}
-          </button>
-        </div>
-        {jobsError && (
-          <p className="text-sm text-red-600">{jobsError}</p>
+        <h2 className="text-lg font-semibold text-slate-800 mb-2">Accounting Report</h2>
+        <p className="text-sm text-slate-600 mb-4">
+          Export job-level accounting and profitability (agreed, invoiced, paid, costs, margins, and cost
+          categories) as an Excel file you can edit or import into Google Sheets.
+        </p>
+        <button
+          type="button"
+          onClick={handleDownloadAccountingExcel}
+          disabled={accountingXlsxLoading}
+          className="px-4 py-2 bg-sky-600 hover:bg-sky-700 disabled:bg-sky-400 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+        >
+          {accountingXlsxLoading ? "Downloading…" : "Download Excel"}
+        </button>
+        {accountingXlsxError && (
+          <p className="text-sm text-red-600 mt-3">{accountingXlsxError}</p>
         )}
       </div>
 
@@ -341,23 +268,129 @@ export default function ReportsPage() {
         )}
       </div>
 
-      {/* Accounting / job profitability (Excel) */}
+      {/* Jobs Export */}
       <div className="bg-white rounded-xl border border-slate-200 p-6 mt-6">
-        <h2 className="text-lg font-semibold text-slate-800 mb-2">Accounting Report</h2>
-        <p className="text-sm text-slate-600 mb-4">
-          Export job-level accounting and profitability (agreed, invoiced, paid, costs, margins, and cost
-          categories) as an Excel file you can edit or import into Google Sheets.
-        </p>
-        <button
-          type="button"
-          onClick={handleDownloadAccountingExcel}
-          disabled={accountingXlsxLoading}
-          className="px-4 py-2 bg-sky-600 hover:bg-sky-700 disabled:bg-sky-400 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
-        >
-          {accountingXlsxLoading ? "Downloading…" : "Download Excel"}
-        </button>
-        {accountingXlsxError && (
-          <p className="text-sm text-red-600 mt-3">{accountingXlsxError}</p>
+        <h2 className="text-lg font-semibold text-slate-800 mb-4">
+          Jobs Export
+        </h2>
+        <div className="flex flex-wrap items-end gap-4 mb-4">
+          <div>
+            <label htmlFor="jobs-status" className="block text-sm font-medium text-slate-700 mb-1">
+              Status
+            </label>
+            <select
+              id="jobs-status"
+              value={jobsStatusDefinitionId}
+              onChange={(e) => setJobsStatusDefinitionId(e.target.value)}
+              className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+            >
+              <option value="">All</option>
+              {sortedJobDefs.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="jobs-limit" className="block text-sm font-medium text-slate-700 mb-1">
+              Limit
+            </label>
+            <select
+              id="jobs-limit"
+              value={jobsLimit}
+              onChange={(e) => setJobsLimit(Number(e.target.value))}
+              className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+            >
+              {LIMIT_OPTIONS.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button
+            onClick={handleDownloadJobs}
+            disabled={jobsLoading}
+            className="px-4 py-2 bg-sky-600 hover:bg-sky-700 disabled:bg-sky-400 text-white text-sm font-medium rounded-lg transition-colors"
+          >
+            {jobsLoading ? "Downloading…" : "Download Jobs CSV"}
+          </button>
+        </div>
+        {jobsError && (
+          <p className="text-sm text-red-600">{jobsError}</p>
+        )}
+      </div>
+
+      {/* Leads Export */}
+      <div className="bg-white rounded-xl border border-slate-200 p-6 mt-6">
+        <h2 className="text-lg font-semibold text-slate-800 mb-4">
+          Pipeline / Leads Export
+        </h2>
+        <div className="flex flex-wrap items-end gap-4 mb-4">
+          <div>
+            <label htmlFor="leads-status" className="block text-sm font-medium text-slate-700 mb-1">
+              Status
+            </label>
+            <select
+              id="leads-status"
+              value={leadsStatusDefinitionId}
+              onChange={(e) => setLeadsStatusDefinitionId(e.target.value)}
+              className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+            >
+              <option value="">All</option>
+              {sortedLeadDefs.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="leads-source" className="block text-sm font-medium text-slate-700 mb-1">
+              Source
+            </label>
+            <select
+              id="leads-source"
+              value={leadsSource}
+              onChange={(e) => setLeadsSource(e.target.value as LeadSource | "")}
+              className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+            >
+              <option value="">All</option>
+              {LEAD_SOURCES.map((s) => (
+                <option key={s} value={s}>
+                  {SOURCE_LABELS[s]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="leads-limit" className="block text-sm font-medium text-slate-700 mb-1">
+              Limit
+            </label>
+            <select
+              id="leads-limit"
+              value={leadsLimit}
+              onChange={(e) => setLeadsLimit(Number(e.target.value))}
+              className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+            >
+              {LIMIT_OPTIONS.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button
+            onClick={handleDownloadLeads}
+            disabled={leadsLoading}
+            className="px-4 py-2 bg-sky-600 hover:bg-sky-700 disabled:bg-sky-400 text-white text-sm font-medium rounded-lg transition-colors"
+          >
+            {leadsLoading ? "Downloading…" : "Download Leads CSV"}
+          </button>
+        </div>
+        {leadsError && (
+          <p className="text-sm text-red-600">{leadsError}</p>
         )}
       </div>
     </div>

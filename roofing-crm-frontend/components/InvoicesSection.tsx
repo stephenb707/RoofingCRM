@@ -38,6 +38,16 @@ function getNextStatus(current: InvoiceStatus): InvoiceStatus | null {
   return null;
 }
 
+function handleRowKeyDown(
+  e: React.KeyboardEvent<HTMLTableRowElement>,
+  onNavigate: () => void
+) {
+  if (e.key === "Enter" || e.key === " ") {
+    e.preventDefault();
+    onNavigate();
+  }
+}
+
 export function InvoicesSection({
   jobId,
   createFromEstimateId,
@@ -166,10 +176,19 @@ export function InvoicesSection({
             </thead>
             <tbody className="divide-y divide-slate-200">
               {invoices.map((inv: InvoiceSummaryDto) => (
-                <tr key={inv.id} className="hover:bg-slate-50">
+                <tr
+                  key={inv.id}
+                  data-testid={`invoice-row-${inv.id}`}
+                  tabIndex={0}
+                  role="link"
+                  onClick={() => router.push(`/app/invoices/${inv.id}`)}
+                  onKeyDown={(e) => handleRowKeyDown(e, () => router.push(`/app/invoices/${inv.id}`))}
+                  className="cursor-pointer hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+                >
                   <td className="px-4 py-3 text-sm">
                     <Link
                       href={`/app/invoices/${inv.id}`}
+                      onClick={(e) => e.stopPropagation()}
                       className="font-medium text-sky-600 hover:text-sky-700"
                     >
                       {inv.invoiceNumber}
@@ -197,12 +216,13 @@ export function InvoicesSection({
                         {getNextStatus(inv.status) && (
                           <button
                             type="button"
-                            onClick={() =>
+                            onClick={(e) => {
+                              e.stopPropagation();
                               updateStatusMutation.mutate({
                                 invoiceId: inv.id,
                                 status: getNextStatus(inv.status)!,
-                              })
-                            }
+                              });
+                            }}
                             disabled={updateStatusMutation.isPending}
                             className="text-sm font-medium text-sky-600 hover:text-sky-700 disabled:opacity-60"
                           >
@@ -211,7 +231,10 @@ export function InvoicesSection({
                         )}
                         <button
                           type="button"
-                          onClick={() => updateStatusMutation.mutate({ invoiceId: inv.id, status: "VOID" })}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            updateStatusMutation.mutate({ invoiceId: inv.id, status: "VOID" });
+                          }}
                           disabled={updateStatusMutation.isPending}
                           className="text-sm font-medium text-red-600 hover:text-red-700 disabled:opacity-60"
                         >

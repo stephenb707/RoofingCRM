@@ -71,7 +71,10 @@ const customersPage: PageResponse<CustomerDto> = {
 const mockCreatedLead: LeadDto = {
   id: "new-lead-123",
   customerId: "customer-456",
-  status: "NEW",
+  statusDefinitionId: "def-new",
+  statusKey: "NEW",
+  statusLabel: "New",
+  pipelinePosition: 0,
   source: "WEBSITE",
   leadNotes: "Test notes",
   propertyAddress: {

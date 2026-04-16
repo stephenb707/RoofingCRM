@@ -4,7 +4,6 @@ import com.roofingcrm.api.GlobalExceptionHandler;
 import com.roofingcrm.config.CorsProperties;
 import com.roofingcrm.config.SecurityConfig;
 import com.roofingcrm.config.SecurityErrorHandlers;
-import com.roofingcrm.domain.enums.JobStatus;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
@@ -69,7 +68,8 @@ class JobScheduleSecurityIntegrationTest {
     void listSchedule_withValidJwt_returns200() throws Exception {
         var dto = new JobDto();
         dto.setId(UUID.randomUUID());
-        dto.setStatus(JobStatus.SCHEDULED);
+        dto.setStatusKey("SCHEDULED");
+        dto.setStatusLabel("Scheduled");
         dto.setType(JobType.REPLACEMENT);
         dto.setScheduledStartDate(LocalDate.of(2026, 1, 15));
         dto.setScheduledEndDate(LocalDate.of(2026, 1, 17));

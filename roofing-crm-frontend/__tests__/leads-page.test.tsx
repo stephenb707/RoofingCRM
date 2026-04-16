@@ -2,6 +2,7 @@ import React from "react";
 import { render, screen, waitFor, fireEvent } from "./test-utils";
 import LeadsPage from "@/app/app/leads/page";
 import * as leadsApi from "@/lib/leadsApi";
+import * as pipelineStatusesApi from "@/lib/pipelineStatusesApi";
 import { LeadDto, PageResponse } from "@/lib/types";
 
 const mockPush = jest.fn();
@@ -16,10 +17,47 @@ jest.mock("next/navigation", () => ({
 jest.mock("@/lib/leadsApi");
 const mockedLeadsApi = leadsApi as jest.Mocked<typeof leadsApi>;
 
+jest.mock("@/lib/pipelineStatusesApi");
+const mockedPipelineApi = pipelineStatusesApi as jest.Mocked<typeof pipelineStatusesApi>;
+
+jest.mock("@/lib/preferencesApi", () => ({
+  getAppPreferences: jest.fn().mockResolvedValue({
+    dashboard: { widgets: [] },
+    jobsList: { visibleFields: [] },
+    leadsList: { visibleFields: ["customer", "propertyAddress", "status", "source", "createdAt"] },
+    customersList: { visibleFields: [] },
+    tasksList: { visibleFields: [] },
+    estimatesList: { visibleFields: [] },
+    updatedAt: null,
+  }),
+}));
+
+const defNew = {
+  id: "def-new",
+  pipelineType: "LEAD" as const,
+  systemKey: "NEW",
+  label: "New",
+  sortOrder: 0,
+  builtIn: true,
+  active: true,
+};
+
+const defContacted = {
+  id: "def-contacted",
+  pipelineType: "LEAD" as const,
+  systemKey: "CONTACTED",
+  label: "Contacted",
+  sortOrder: 1,
+  builtIn: true,
+  active: true,
+};
+
 const mockLead: LeadDto = {
   id: "lead-123",
   customerId: "customer-456",
-  status: "NEW",
+  statusDefinitionId: defNew.id,
+  statusKey: "NEW",
+  statusLabel: "New",
   source: "WEBSITE",
   leadNotes: "Test notes",
   propertyAddress: {
@@ -28,6 +66,7 @@ const mockLead: LeadDto = {
     state: "CO",
     zip: "80202",
   },
+  pipelinePosition: 0,
   createdAt: "2024-01-15T10:00:00Z",
   updatedAt: "2024-01-15T10:00:00Z",
   customerFirstName: "John",
@@ -60,6 +99,7 @@ describe("LeadsPage", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockPush.mockClear();
+    mockedPipelineApi.listPipelineStatuses.mockResolvedValue([defNew, defContacted]);
   });
 
   it("renders loading state initially", async () => {
@@ -127,6 +167,10 @@ describe("LeadsPage", () => {
       "href",
       "/app/leads/new"
     );
+    expect(screen.getByRole("link", { name: /pipeline view/i })).toHaveAttribute(
+      "href",
+      "/app/leads/pipeline"
+    );
   });
 
   it("filters leads by status when selecting from dropdown", async () => {
@@ -143,12 +187,12 @@ describe("LeadsPage", () => {
 
     // Change the filter
     const statusSelect = screen.getByLabelText("Status:");
-    fireEvent.change(statusSelect, { target: { value: "CONTACTED" } });
+    fireEvent.change(statusSelect, { target: { value: defContacted.id } });
 
     await waitFor(() => {
       expect(mockedLeadsApi.listLeads).toHaveBeenCalledWith(
         expect.anything(),
-        expect.objectContaining({ status: "CONTACTED" })
+        expect.objectContaining({ statusDefinitionId: defContacted.id })
       );
     });
   });
@@ -164,7 +208,7 @@ describe("LeadsPage", () => {
 
     // Apply a filter
     const statusSelect = screen.getByLabelText("Status:");
-    fireEvent.change(statusSelect, { target: { value: "NEW" } });
+    fireEvent.change(statusSelect, { target: { value: defNew.id } });
 
     await waitFor(() => {
       expect(screen.getByText("Clear filters")).toBeInTheDocument();

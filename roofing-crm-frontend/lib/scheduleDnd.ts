@@ -1,6 +1,7 @@
 import { parseISO, format, addDays, differenceInCalendarDays } from "date-fns";
-import type { JobDto, JobStatus } from "./types";
+import type { JobDto } from "./types";
 import type { UpdateJobRequest } from "./types";
+import type { PipelineStatusDefinitionDto } from "./pipelineStatusesApi";
 
 export type ScheduleDropTarget =
   | { type: "unscheduled" }
@@ -35,23 +36,51 @@ export function computeScheduleUpdate(
   };
 }
 
+function findDef(
+  defs: PipelineStatusDefinitionDto[],
+  systemKey: string
+): PipelineStatusDefinitionDto | undefined {
+  return defs.find((d) => d.systemKey === systemKey);
+}
+
 /**
  * Apply optimistic scheduling tag/status change for a job.
- * Mirrors backend normalization: scheduled → SCHEDULED, unscheduled → UNSCHEDULED.
+ * Mirrors backend normalization: scheduled → SCHEDULED, unscheduled → UNSCHEDULED
+ * when the job was only in one of those scheduling buckets.
  */
 export function applyOptimisticSchedulingTagChange(
   job: JobDto,
-  scheduleUpdate: UpdateJobRequest
+  scheduleUpdate: UpdateJobRequest,
+  jobPipelineDefs: PipelineStatusDefinitionDto[]
 ): JobDto {
   const clearSchedule = scheduleUpdate.clearSchedule === true;
-  const shouldFlipSchedulingStatus =
-    job.status === "SCHEDULED" || job.status === "UNSCHEDULED";
-  const newStatus: JobStatus = shouldFlipSchedulingStatus
-    ? (clearSchedule ? "UNSCHEDULED" : "SCHEDULED")
-    : job.status;
+  const scheduledDef = findDef(jobPipelineDefs, "SCHEDULED");
+  const unscheduledDef = findDef(jobPipelineDefs, "UNSCHEDULED");
+
+  const wasSchedulingOnly =
+    job.statusKey === "SCHEDULED" || job.statusKey === "UNSCHEDULED";
+
+  let nextDefId = job.statusDefinitionId;
+  let nextKey = job.statusKey;
+  let nextLabel = job.statusLabel;
+
+  if (wasSchedulingOnly && scheduledDef && unscheduledDef) {
+    if (clearSchedule) {
+      nextDefId = unscheduledDef.id;
+      nextKey = unscheduledDef.systemKey;
+      nextLabel = unscheduledDef.label;
+    } else {
+      nextDefId = scheduledDef.id;
+      nextKey = scheduledDef.systemKey;
+      nextLabel = scheduledDef.label;
+    }
+  }
+
   return {
     ...job,
-    status: newStatus,
+    statusDefinitionId: nextDefId,
+    statusKey: nextKey,
+    statusLabel: nextLabel,
     scheduledStartDate: clearSchedule ? null : scheduleUpdate.scheduledStartDate ?? null,
     scheduledEndDate: clearSchedule ? null : scheduleUpdate.scheduledEndDate ?? null,
   };

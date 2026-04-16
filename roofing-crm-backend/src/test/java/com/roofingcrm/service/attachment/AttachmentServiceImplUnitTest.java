@@ -9,6 +9,7 @@ import com.roofingcrm.domain.enums.AttachmentTag;
 import com.roofingcrm.domain.enums.ActivityEntityType;
 import com.roofingcrm.domain.enums.ActivityEventType;
 import com.roofingcrm.domain.repository.AttachmentRepository;
+import com.roofingcrm.domain.repository.CustomerPhotoReportSectionPhotoRepository;
 import com.roofingcrm.domain.repository.JobRepository;
 import com.roofingcrm.domain.repository.LeadRepository;
 import com.roofingcrm.service.activity.ActivityEventService;
@@ -39,6 +40,8 @@ class AttachmentServiceImplUnitTest {
     @Mock
     private AttachmentRepository attachmentRepository;
     @Mock
+    private CustomerPhotoReportSectionPhotoRepository reportSectionPhotoRepository;
+    @Mock
     private LeadRepository leadRepository;
     @Mock
     private JobRepository jobRepository;
@@ -60,7 +63,7 @@ class AttachmentServiceImplUnitTest {
     @BeforeEach
     void setUp() {
         service = new AttachmentServiceImpl(
-                tenantAccessService, attachmentRepository, leadRepository, jobRepository,
+                tenantAccessService, attachmentRepository, reportSectionPhotoRepository, leadRepository, jobRepository,
                 storageService, activityEventService);
 
         tenant = new Tenant();
@@ -154,5 +157,42 @@ class AttachmentServiceImplUnitTest {
 
         verify(activityEventService).recordEvent(eq(tenant), eq(userId), eq(ActivityEntityType.JOB), eq(jobId),
                 eq(ActivityEventType.ATTACHMENT_ADDED), contains("Added "), any(Map.class));
+    }
+
+    @Test
+    void deleteAttachment_archivesWhenNotUsedByReport() {
+        UUID attachmentId = UUID.randomUUID();
+        Attachment attachment = new Attachment();
+        attachment.setId(attachmentId);
+        attachment.setTenant(tenant);
+
+        when(tenantAccessService.loadTenantForUserOrThrow(tenantId, userId)).thenReturn(tenant);
+        when(attachmentRepository.findByIdAndTenantAndArchivedFalse(attachmentId, tenant)).thenReturn(Optional.of(attachment));
+        when(reportSectionPhotoRepository.existsActiveReportReference(attachmentId)).thenReturn(false);
+
+        service.deleteAttachment(tenantId, userId, attachmentId);
+
+        assertTrue(attachment.isArchived());
+        assertNotNull(attachment.getArchivedAt());
+        assertEquals(userId, attachment.getUpdatedByUserId());
+        verify(attachmentRepository).save(attachment);
+    }
+
+    @Test
+    void deleteAttachment_rejectsWhenUsedByCustomerPhotoReport() {
+        UUID attachmentId = UUID.randomUUID();
+        Attachment attachment = new Attachment();
+        attachment.setId(attachmentId);
+        attachment.setTenant(tenant);
+
+        when(tenantAccessService.loadTenantForUserOrThrow(tenantId, userId)).thenReturn(tenant);
+        when(attachmentRepository.findByIdAndTenantAndArchivedFalse(attachmentId, tenant)).thenReturn(Optional.of(attachment));
+        when(reportSectionPhotoRepository.existsActiveReportReference(attachmentId)).thenReturn(true);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> service.deleteAttachment(tenantId, userId, attachmentId));
+
+        assertTrue(ex.getMessage().contains("customer photo report"));
+        verify(attachmentRepository, never()).save(any());
     }
 }

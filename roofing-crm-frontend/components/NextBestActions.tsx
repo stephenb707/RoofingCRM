@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import type { EstimateStatus, JobStatus, LeadStatus } from "@/lib/types";
+import type { EstimateStatus } from "@/lib/types";
 
 type EntityType = "lead" | "job" | "estimate";
 
@@ -42,17 +42,17 @@ type ButtonAction = {
 type NextAction = LinkAction | ButtonAction;
 
 function leadActions(
-  status: LeadStatus,
+  statusKey: string,
   leadId: string,
   convertedJobId: string | null | undefined,
   customerId: string | null | undefined
 ): LinkAction[] {
-  const canConvert = status !== "LOST" && !convertedJobId;
+  const canConvert = statusKey !== "LOST" && !convertedJobId;
   const callCustomerHref =
     customerId != null && customerId !== ""
       ? `/app/customers/${customerId}`
       : `/app/leads/${leadId}`;
-  if (status === "NEW") {
+  if (statusKey === "NEW") {
     const secondary: LinkAction[] = [
       { kind: "link", label: "Call customer", href: callCustomerHref },
       { kind: "link", label: "Schedule inspection", href: `/app/tasks/new?leadId=${leadId}` },
@@ -132,9 +132,9 @@ function estimateActions(
   ];
 }
 
-function jobActions(status: JobStatus, jobId: string): LinkAction[] {
+function jobActions(statusKey: string, jobId: string): LinkAction[] {
   const taskNew = `/app/tasks/new?jobId=${encodeURIComponent(jobId)}`;
-  if (status === "UNSCHEDULED") {
+  if (statusKey === "UNSCHEDULED") {
     return [
       {
         kind: "link",
@@ -146,7 +146,7 @@ function jobActions(status: JobStatus, jobId: string): LinkAction[] {
       { kind: "link", label: "Create task", href: taskNew },
     ];
   }
-  if (status === "SCHEDULED") {
+  if (statusKey === "SCHEDULED") {
     return [
       { kind: "link", label: "Create task", href: taskNew, primary: true },
       { kind: "link", label: "Assign crew", href: `/app/jobs/${jobId}/edit` },
@@ -172,9 +172,9 @@ export function NextBestActions({
   let actions: NextAction[] = [];
 
   if (entityType === "lead" && leadId) {
-    actions = leadActions(status as LeadStatus, leadId, leadConvertedJobId, customerId);
+    actions = leadActions(status, leadId, leadConvertedJobId, customerId);
   } else if (entityType === "job" && jobId) {
-    actions = jobActions(status as JobStatus, jobId);
+    actions = jobActions(status, jobId);
   } else if (entityType === "estimate" && estimateId && jobId) {
     actions = estimateActions(
       status as EstimateStatus,
