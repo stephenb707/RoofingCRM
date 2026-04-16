@@ -30,7 +30,7 @@ export default function CustomerPhotoReportsListPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Customer photo reports</h1>
           <p className="text-sm text-slate-500 mt-1">
-            Customer-facing reports with photos and narrative — export to PDF when ready.
+            Customer-facing reports, download or email to a customer when ready.
           </p>
         </div>
         <Link

@@ -60,7 +60,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
           <div>
             <div className="font-semibold text-slate-800 text-sm">
-              Viva Roofing CRM
+              Viva CRM
             </div>
             {currentTenant && (
               <div className="text-xs text-slate-500">

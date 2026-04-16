@@ -177,8 +177,153 @@ export default function ReportsPage() {
     <div className="max-w-4xl mx-auto">
       <h1 className="text-2xl font-bold text-slate-800 mb-6">Reports</h1>
 
-      {/* Leads Export */}
+      {/* Customer photo reports */}
       <div className="bg-white rounded-xl border border-slate-200 p-6 mb-6">
+        <h2 className="text-lg font-semibold text-slate-800 mb-2">Customer photo reports</h2>
+        <p className="text-sm text-slate-600 mb-4">
+          Create customer-facing reports with photos and text, ideal for inspections, before and after
+          documentation, scope explanations, and recommendations. Build sections, pull in job or customer
+          photos, then download or email a polished PDF.
+        </p>
+        <Link
+          href="/app/reports/customer-reports"
+          className="inline-flex items-center px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+        >
+          Open photo reports
+        </Link>
+      </div>
+
+      {/* Accounting / job profitability (Excel) */}
+      <div className="bg-white rounded-xl border border-slate-200 p-6">
+        <h2 className="text-lg font-semibold text-slate-800 mb-2">Accounting Report</h2>
+        <p className="text-sm text-slate-600 mb-4">
+          Export job-level accounting and profitability (agreed, invoiced, paid, costs, margins, and cost
+          categories) as an Excel file you can edit or import into Google Sheets.
+        </p>
+        <button
+          type="button"
+          onClick={handleDownloadAccountingExcel}
+          disabled={accountingXlsxLoading}
+          className="px-4 py-2 bg-sky-600 hover:bg-sky-700 disabled:bg-sky-400 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+        >
+          {accountingXlsxLoading ? "Downloading…" : "Download Excel"}
+        </button>
+        {accountingXlsxError && (
+          <p className="text-sm text-red-600 mt-3">{accountingXlsxError}</p>
+        )}
+      </div>
+
+      {/* Paid Invoices Annual PDF */}
+      <div className="bg-white rounded-xl border border-slate-200 p-6 mt-6">
+        <h2 className="text-lg font-semibold text-slate-800 mb-4">
+          Paid Invoices Annual Report
+        </h2>
+        {invoiceYearLoading || invoiceYears === null ? (
+          <p className="text-sm text-slate-500">Loading available years…</p>
+        ) : invoiceYears.length === 0 ? (
+          <div className="space-y-3">
+            <p className="text-sm text-slate-500">No paid invoices available yet.</p>
+            <button
+              type="button"
+              disabled
+              className="px-4 py-2 bg-sky-400 text-white text-sm font-medium rounded-lg shadow-sm"
+            >
+              Download PDF
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-end gap-4">
+            <div>
+              <label htmlFor="paid-invoices-year" className="block text-sm font-medium text-slate-700 mb-1">
+                Year
+              </label>
+              <select
+                id="paid-invoices-year"
+                value={selectedInvoiceYear ?? ""}
+                onChange={(e) => setSelectedInvoiceYear(Number(e.target.value))}
+                className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+              >
+                {invoiceYears.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              type="button"
+              onClick={handleDownloadPaidInvoicesPdf}
+              disabled={invoicePdfLoading || selectedInvoiceYear == null}
+              className="px-4 py-2 bg-sky-600 hover:bg-sky-700 disabled:bg-sky-400 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+            >
+              {invoicePdfLoading ? "Downloading…" : "Download PDF"}
+            </button>
+          </div>
+        )}
+        {invoiceYearError && (
+          <p className="text-sm text-red-600 mt-3">{invoiceYearError}</p>
+        )}
+        {invoicePdfError && (
+          <p className="text-sm text-red-600 mt-3">{invoicePdfError}</p>
+        )}
+      </div>
+
+      {/* Jobs Export */}
+      <div className="bg-white rounded-xl border border-slate-200 p-6 mt-6">
+        <h2 className="text-lg font-semibold text-slate-800 mb-4">
+          Jobs Export
+        </h2>
+        <div className="flex flex-wrap items-end gap-4 mb-4">
+          <div>
+            <label htmlFor="jobs-status" className="block text-sm font-medium text-slate-700 mb-1">
+              Status
+            </label>
+            <select
+              id="jobs-status"
+              value={jobsStatusDefinitionId}
+              onChange={(e) => setJobsStatusDefinitionId(e.target.value)}
+              className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+            >
+              <option value="">All</option>
+              {sortedJobDefs.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="jobs-limit" className="block text-sm font-medium text-slate-700 mb-1">
+              Limit
+            </label>
+            <select
+              id="jobs-limit"
+              value={jobsLimit}
+              onChange={(e) => setJobsLimit(Number(e.target.value))}
+              className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+            >
+              {LIMIT_OPTIONS.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button
+            onClick={handleDownloadJobs}
+            disabled={jobsLoading}
+            className="px-4 py-2 bg-sky-600 hover:bg-sky-700 disabled:bg-sky-400 text-white text-sm font-medium rounded-lg transition-colors"
+          >
+            {jobsLoading ? "Downloading…" : "Download Jobs CSV"}
+          </button>
+        </div>
+        {jobsError && (
+          <p className="text-sm text-red-600">{jobsError}</p>
+        )}
+      </div>
+
+      {/* Leads Export */}
+      <div className="bg-white rounded-xl border border-slate-200 p-6 mt-6">
         <h2 className="text-lg font-semibold text-slate-800 mb-4">
           Pipeline / Leads Export
         </h2>
@@ -247,151 +392,6 @@ export default function ReportsPage() {
         {leadsError && (
           <p className="text-sm text-red-600">{leadsError}</p>
         )}
-      </div>
-
-      {/* Jobs Export */}
-      <div className="bg-white rounded-xl border border-slate-200 p-6">
-        <h2 className="text-lg font-semibold text-slate-800 mb-4">
-          Jobs Export
-        </h2>
-        <div className="flex flex-wrap items-end gap-4 mb-4">
-          <div>
-            <label htmlFor="jobs-status" className="block text-sm font-medium text-slate-700 mb-1">
-              Status
-            </label>
-            <select
-              id="jobs-status"
-              value={jobsStatusDefinitionId}
-              onChange={(e) => setJobsStatusDefinitionId(e.target.value)}
-              className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-            >
-              <option value="">All</option>
-              {sortedJobDefs.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label htmlFor="jobs-limit" className="block text-sm font-medium text-slate-700 mb-1">
-              Limit
-            </label>
-            <select
-              id="jobs-limit"
-              value={jobsLimit}
-              onChange={(e) => setJobsLimit(Number(e.target.value))}
-              className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-            >
-              {LIMIT_OPTIONS.map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
-            </select>
-          </div>
-          <button
-            onClick={handleDownloadJobs}
-            disabled={jobsLoading}
-            className="px-4 py-2 bg-sky-600 hover:bg-sky-700 disabled:bg-sky-400 text-white text-sm font-medium rounded-lg transition-colors"
-          >
-            {jobsLoading ? "Downloading…" : "Download Jobs CSV"}
-          </button>
-        </div>
-        {jobsError && (
-          <p className="text-sm text-red-600">{jobsError}</p>
-        )}
-      </div>
-
-      {/* Paid Invoices Annual PDF */}
-      <div className="bg-white rounded-xl border border-slate-200 p-6 mt-6">
-        <h2 className="text-lg font-semibold text-slate-800 mb-4">
-          Paid Invoices Annual Report
-        </h2>
-        {invoiceYearLoading || invoiceYears === null ? (
-          <p className="text-sm text-slate-500">Loading available years…</p>
-        ) : invoiceYears.length === 0 ? (
-          <div className="space-y-3">
-            <p className="text-sm text-slate-500">No paid invoices available yet.</p>
-            <button
-              type="button"
-              disabled
-              className="px-4 py-2 bg-sky-400 text-white text-sm font-medium rounded-lg shadow-sm"
-            >
-              Download PDF
-            </button>
-          </div>
-        ) : (
-          <div className="flex flex-wrap items-end gap-4">
-            <div>
-              <label htmlFor="paid-invoices-year" className="block text-sm font-medium text-slate-700 mb-1">
-                Year
-              </label>
-              <select
-                id="paid-invoices-year"
-                value={selectedInvoiceYear ?? ""}
-                onChange={(e) => setSelectedInvoiceYear(Number(e.target.value))}
-                className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-              >
-                {invoiceYears.map((year) => (
-                  <option key={year} value={year}>
-                    {year}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <button
-              type="button"
-              onClick={handleDownloadPaidInvoicesPdf}
-              disabled={invoicePdfLoading || selectedInvoiceYear == null}
-              className="px-4 py-2 bg-sky-600 hover:bg-sky-700 disabled:bg-sky-400 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
-            >
-              {invoicePdfLoading ? "Downloading…" : "Download PDF"}
-            </button>
-          </div>
-        )}
-        {invoiceYearError && (
-          <p className="text-sm text-red-600 mt-3">{invoiceYearError}</p>
-        )}
-        {invoicePdfError && (
-          <p className="text-sm text-red-600 mt-3">{invoicePdfError}</p>
-        )}
-      </div>
-
-      {/* Accounting / job profitability (Excel) */}
-      <div className="bg-white rounded-xl border border-slate-200 p-6 mt-6">
-        <h2 className="text-lg font-semibold text-slate-800 mb-2">Accounting Report</h2>
-        <p className="text-sm text-slate-600 mb-4">
-          Export job-level accounting and profitability (agreed, invoiced, paid, costs, margins, and cost
-          categories) as an Excel file you can edit or import into Google Sheets.
-        </p>
-        <button
-          type="button"
-          onClick={handleDownloadAccountingExcel}
-          disabled={accountingXlsxLoading}
-          className="px-4 py-2 bg-sky-600 hover:bg-sky-700 disabled:bg-sky-400 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
-        >
-          {accountingXlsxLoading ? "Downloading…" : "Download Excel"}
-        </button>
-        {accountingXlsxError && (
-          <p className="text-sm text-red-600 mt-3">{accountingXlsxError}</p>
-        )}
-      </div>
-
-      {/* Customer photo reports */}
-      <div className="bg-white rounded-xl border border-slate-200 p-6 mt-6">
-        <h2 className="text-lg font-semibold text-slate-800 mb-2">Customer photo reports</h2>
-        <p className="text-sm text-slate-600 mb-4">
-          Create customer-facing reports with photos and text — ideal for inspections, before/after
-          documentation, scope explanations, and recommendations. Build sections, pull in job or customer
-          photos, then download a polished PDF.
-        </p>
-        <Link
-          href="/app/reports/customer-reports"
-          className="inline-flex items-center px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
-        >
-          Open photo reports
-        </Link>
       </div>
     </div>
   );

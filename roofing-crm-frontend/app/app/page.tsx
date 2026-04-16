@@ -372,7 +372,7 @@ export default function DashboardPage() {
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-slate-800">Dashboard</h1>
         <p className="text-sm text-slate-500 mt-1 max-w-2xl">
-          Your roofing business at a glance—pipeline health, what&apos;s on the calendar, and the
+          Your roofing business at a glance, including pipeline health, what&apos;s on the calendar, and the
           next things worth doing.
         </p>
       </div>

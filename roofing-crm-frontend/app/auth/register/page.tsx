@@ -92,7 +92,7 @@ export default function RegisterPage() {
           <p className="text-sm text-slate-500 mt-1">
             {inviteMode
               ? "Create your account to join the invited team"
-              : "Set up Viva Roofing CRM for your roofing business"}
+              : "Set up Viva CRM for your roofing business"}
           </p>
         </div>
 

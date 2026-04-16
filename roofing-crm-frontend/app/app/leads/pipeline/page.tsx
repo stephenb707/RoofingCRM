@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -43,10 +43,36 @@ function sortActiveLeadColumns(defs: PipelineStatusDefinitionDto[]): PipelineSta
   return [...defs].filter((d) => d.active).sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
+function leadMatchesSearch(lead: LeadDto, q: string): boolean {
+  if (!q.trim()) return true;
+  const needle = q.trim().toLowerCase();
+  const phoneDigits = lead.customerPhone?.replace(/\D/g, "") ?? "";
+  const sourceLabel =
+    lead.source != null ? (SOURCE_LABELS[lead.source] ?? String(lead.source)) : "";
+  const parts = [
+    customerName(lead),
+    formatAddress(lead.propertyAddress),
+    lead.customerPhone ?? "",
+    phoneDigits,
+    lead.customerEmail ?? "",
+    lead.statusLabel ?? "",
+    sourceLabel,
+    lead.leadNotes?.trim() ?? "",
+  ];
+  return parts.some((p) => p.toLowerCase().includes(needle));
+}
+
 export default function LeadsPipelinePage() {
   const { api, auth, ready } = useAuthReady();
   const queryClient = useQueryClient();
   const [activeLead, setActiveLead] = useState<LeadDto | null>(null);
+  const [searchInput, setSearchInput] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchInput), 300);
+    return () => clearTimeout(t);
+  }, [searchInput]);
 
   const canEditPipeline =
     auth.tenants.find((t) => t.tenantId === auth.selectedTenantId)?.role === "OWNER" ||
@@ -142,7 +168,8 @@ export default function LeadsPipelinePage() {
     },
   });
 
-  const leadsByDefinitionId = useMemo(() => {
+  /** Full columns for drag/drop index math (must not use filtered-only lists). */
+  const fullLeadsByDefinitionId = useMemo(() => {
     const leads = data?.content ?? [];
     const byId = new Map<string, LeadDto[]>();
     for (const d of columnDefs) {
@@ -159,6 +186,28 @@ export default function LeadsPipelinePage() {
     }
     return byId;
   }, [data?.content, columnDefs]);
+
+  const filteredContent = useMemo(() => {
+    const leads = data?.content ?? [];
+    return leads.filter((l) => leadMatchesSearch(l, debouncedSearch));
+  }, [data?.content, debouncedSearch]);
+
+  const leadsByDefinitionId = useMemo(() => {
+    const byId = new Map<string, LeadDto[]>();
+    for (const d of columnDefs) {
+      byId.set(d.id, []);
+    }
+    for (const lead of filteredContent) {
+      const list = byId.get(lead.statusDefinitionId) ?? [];
+      list.push(lead);
+      byId.set(lead.statusDefinitionId, list);
+    }
+    for (const d of columnDefs) {
+      const list = byId.get(d.id) ?? [];
+      byId.set(d.id, sortLeadsByPosition(list));
+    }
+    return byId;
+  }, [filteredContent, columnDefs]);
 
   const handleStatusChange = (leadId: string, statusDefinitionId: string, position?: number) => {
     updateStatusMutation.mutate({ leadId, statusDefinitionId, position });
@@ -185,7 +234,7 @@ export default function LeadsPipelinePage() {
     const colIds = new Set(columnDefs.map((c) => c.id));
     if (colIds.has(overId)) {
       newDefId = overId;
-      const targetCol = leadsByDefinitionId.get(newDefId) ?? [];
+      const targetCol = fullLeadsByDefinitionId.get(newDefId) ?? [];
       newIndex =
         lead.statusDefinitionId === newDefId
           ? Math.max(0, targetCol.findIndex((l) => l.id === leadId))
@@ -195,7 +244,7 @@ export default function LeadsPipelinePage() {
       const overLead = (data?.content ?? []).find((l) => l.id === overLeadId);
       if (!overLead) return;
       newDefId = overLead.statusDefinitionId;
-      const targetCol = leadsByDefinitionId.get(newDefId) ?? [];
+      const targetCol = fullLeadsByDefinitionId.get(newDefId) ?? [];
       const overIdx = targetCol.findIndex((l) => l.id === overLeadId);
       newIndex = overIdx >= 0 ? overIdx : targetCol.length;
     } else {
@@ -203,7 +252,7 @@ export default function LeadsPipelinePage() {
     }
 
     if (lead.statusDefinitionId === newDefId) {
-      const currentCol = leadsByDefinitionId.get(lead.statusDefinitionId) ?? [];
+      const currentCol = fullLeadsByDefinitionId.get(lead.statusDefinitionId) ?? [];
       const fromIdx = currentCol.findIndex((l) => l.id === leadId);
       if (fromIdx === newIndex) return;
     }
@@ -246,7 +295,7 @@ export default function LeadsPipelinePage() {
 
   return (
     <div className="max-w-7xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between mb-6">
         <div>
           <Link
             href="/app/leads"
@@ -272,16 +321,24 @@ export default function LeadsPipelinePage() {
             .
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3">
+          <input
+            type="search"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Search customer, address…"
+            className="border border-slate-300 rounded-lg px-3 py-2 text-sm w-full sm:w-64 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+            aria-label="Search leads in pipeline"
+          />
           <Link
             href="/app/leads"
-            className="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+            className="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors text-center"
           >
             Back to Leads
           </Link>
           <Link
             href="/app/leads/new"
-            className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-sm font-medium rounded-lg transition-colors"
+            className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-sm font-medium rounded-lg transition-colors text-center"
           >
             + New Lead
           </Link>
@@ -344,6 +401,9 @@ function PipelineColumn({
         <p className="text-xs text-slate-600 mt-0.5">{leads.length} leads</p>
       </div>
       <div className="max-h-[calc(100vh-280px)] overflow-y-auto p-2 space-y-2">
+        {leads.length === 0 && (
+          <p className="text-xs text-slate-400 text-center py-6 px-2">No leads in this stage</p>
+        )}
         {leads.map((lead) => (
           <PipelineLeadCard key={lead.id} lead={lead} canEdit={canEdit} />
         ))}

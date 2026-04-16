@@ -61,6 +61,15 @@ describe("ReportsPage", () => {
       expect(screen.getByText("Reports")).toBeInTheDocument();
     });
 
+    const headings = screen.getAllByRole("heading", { level: 2 });
+    expect(headings.map((h) => h.textContent)).toEqual([
+      "Customer photo reports",
+      "Accounting Report",
+      "Paid Invoices Annual Report",
+      "Jobs Export",
+      "Pipeline / Leads Export",
+    ]);
+
     expect(screen.getByText("Pipeline / Leads Export")).toBeInTheDocument();
     expect(screen.getByText("Jobs Export")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Download Leads CSV/i })).toBeInTheDocument();
@@ -114,8 +123,8 @@ describe("ReportsPage", () => {
       expect(screen.getByText("Jobs Export")).toBeInTheDocument();
     });
 
-    const statusComboboxes = screen.getAllByRole("combobox", { name: /status/i });
-    const jobsStatusSelect = statusComboboxes[1];
+    const jobsStatusSelect = document.getElementById("jobs-status");
+    if (!jobsStatusSelect) throw new Error("jobs-status not found");
     fireEvent.change(jobsStatusSelect, { target: { value: "job-completed" } });
 
     const downloadBtn = screen.getByRole("button", { name: /Download Jobs CSV/i });
