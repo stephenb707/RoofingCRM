@@ -7,6 +7,22 @@ export { LIMIT_OPTIONS };
 
 export function parseFilenameFromContentDisposition(header?: string): string | null {
   if (!header) return null;
+
+  const star = header.match(/filename\*\s*=\s*UTF-8''([^;\s]+)/i);
+  if (star) {
+    try {
+      const decoded = decodeURIComponent(star[1].replace(/^"+|"+$/g, ""));
+      if (decoded) return decoded;
+    } catch {
+      /* fall through */
+    }
+  }
+
+  const rfc2047 = header.match(/filename\s*=\s*"\s*=\?UTF-8\?Q\?([^?]+)\?\="/i);
+  if (rfc2047?.[1]) {
+    return rfc2047[1].replace(/_/g, " ");
+  }
+
   const match = header.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
   if (!match) return null;
   let filename = match[1].replace(/['"]/g, "");
@@ -14,6 +30,25 @@ export function parseFilenameFromContentDisposition(header?: string): string | n
     filename = decodeURIComponent(filename.slice(7));
   }
   return filename || null;
+}
+
+/** Client-side fallback for PDF download names; mirrors backend sanitizer loosely. */
+export function simplePdfFilenameFromTitle(title?: string | null): string {
+  const defaultName = "Customer Report.pdf";
+  if (!title) return defaultName;
+  let t = title.replace(/\u00a0/g, " ").trim();
+  if (!t) return defaultName;
+  const lower = t.toLowerCase();
+  if (lower.endsWith(".pdf")) t = t.slice(0, -4).trim();
+  if (!t) return defaultName;
+  t = t
+    .replace(/\s+/g, " ")
+    .replace(/[<>:"/\\|?*\u0000-\u001f]/g, "-")
+    .replace(/"/g, "");
+  t = t.replace(/-+/g, "-").replace(/[. ]+$/g, "");
+  if (!t) return defaultName;
+  const stem = t.length > 180 ? t.slice(0, 180).trim().replace(/[. ]+$/g, "") : t;
+  return `${stem || "Customer Report"}.pdf`;
 }
 
 export function triggerBrowserDownload(blob: Blob, filename: string): void {

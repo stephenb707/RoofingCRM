@@ -11,14 +11,18 @@ import com.roofingcrm.domain.value.Address;
 import com.roofingcrm.storage.AttachmentStorageService;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 
 import javax.imageio.ImageIO;
+import java.awt.Graphics2D;
 import java.awt.Color;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
+import java.util.Objects;
 import java.util.TimeZone;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -86,6 +90,107 @@ class CustomerPhotoReportPdfGeneratorTest {
         }
     }
 
+    @Test
+    void generate_embedsGifRasterWhenImageIoHasGifWriter() throws Exception {
+        TimeZone previous = TimeZone.getDefault();
+        TimeZone.setDefault(TimeZone.getTimeZone("America/Denver"));
+        try {
+            byte[] gif = tryWriteRasterAsFormat("gif", 72, 72, Color.RED);
+            Assumptions.assumeTrue(gif != null && gif.length > 0);
+            AttachmentStorageService storageService = mock(AttachmentStorageService.class);
+            CustomerPhotoReportPdfGenerator generator = new CustomerPhotoReportPdfGenerator(storageService);
+            CustomerPhotoReport report =
+                    buildReportWithImage(storageService, "diagram.gif", "report/diagram.gif", gif);
+            Objects.requireNonNull(report.getSections().getFirst().getPhotos().getFirst().getAttachment())
+                    .setContentType("image/gif");
+
+            byte[] pdf = generator.generate(report, tenant());
+
+            assertSinglePageHealthyPdf(pdf);
+        } finally {
+            TimeZone.setDefault(previous);
+        }
+    }
+
+    @Test
+    void generate_embedsBmpRasterWithoutCrashing() throws Exception {
+        TimeZone previous = TimeZone.getDefault();
+        TimeZone.setDefault(TimeZone.getTimeZone("America/Denver"));
+        try {
+            byte[] bmp = tryWriteRasterAsFormat("bmp", 96, 64, Color.MAGENTA);
+            AttachmentStorageService storageService = mock(AttachmentStorageService.class);
+            CustomerPhotoReportPdfGenerator generator = new CustomerPhotoReportPdfGenerator(storageService);
+            CustomerPhotoReport report =
+                    buildReportWithImage(storageService, "diagram.bmp", "report/diagram.bmp",
+                            Objects.requireNonNull(bmp));
+            Objects.requireNonNull(report.getSections().getFirst().getPhotos().getFirst().getAttachment())
+                    .setContentType("image/bmp");
+
+            byte[] pdf = generator.generate(report, tenant());
+
+            assertSinglePageHealthyPdf(pdf);
+        } finally {
+            TimeZone.setDefault(previous);
+        }
+    }
+
+    @Test
+    void generate_allowsMultipleShortSectionsOnOnePageWhenRoomPermits() throws Exception {
+        AttachmentStorageService storageService = mock(AttachmentStorageService.class);
+        CustomerPhotoReportPdfGenerator generator = new CustomerPhotoReportPdfGenerator(storageService);
+
+        Customer customer = new Customer();
+        Job job = new Job();
+        job.setCustomer(customer);
+        CustomerPhotoReport report = new CustomerPhotoReport();
+        report.setCustomer(customer);
+        report.setJob(job);
+        report.setTitle("Photo report");
+        report.setSummary(null);
+
+        for (int i = 0; i < 3; i++) {
+            CustomerPhotoReportSection s = new CustomerPhotoReportSection();
+            s.setSortOrder(i);
+            s.setTitle("Section " + (i + 1));
+            s.setBody(null);
+            report.getSections().add(s);
+        }
+
+        byte[] pdf = generator.generate(report, tenant());
+        try (PDDocument document = PDDocument.load(pdf)) {
+            assertTrue(document.getNumberOfPages() == 1,
+                    "Short sections should share a page when there is enough room.");
+        }
+    }
+
+    @Test
+    void estimateSectionStartMinHeight_includesPhotoBlockWhenPhotosPresent() throws Exception {
+        AttachmentStorageService storageService = mock(AttachmentStorageService.class);
+        CustomerPhotoReportPdfGenerator generator = new CustomerPhotoReportPdfGenerator(storageService);
+
+        CustomerPhotoReportSection titleOnly = new CustomerPhotoReportSection();
+        titleOnly.setTitle("Alpha");
+        titleOnly.setBody(null);
+
+        CustomerPhotoReportSection withPhoto = new CustomerPhotoReportSection();
+        withPhoto.setTitle("Beta");
+        withPhoto.setBody(null);
+        Attachment att = new Attachment();
+        CustomerPhotoReportSectionPhoto link = new CustomerPhotoReportSectionPhoto();
+        link.setAttachment(att);
+        withPhoto.getPhotos().add(link);
+
+        float a = generator.estimateSectionStartMinHeight(titleOnly);
+        float b = generator.estimateSectionStartMinHeight(withPhoto);
+        assertTrue(b > a, "Sections with photos should reserve more vertical start space.");
+    }
+
+    @Test
+    void insufficientRemainingSpace_matchesFitRule() {
+        assertTrue(CustomerPhotoReportPdfGenerator.insufficientRemainingSpace(100f, 84f, 50f));
+        assertFalse(CustomerPhotoReportPdfGenerator.insufficientRemainingSpace(200f, 84f, 50f));
+    }
+
     private CustomerPhotoReport buildReportWithImage(AttachmentStorageService storageService,
                                                      String fileName,
                                                      String storageKey,
@@ -124,6 +229,39 @@ class CustomerPhotoReportPdfGeneratorTest {
         report.setUpdatedAt(java.time.Instant.parse("2026-04-15T01:30:00Z"));
         report.getSections().add(section);
         return report;
+    }
+
+    private Tenant tenant() {
+        Tenant tenant = new Tenant();
+        tenant.setName("Acme Roofing");
+        return tenant;
+    }
+
+    private static void assertSinglePageHealthyPdf(byte[] pdf) throws Exception {
+        try (PDDocument document = PDDocument.load(pdf)) {
+            assertTrue(document.getNumberOfPages() >= 1);
+            String text = new PDFTextStripper().getText(document);
+            assertTrue(text.contains("Front elevation"));
+            assertTrue(!text.contains("Photo 1.1"));
+        }
+    }
+
+    private static byte[] tryWriteRasterAsFormat(String format, int width, int height, Color fill) throws Exception {
+        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = image.createGraphics();
+        try {
+            g.setColor(fill);
+            g.fillRect(0, 0, width, height);
+        } finally {
+            g.dispose();
+        }
+        try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            boolean ok = ImageIO.write(image, format, out);
+            if (!ok) {
+                return null;
+            }
+            return out.toByteArray();
+        }
     }
 
     private static byte[] pngBytes(int width, int height, Color color) throws Exception {

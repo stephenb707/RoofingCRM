@@ -5,6 +5,7 @@ import com.roofingcrm.security.SecurityUtils;
 import com.roofingcrm.service.customerreport.CustomerPhotoReportPdfExport;
 import com.roofingcrm.service.customerreport.CustomerPhotoReportService;
 import jakarta.validation.Valid;
+import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -12,6 +13,7 @@ import org.springframework.lang.NonNull;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -82,9 +84,12 @@ public class CustomerPhotoReportController {
             @PathVariable("reportId") UUID reportId) {
         UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
         CustomerPhotoReportPdfExport exported = customerPhotoReportService.exportPdf(tenantId, userId, Objects.requireNonNull(reportId));
+        ContentDisposition disposition = ContentDisposition.attachment()
+                .filename(exported.filename(), StandardCharsets.UTF_8)
+                .build();
         return ResponseEntity.ok()
                 .contentType(Objects.requireNonNull(MediaType.APPLICATION_PDF))
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + exported.filename() + "\"")
+                .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
                 .body(exported.content());
     }
 

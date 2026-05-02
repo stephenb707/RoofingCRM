@@ -9,6 +9,7 @@ import org.springframework.lang.NonNull;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Objects;
 import java.util.UUID;
 
 @RestController
@@ -35,6 +36,6 @@ public class AppPreferencesController {
             @RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
             @Valid @RequestBody UpdateAppPreferencesRequest request) {
         UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
-        return ResponseEntity.ok(appPreferencesService.updatePreferences(tenantId, userId, request));
+        return ResponseEntity.ok(appPreferencesService.updatePreferences(tenantId, userId, Objects.requireNonNull(request)));
     }
 }

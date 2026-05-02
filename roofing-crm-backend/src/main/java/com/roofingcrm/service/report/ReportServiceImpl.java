@@ -23,6 +23,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
 import com.roofingcrm.domain.enums.LeadSource;
@@ -74,10 +75,10 @@ public class ReportServiceImpl implements ReportService {
         // - Friendly date/time formatting (e.g., "Jan 15, 2024 at 2:30 PM")
         // - Consistent placeholder for empty values
         // - Formatted phone numbers
-        // - Logical column grouping: ID → Customer Info → Property → Status → Dates
+        // Logical column grouping: Customer Info → Property → Status → Dates → converted job summary
         StringBuilder sb = new StringBuilder();
         sb.append(CsvUtils.UTF8_BOM);
-        sb.append("Lead ID,Customer Name,Email,Phone,Property Address,Lead Source,Status,Created,Last Updated,Converted to Job\n");
+        sb.append("Customer Name,Email,Phone,Property Address,Lead Source,Status,Created,Last Updated,Converted to Job\n");
 
         for (Lead lead : leads) {
             String customerName = emptyPlaceholder(customerNameFromLead(lead));
@@ -86,15 +87,18 @@ public class ReportServiceImpl implements ReportService {
 
             String propertyAddress = emptyPlaceholder(formatAddress(lead.getPropertyAddress()));
 
-            String convertedJobId = "—";
-            if (lead.getId() != null) {
-                convertedJobId = jobRepository.findByTenantAndLeadIdAndArchivedFalse(tenant, lead.getId())
-                        .map(j -> CsvUtils.cell(j.getId()))
-                        .orElse("—");
+            String convertedJobSummary;
+            Optional<Job> converted = lead.getId() == null
+                    ? Optional.empty()
+                    : jobRepository.findByTenantAndLeadIdAndArchivedFalse(tenant, lead.getId());
+            if (converted.isEmpty()) {
+                convertedJobSummary = CsvUtils.cell("—");
+            } else {
+                String jl = AccountingJobsReportService.jobLabel(converted.get());
+                convertedJobSummary = CsvUtils.cell(jl.isBlank() ? "—" : jl);
             }
 
-            sb.append(CsvUtils.cell(lead.getId())).append(",")
-                    .append(CsvUtils.cell(customerName)).append(",")
+            sb.append(CsvUtils.cell(customerName)).append(",")
                     .append(CsvUtils.cell(customerEmail)).append(",")
                     .append(CsvUtils.cell(customerPhone)).append(",")
                     .append(CsvUtils.cell(propertyAddress)).append(",")
@@ -102,7 +106,7 @@ public class ReportServiceImpl implements ReportService {
                     .append(CsvUtils.cell(lead.getStatusDefinition().getLabel())).append(",")
                     .append(CsvUtils.cell(toFriendlyTimestamp(lead.getCreatedAt()))).append(",")
                     .append(CsvUtils.cell(toFriendlyTimestamp(lead.getUpdatedAt()))).append(",")
-                    .append(convertedJobId)
+                    .append(convertedJobSummary)
                     .append("\n");
         }
 
@@ -127,7 +131,7 @@ public class ReportServiceImpl implements ReportService {
 
         StringBuilder sb = new StringBuilder();
         sb.append(CsvUtils.UTF8_BOM);
-        sb.append("Job ID,Customer Name,Email,Phone,Property Address,Job Type,Status,Scheduled Start,Scheduled End,Actual Start,Actual End,Assigned Crew,Roof Type,Created,Last Updated\n");
+        sb.append("Customer Name,Email,Phone,Property Address,Job Type,Status,Scheduled Start,Scheduled End,Actual Start,Actual End,Assigned Crew,Roof Type,Created,Last Updated\n");
 
         for (Job job : jobs) {
             String customerName = emptyPlaceholder(customerNameFromJob(job));
@@ -140,8 +144,7 @@ public class ReportServiceImpl implements ReportService {
             String actualStart = toFriendlyDate(job.getActualStartDate());
             String actualEnd = toFriendlyDate(job.getActualEndDate());
 
-            sb.append(CsvUtils.cell(job.getId())).append(",")
-                    .append(CsvUtils.cell(customerName)).append(",")
+            sb.append(CsvUtils.cell(customerName)).append(",")
                     .append(CsvUtils.cell(customerEmail)).append(",")
                     .append(CsvUtils.cell(customerPhone)).append(",")
                     .append(CsvUtils.cell(propertyAddress)).append(",")

@@ -11,6 +11,7 @@ import * as activityApi from "@/lib/activityApi";
 import * as pipelineStatusesApi from "@/lib/pipelineStatusesApi";
 import { LeadDto } from "@/lib/types";
 
+const mockPush = jest.fn();
 jest.mock("@/lib/leadsApi");
 jest.mock("@/lib/customersApi");
 jest.mock("@/lib/attachmentsApi");
@@ -19,7 +20,7 @@ jest.mock("@/lib/tasksApi");
 jest.mock("@/lib/activityApi");
 jest.mock("@/lib/pipelineStatusesApi");
 jest.mock("next/navigation", () => ({
-  useRouter: () => ({ push: jest.fn(), replace: jest.fn(), back: jest.fn() }),
+  useRouter: () => ({ push: mockPush, replace: jest.fn(), back: jest.fn() }),
   usePathname: () => "/app/leads/lead-1",
   useParams: () => ({ leadId: "lead-1" }),
   useSearchParams: () => new URLSearchParams(),
@@ -86,6 +87,8 @@ describe("LeadDetailPage", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockPush.mockClear();
+    mockedLeadsApi.updateLeadStatus.mockReset();
     mockedPipelineApi.listPipelineStatuses.mockResolvedValue([defNew, defWon, defLost]);
     mockedLeadsApi.getLead.mockResolvedValue(mockLead);
     mockedCustomersApi.getCustomer.mockResolvedValue({
@@ -205,6 +208,33 @@ describe("LeadDetailPage", () => {
 
     const editLink = screen.getByRole("link", { name: /edit lead/i });
     expect(editLink).toBeInTheDocument();
+  });
+
+  it("navigates to the job when status update returns convertedJobId (WON label can be customized)", async () => {
+    const defWonSigned = { ...defWon, label: "Signed" };
+    mockedPipelineApi.listPipelineStatuses.mockResolvedValue([defNew, defWonSigned, defLost]);
+    mockedLeadsApi.updateLeadStatus.mockResolvedValue({
+      ...mockLead,
+      statusDefinitionId: defWonSigned.id,
+      statusKey: "WON",
+      statusLabel: "Signed",
+      convertedJobId: "job-from-won-1",
+    });
+
+    const user = userEvent.setup();
+    render(<LeadDetailPage />);
+
+    const signed = await screen.findByRole("button", { name: "Signed" });
+    await user.click(signed);
+
+    await waitFor(() => {
+      expect(mockedLeadsApi.updateLeadStatus).toHaveBeenCalledWith(
+        expect.anything(),
+        "lead-1",
+        defWonSigned.id
+      );
+    });
+    expect(mockPush).toHaveBeenCalledWith("/app/jobs/job-from-won-1");
   });
 
   it("renders — when customer name fields are missing", async () => {

@@ -137,4 +137,58 @@ describe("AttachmentSection", () => {
     expect(screen.getByTestId("attachment-thumbnail-att-1")).toBeInTheDocument();
     expect(screen.getByAltText("damage.jpg")).toBeInTheDocument();
   });
+
+  it("opens shared image preview lightbox when thumbnail is clicked and closes with X", () => {
+    render(
+      <AttachmentSection
+        title="Attachments"
+        attachments={[
+          {
+            id: "att-1",
+            fileName: "damage.jpg",
+            contentType: "image/jpeg",
+            fileSize: 1024,
+            tag: "DAMAGE",
+            leadId: null,
+            jobId: "job-1",
+          },
+        ]}
+        previewUrls={{ "att-1": "blob:image-preview" }}
+        onUpload={jest.fn()}
+        onDownload={jest.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /view full size: damage\.jpg/i }));
+
+    expect(screen.getByTestId("image-preview-lightbox")).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: /image preview/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("image-preview-close"));
+
+    expect(screen.queryByTestId("image-preview-lightbox")).not.toBeInTheDocument();
+  });
+
+  it("does not show a thumbnail lightbox opener for non-image attachments", () => {
+    render(
+      <AttachmentSection
+        title="Attachments"
+        attachments={[
+          {
+            id: "att-2",
+            fileName: "notes.pdf",
+            contentType: "application/pdf",
+            fileSize: 2048,
+            tag: "OTHER",
+            leadId: null,
+            jobId: "job-1",
+          },
+        ]}
+        onUpload={jest.fn()}
+        onDownload={jest.fn()}
+      />
+    );
+
+    expect(screen.queryByRole("button", { name: /view full size/i })).not.toBeInTheDocument();
+  });
 });

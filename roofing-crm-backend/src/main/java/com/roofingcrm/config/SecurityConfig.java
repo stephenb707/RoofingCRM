@@ -11,6 +11,7 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -72,6 +73,7 @@ public class SecurityConfig {
                 config.setAllowedHeaders(corsProperties.getAllowedHeaders());
                 config.setAllowCredentials(corsProperties.isAllowCredentials());
                 config.setMaxAge(corsProperties.getMaxAge());
+                config.addExposedHeader(HttpHeaders.CONTENT_DISPOSITION);
 
                 UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
                 source.registerCorsConfiguration("/**", config);

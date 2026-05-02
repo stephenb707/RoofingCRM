@@ -252,6 +252,126 @@ describe("ReportBuilderForm", () => {
     expect(within(section2).getByRole("button", { name: /remove roof-back\.jpg from section 2/i })).toBeInTheDocument();
   });
 
+  it("shows section thumbnails for a saved report without opening the picker, then opens and closes image preview", async () => {
+    mockedCustomerReportsApi.getCustomerPhotoReport.mockResolvedValue({
+      id: "report-saved",
+      customerId: "cust-1",
+      customerName: "Jane Doe",
+      customerEmail: "jane@example.com",
+      jobId: "job-1",
+      jobDisplayName: "123 Main St",
+      title: "Inspection",
+      reportType: null,
+      summary: null,
+      sections: [
+        {
+          id: "sec-1",
+          sortOrder: 0,
+          title: "Damage",
+          body: "",
+          photos: [{ attachmentId: "img-1", sortOrder: 0 }],
+        },
+      ],
+      createdAt: "2024-01-01T00:00:00Z",
+      updatedAt: "2024-01-01T00:00:00Z",
+    });
+
+    render(<ReportBuilderForm reportId="report-saved" />);
+
+    await waitFor(() =>
+      expect(mockedCustomerReportsApi.getCustomerPhotoReport).toHaveBeenCalledWith(
+        expect.anything(),
+        "report-saved"
+      )
+    );
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("Damage")).toBeInTheDocument();
+    });
+
+    const section1 = screen.getByTestId("report-section-1");
+
+    await waitFor(() => {
+      expect(within(section1).getByTestId("selected-photo-thumbnail-img-1")).toBeInTheDocument();
+      expect(within(section1).getByAltText("Selected roof-front.jpg")).toBeInTheDocument();
+    });
+
+    expect(within(section1).queryByTestId("photo-picker-list-1")).not.toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /view full size: selected roof-front\.jpg/i })
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("image-preview-lightbox")).toBeInTheDocument();
+      expect(screen.getByRole("dialog", { name: /image preview/i })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("image-preview-close"));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("image-preview-lightbox")).not.toBeInTheDocument();
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /view full size: selected roof-front\.jpg/i })
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("image-preview-lightbox")).toBeInTheDocument();
+    });
+
+    fireEvent.keyDown(window, { key: "Escape", code: "Escape", bubbles: true });
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("image-preview-lightbox")).not.toBeInTheDocument();
+    });
+  });
+
+  it("shows No preview when an image thumbnail download fails", async () => {
+    mockedAttachmentsApi.downloadAttachment.mockRejectedValue(new Error("network"));
+
+    mockedCustomerReportsApi.getCustomerPhotoReport.mockResolvedValue({
+      id: "report-broken-thumb",
+      customerId: "cust-1",
+      customerName: "Jane Doe",
+      jobId: "job-1",
+      jobDisplayName: "123 Main St",
+      title: "Inspection",
+      reportType: null,
+      summary: null,
+      sections: [
+        {
+          id: "sec-1",
+          sortOrder: 0,
+          title: "Damage",
+          body: "",
+          photos: [{ attachmentId: "img-1", sortOrder: 0 }],
+        },
+      ],
+      createdAt: "2024-01-01T00:00:00Z",
+      updatedAt: "2024-01-01T00:00:00Z",
+    });
+
+    render(<ReportBuilderForm reportId="report-broken-thumb" />);
+
+    await waitFor(() =>
+      expect(mockedCustomerReportsApi.getCustomerPhotoReport).toHaveBeenCalledWith(
+        expect.anything(),
+        "report-broken-thumb"
+      )
+    );
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("Damage")).toBeInTheDocument();
+    });
+
+    const section1 = screen.getByTestId("report-section-1");
+    await waitFor(() => {
+      expect(within(section1).getByText("No preview")).toBeInTheDocument();
+    });
+  });
+
   it("shows a clean related job/date display and prefills send email for an existing report", async () => {
     mockedCustomerReportsApi.getCustomerPhotoReport.mockResolvedValue({
       id: "report-1",

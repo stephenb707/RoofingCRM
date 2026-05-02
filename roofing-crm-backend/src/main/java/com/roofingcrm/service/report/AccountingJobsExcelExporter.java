@@ -34,7 +34,6 @@ public class AccountingJobsExcelExporter {
     private static final String SHEET_NAME = "Job Accounting";
 
     private static final String[] HEADERS = {
-            "Job ID",
             "Job Name",
             "Customer Name",
             "Job Status",
@@ -99,7 +98,6 @@ public class AccountingJobsExcelExporter {
             for (AccountingJobsReportService.AccountingJobExportRow rowData : rows) {
                 Row row = sheet.createRow(r++);
                 int c = 0;
-                setText(row.createCell(c++), rowData.job().getId() != null ? rowData.job().getId().toString() : "", textStyle);
                 setText(row.createCell(c++), AccountingJobsReportService.jobLabel(rowData.job()), textStyle);
                 setText(row.createCell(c++), AccountingJobsReportService.customerName(rowData.job()), textStyle);
                 setText(row.createCell(c++), rowData.job().getStatusDefinition().getLabel(), textStyle);

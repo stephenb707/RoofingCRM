@@ -14,6 +14,7 @@ import { listPipelineStatuses } from "@/lib/pipelineStatusesApi";
 import type { PipelineStatusDefinitionDto } from "@/lib/pipelineStatusesApi";
 import { jobStatusBadgeClass } from "@/lib/pipelineStatusVisuals";
 import { queryKeys } from "@/lib/queryKeys";
+import { supportsReportGalleryImage } from "@/lib/reportGalleryImageMime";
 import { formatAddress, formatDate, formatDateTime, formatMoney, formatPhone } from "@/lib/format";
 import { listJobAttachments, uploadJobAttachment, downloadAttachment, deleteAttachment } from "@/lib/attachmentsApi";
 import {
@@ -247,7 +248,7 @@ export default function JobDetailPage() {
       return;
     }
     const imageAttachments = nonReceiptAttachments.filter((attachment) =>
-      (attachment.contentType ?? "").toLowerCase().startsWith("image/")
+      supportsReportGalleryImage(attachment.contentType)
     );
     const missing = imageAttachments.filter(
       (attachment) => !Object.prototype.hasOwnProperty.call(attachmentPreviewUrlRef.current, attachment.id)

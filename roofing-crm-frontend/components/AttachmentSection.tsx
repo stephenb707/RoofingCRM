@@ -1,7 +1,9 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
+import { ImagePreviewLightbox } from "@/components/ImagePreviewLightbox";
 import { formatFileSize } from "@/lib/format";
+import { supportsReportGalleryImage } from "@/lib/reportGalleryImageMime";
 import { ATTACHMENT_TAGS, TAG_LABELS } from "@/lib/attachmentConstants";
 import type { AttachmentDto, AttachmentTag } from "@/lib/types";
 
@@ -42,6 +44,8 @@ export function AttachmentSection({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedTag, setSelectedTag] = useState<AttachmentTag>("OTHER");
   const [description, setDescription] = useState("");
+  const [imagePreview, setImagePreview] = useState<{ url: string; alt: string } | null>(null);
+  const closeImagePreview = useCallback(() => setImagePreview(null), []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -55,26 +59,38 @@ export function AttachmentSection({
     }
   };
 
+  const thumbFrame =
+    "flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md border border-slate-200 bg-slate-100";
+
   const renderPreview = (attachment: AttachmentDto) => {
-    const isImage = (attachment.contentType ?? "").toLowerCase().startsWith("image/");
-    if (!isImage) {
+    const isGalleryRaster = supportsReportGalleryImage(attachment.contentType);
+    if (!isGalleryRaster) {
       return null;
     }
     const previewUrl = previewUrls[attachment.id];
     const isLoadingPreview = loadingPreviewIds.includes(attachment.id);
-    return (
-      <div
-        data-testid={`attachment-thumbnail-${attachment.id}`}
-        className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md border border-slate-200 bg-slate-100"
-      >
-        {previewUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
+    const altLabel = attachment.fileName ?? "Attachment preview";
+    if (previewUrl) {
+      return (
+        <button
+          type="button"
+          data-testid={`attachment-thumbnail-${attachment.id}`}
+          aria-label={`View full size: ${altLabel}`}
+          className={`${thumbFrame} cursor-zoom-in p-0`}
+          onClick={() => setImagePreview({ url: previewUrl, alt: altLabel })}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={previewUrl}
-            alt={attachment.fileName ?? "Attachment preview"}
-            className="h-full w-full object-cover"
+            alt={altLabel}
+            className="pointer-events-none h-full w-full object-cover"
           />
-        ) : isLoadingPreview ? (
+        </button>
+      );
+    }
+    return (
+      <div data-testid={`attachment-thumbnail-${attachment.id}`} className={thumbFrame}>
+        {isLoadingPreview ? (
           <span className="text-[10px] text-slate-400">Loading…</span>
         ) : (
           <span className="text-[10px] text-slate-400">No preview</span>
@@ -185,6 +201,13 @@ export function AttachmentSection({
           </ul>
         </div>
       )}
+      {imagePreview ? (
+        <ImagePreviewLightbox
+          url={imagePreview.url}
+          alt={imagePreview.alt}
+          onClose={closeImagePreview}
+        />
+      ) : null}
     </div>
   );
 }

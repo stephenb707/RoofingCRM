@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   DndContext,
@@ -68,6 +69,7 @@ export type LeadsPipelineVariant = "page" | "embedded";
 export default function LeadsPipelineExperience({ variant }: { variant: LeadsPipelineVariant }) {
   const { api, auth, ready } = useAuthReady();
   const queryClient = useQueryClient();
+  const router = useRouter();
   const [activeLead, setActiveLead] = useState<LeadDto | null>(null);
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -130,6 +132,17 @@ export default function LeadsPipelineExperience({ variant }: { variant: LeadsPip
         const lead = old.content.find((l) => l.id === leadId);
         if (!lead) return old;
         const oldDefId = lead.statusDefinitionId;
+        const isSameColumn = oldDefId === statusDefinitionId;
+        // Moving into WON converts the lead and removes it from the board — do not add a card to the WON column.
+        if (targetDef.systemKey === "WON" && !isSameColumn) {
+          const withoutMoved = old.content.filter((l) => l.id !== leadId);
+          const oldColReseq = withoutMoved
+            .filter((l) => l.statusDefinitionId === oldDefId)
+            .sort((a, b) => (a.pipelinePosition ?? 0) - (b.pipelinePosition ?? 0))
+            .map((l, i) => ({ ...l, pipelinePosition: i }));
+          const otherCols = withoutMoved.filter((l) => l.statusDefinitionId !== oldDefId);
+          return { ...old, content: [...otherCols, ...oldColReseq] };
+        }
         const withoutMoved = old.content.filter((l) => l.id !== leadId);
         const targetCol = withoutMoved.filter((l) => l.statusDefinitionId === statusDefinitionId);
         const insertIdx =
@@ -146,7 +159,6 @@ export default function LeadsPipelineExperience({ variant }: { variant: LeadsPip
         const targetWithMoved = [...targetCol];
         targetWithMoved.splice(insertIdx, 0, moved);
         const reseqTarget = targetWithMoved.map((l, i) => ({ ...l, pipelinePosition: i }));
-        const isSameColumn = oldDefId === statusDefinitionId;
         const oldColReseq = isSameColumn
           ? []
           : withoutMoved
@@ -164,6 +176,13 @@ export default function LeadsPipelineExperience({ variant }: { variant: LeadsPip
     onError: (_err, _vars, context) => {
       if (context?.previous) {
         queryClient.setQueryData(pipelineKey, context.previous);
+      }
+    },
+    onSuccess: (updated) => {
+      if (updated.convertedJobId) {
+        queryClient.invalidateQueries({ queryKey: pipelineKey });
+        queryClient.invalidateQueries({ queryKey: ["leads", auth.selectedTenantId] });
+        router.push(`/app/jobs/${updated.convertedJobId}`);
       }
     },
     onSettled: () => {

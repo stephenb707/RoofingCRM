@@ -31,6 +31,7 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -110,20 +111,20 @@ class CustomerPhotoReportServiceImplUnitTest {
         when(tenantAccessService.requireAnyRole(eq(tenantId), eq(userId), any(), anyString())).thenReturn(null);
         when(tenantAccessService.loadTenantForUserOrThrow(tenantId, userId)).thenReturn(tenant);
         when(customerRepository.findByIdAndTenantAndArchivedFalse(customer.getId(), tenant)).thenReturn(Optional.of(customer));
-        when(attachmentRepository.findByIdAndTenantAndArchivedFalse(frontPhoto.getId(), tenant)).thenReturn(Optional.of(frontPhoto));
-        when(attachmentRepository.findByIdAndTenantAndArchivedFalse(rearPhoto.getId(), tenant)).thenReturn(Optional.of(rearPhoto));
+        lenient().when(attachmentRepository.findByIdAndTenantAndArchivedFalse(frontPhoto.getId(), tenant)).thenReturn(Optional.of(frontPhoto));
+        lenient().when(attachmentRepository.findByIdAndTenantAndArchivedFalse(rearPhoto.getId(), tenant)).thenReturn(Optional.of(rearPhoto));
 
-        when(reportRepository.save(any(CustomerPhotoReport.class))).thenAnswer(invocation -> {
+        lenient().when(reportRepository.save(any(CustomerPhotoReport.class))).thenAnswer(invocation -> {
             CustomerPhotoReport report = invocation.getArgument(0);
             assignIds(report);
             storedReport.set(report);
             return report;
         });
-        when(reportRepository.loadDetailed(any(UUID.class), eq(tenant))).thenAnswer(invocation ->
+        lenient().when(reportRepository.loadDetailed(any(UUID.class), eq(tenant))).thenAnswer(invocation ->
                 Optional.ofNullable(storedReport.get()));
         lenient().when(reportRepository.findById(any(UUID.class))).thenAnswer(invocation ->
                 Optional.ofNullable(storedReport.get()));
-        when(sectionPhotoRepository.findBySectionIdInWithAttachmentFetched(any())).thenAnswer(invocation ->
+        lenient().when(sectionPhotoRepository.findBySectionIdInWithAttachmentFetched(any())).thenAnswer(invocation ->
                 storedReport.get() == null
                         ? List.of()
                         : storedReport.get().getSections().stream().flatMap(section -> section.getPhotos().stream()).toList());
@@ -182,6 +183,44 @@ class CustomerPhotoReportServiceImplUnitTest {
                         && message.attachments().size() == 1
                         && message.attachments().get(0).filename().endsWith(".pdf")
                         && "application/pdf".equals(message.attachments().get(0).contentType())));
+    }
+
+    @Test
+    void exportPdf_filenameUsesSanitizedReportTitle() {
+        UpsertCustomerPhotoReportRequest req = buildRequest(List.of(frontPhoto.getId()), List.of(rearPhoto.getId()));
+        req.setTitle("  Before & After: Smith<>Home  ");
+        service.create(tenantId, userId, req);
+        when(pdfGenerator.generate(any(CustomerPhotoReport.class), eq(tenant))).thenReturn(new byte[] {1});
+
+        CustomerPhotoReportPdfExport exported =
+                service.exportPdf(tenantId, userId, storedReport.get().getId());
+
+        assertEquals("Before & After- Smith-Home.pdf", exported.filename());
+    }
+
+    @Test
+    void exportPdf_blankStoredTitleFallsBackToCustomerReportPdf() {
+        UpsertCustomerPhotoReportRequest req = buildRequest(List.of(frontPhoto.getId()), List.of(rearPhoto.getId()));
+        service.create(tenantId, userId, req);
+        storedReport.get().setTitle("   ");
+        when(pdfGenerator.generate(any(CustomerPhotoReport.class), eq(tenant))).thenReturn(new byte[] {1});
+
+        CustomerPhotoReportPdfExport exported =
+                service.exportPdf(tenantId, userId, storedReport.get().getId());
+
+        assertEquals("Customer Report.pdf", exported.filename());
+    }
+
+    @Test
+    void create_rejectsAttachmentsOutsideGalleryRasterWhitelist() {
+        UUID badId = UUID.randomUUID();
+        Attachment badPdf = buildAttachment(badId, "brochure.pdf");
+        badPdf.setContentType("application/pdf");
+
+        when(attachmentRepository.findByIdAndTenantAndArchivedFalse(badId, tenant)).thenReturn(Optional.of(badPdf));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> service.create(tenantId, userId, buildRequest(List.of(badId), List.of(rearPhoto.getId()))));
     }
 
     private UpsertCustomerPhotoReportRequest buildRequest(List<UUID> sectionOne, List<UUID> sectionTwo) {

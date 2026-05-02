@@ -207,10 +207,15 @@ export default function LeadDetailPage() {
     mutationFn: async (statusDefinitionId: string) => {
       return updateLeadStatus(api, leadId, statusDefinitionId);
     },
-    onSuccess: () => {
+    onSuccess: (updated) => {
       setUpdateError(null);
       queryClient.invalidateQueries({ queryKey });
       queryClient.invalidateQueries({ queryKey: ["leads", auth.selectedTenantId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.leadsPipeline(auth.selectedTenantId) });
+      if (updated.convertedJobId) {
+        queryClient.invalidateQueries({ queryKey: ["jobs", auth.selectedTenantId] });
+        router.push(`/app/jobs/${updated.convertedJobId}`);
+      }
     },
     onError: (err: unknown) => {
       console.error("Failed to update lead status:", err);
@@ -763,7 +768,12 @@ export default function LeadDetailPage() {
           {showConvertModal && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => !convertMutation.isPending && setShowConvertModal(false)}>
               <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
-                <h3 className="text-lg font-semibold text-slate-800 mb-4">Convert to Job</h3>
+                <h3 className="text-lg font-semibold text-slate-800 mb-2">Convert to Job</h3>
+                <p className="text-sm text-slate-600 mb-4">
+                  Setting the lead to your won status (in Pipeline settings) also creates a job. Use
+                  this form when you need to choose job type, schedule, or internal notes before
+                  creating the job.
+                </p>
                 <form onSubmit={handleConvertSubmit} className="space-y-4">
                   {convertMutation.isError && (
                     <p className="text-sm text-red-600">{getApiErrorMessage(convertMutation.error, "Failed to convert")}</p>
