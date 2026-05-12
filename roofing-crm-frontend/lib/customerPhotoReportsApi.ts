@@ -7,7 +7,10 @@ import type {
   CustomerPhotoReportSummaryDto,
   UpsertCustomerPhotoReportRequest,
 } from "./types";
-import { parseFilenameFromContentDisposition } from "./reportsApi";
+import {
+  parseFilenameFromContentDisposition,
+  simplePdfFilenameFromTitle,
+} from "./reportsApi";
 
 const BASE = "/api/v1/customer-photo-reports";
 
@@ -49,13 +52,16 @@ export async function deleteCustomerPhotoReport(api: AxiosInstance, reportId: st
 
 export async function downloadCustomerPhotoReportPdf(
   api: AxiosInstance,
-  reportId: string
+  reportId: string,
+  reportTitleFallback?: string | null
 ): Promise<{ blob: Blob; filename: string }> {
-  const response = await api.get(`${BASE}/${reportId}/pdf`, { responseType: "blob" });
+  const response = await api.get(`${BASE}/${String(reportId).trim()}/pdf`, { responseType: "blob" });
   const blob = response.data as Blob;
   const cd = response.headers["content-disposition"];
   const filename =
-    parseFilenameFromContentDisposition(cd) ?? `customer-report-${reportId}.pdf`;
+    parseFilenameFromContentDisposition(
+      typeof cd === "string" ? cd : Array.isArray(cd) ? cd[0] : undefined
+    ) ?? simplePdfFilenameFromTitle(reportTitleFallback);
   return { blob, filename };
 }
 

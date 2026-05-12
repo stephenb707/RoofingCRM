@@ -46,6 +46,7 @@ class PublicEstimateControllerTest {
         dto.setStatus(EstimateStatus.SENT);
         dto.setTitle("Roof Estimate");
         dto.setCustomerName("Jane Doe");
+        dto.setCompanyName("Acme Roofing Co");
         dto.setSubtotal(new BigDecimal("5000.00"));
         dto.setTotal(new BigDecimal("5000.00"));
         dto.setItems(List.of());
@@ -56,7 +57,8 @@ class PublicEstimateControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.estimateNumber", is("EST-1001")))
                 .andExpect(jsonPath("$.status", is("SENT")))
-                .andExpect(jsonPath("$.customerName", is("Jane Doe")));
+                .andExpect(jsonPath("$.customerName", is("Jane Doe")))
+                .andExpect(jsonPath("$.companyName", is("Acme Roofing Co")));
     }
 
     @Test

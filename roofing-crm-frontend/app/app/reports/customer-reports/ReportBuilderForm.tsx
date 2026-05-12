@@ -17,6 +17,7 @@ import { listCustomers } from "@/lib/customersApi";
 import { listJobs } from "@/lib/jobsApi";
 import { downloadAttachment, uploadJobAttachment } from "@/lib/attachmentsApi";
 import { queryKeys } from "@/lib/queryKeys";
+import { supportsReportGalleryImage } from "@/lib/reportGalleryImageMime";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { sanitizeAttachmentIds } from "@/lib/customerPhotoReportPayload";
 import { formatAddress, formatDate } from "@/lib/format";
@@ -27,6 +28,7 @@ import type {
   SendCustomerPhotoReportEmailRequest,
   UpsertCustomerPhotoReportRequest,
 } from "@/lib/types";
+import { ImagePreviewLightbox } from "@/components/ImagePreviewLightbox";
 import { SendEmailModal } from "@/components/SendEmailModal";
 
 type SectionDraft = {
@@ -81,6 +83,10 @@ export function ReportBuilderForm({
   const [openPhotoPickerKeys, setOpenPhotoPickerKeys] = useState<string[]>([]);
   const [photoPreviewUrls, setPhotoPreviewUrls] = useState<Record<string, string>>({});
   const [loadingPhotoPreviewIds, setLoadingPhotoPreviewIds] = useState<string[]>([]);
+  const [imagePreviewOverlay, setImagePreviewOverlay] = useState<{
+    url: string;
+    alt: string;
+  } | null>(null);
   const [pdfError, setPdfError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [showEmailModal, setShowEmailModal] = useState(false);
@@ -124,9 +130,27 @@ export function ReportBuilderForm({
   });
 
   const imageCandidates = useMemo(
-    () => candidates.filter((c) => (c.contentType ?? "").toLowerCase().startsWith("image/")),
+    () => candidates.filter((c) => supportsReportGalleryImage(c.contentType)),
     [candidates]
   );
+
+  const imageAttachmentsForPreview = useMemo(() => {
+    const seen = new Set<string>();
+    const list: AttachmentDto[] = [];
+    for (const a of imageCandidates) {
+      if (!seen.has(a.id)) {
+        seen.add(a.id);
+        list.push(a);
+      }
+    }
+    for (const a of Object.values(recentUploadsById)) {
+      if (supportsReportGalleryImage(a.contentType) && !seen.has(a.id)) {
+        seen.add(a.id);
+        list.push(a);
+      }
+    }
+    return list;
+  }, [imageCandidates, recentUploadsById]);
 
   const imageOptionById = useMemo(() => {
     const map = new Map<string, AttachmentDto>();
@@ -134,7 +158,7 @@ export function ReportBuilderForm({
       map.set(attachment.id, attachment);
     }
     for (const attachment of Object.values(recentUploadsById)) {
-      if (!map.has(attachment.id) && (attachment.contentType ?? "").toLowerCase().startsWith("image/")) {
+      if (!map.has(attachment.id) && supportsReportGalleryImage(attachment.contentType)) {
         map.set(attachment.id, attachment);
       }
     }
@@ -153,35 +177,41 @@ export function ReportBuilderForm({
   }, []);
 
   useEffect(() => {
-    if (openPhotoPickerKeys.length === 0 || imageCandidates.length === 0) {
+    if (typeof URL.createObjectURL !== "function") {
       return;
     }
-    const missing = imageCandidates.filter((candidate) => !previewUrlRef.current[candidate.id]);
+    const missing = imageAttachmentsForPreview.filter(
+      (attachment) => !Object.prototype.hasOwnProperty.call(previewUrlRef.current, attachment.id)
+    );
     if (missing.length === 0) {
       return;
     }
 
     let cancelled = false;
-    const ids = missing.map((candidate) => candidate.id);
+    const ids = missing.map((attachment) => attachment.id);
+    for (const attachment of missing) {
+      previewUrlRef.current[attachment.id] = "";
+    }
     setLoadingPhotoPreviewIds((prev) => Array.from(new Set([...prev, ...ids])));
 
     void Promise.all(
-      missing.map(async (candidate) => {
+      missing.map(async (attachment) => {
         try {
-          const blob = await downloadAttachment(api, candidate.id);
-          if (cancelled) {
+          const blob = await downloadAttachment(api, attachment.id);
+          if (cancelled || !(blob instanceof Blob)) {
             return;
           }
           const url = URL.createObjectURL(blob);
-          previewUrlRef.current[candidate.id] = url;
-          setPhotoPreviewUrls((prev) => ({ ...prev, [candidate.id]: url }));
+          previewUrlRef.current[attachment.id] = url;
+          setPhotoPreviewUrls((prev) => ({ ...prev, [attachment.id]: url }));
         } catch {
           if (!cancelled) {
-            setPhotoPreviewUrls((prev) => ({ ...prev, [candidate.id]: "" }));
+            previewUrlRef.current[attachment.id] = "";
+            setPhotoPreviewUrls((prev) => ({ ...prev, [attachment.id]: "" }));
           }
         } finally {
           if (!cancelled) {
-            setLoadingPhotoPreviewIds((prev) => prev.filter((id) => id !== candidate.id));
+            setLoadingPhotoPreviewIds((prev) => prev.filter((id) => id !== attachment.id));
           }
         }
       })
@@ -190,7 +220,7 @@ export function ReportBuilderForm({
     return () => {
       cancelled = true;
     };
-  }, [api, imageCandidates, openPhotoPickerKeys]);
+  }, [api, imageAttachmentsForPreview]);
 
   const selectedCustomer = useMemo(
     () => customersPage?.content?.find((c) => c.id === customerId) ?? null,
@@ -278,7 +308,7 @@ export function ReportBuilderForm({
     if (!reportId) return;
     setPdfError(null);
     try {
-      const { blob, filename } = await downloadCustomerPhotoReportPdf(api, reportId);
+      const { blob, filename } = await downloadCustomerPhotoReportPdf(api, reportId, title);
       triggerBrowserDownload(blob, filename);
     } catch {
       setPdfError("Could not download PDF.");
@@ -305,6 +335,9 @@ export function ReportBuilderForm({
     setOpenPhotoPickerKeys((prev) => prev.filter((key) => key !== sectionKey));
   };
 
+  const thumbFrameClass =
+    "flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md border border-slate-200 bg-slate-100";
+
   const renderPhotoThumbnail = (
     attachmentId: string,
     fileName: string | undefined,
@@ -314,15 +347,33 @@ export function ReportBuilderForm({
     const previewUrl = photoPreviewUrls[attachmentId];
     const previewLoading = loadingPhotoPreviewIds.includes(attachmentId);
 
+    if (previewUrl) {
+      const fullSizeLabel = `View full size: ${altLabel}`;
+      return (
+        <button
+          type="button"
+          data-testid={testId}
+          aria-label={fullSizeLabel}
+          className={`${thumbFrameClass} cursor-zoom-in p-0`}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setImagePreviewOverlay({ url: previewUrl, alt: fileName ?? altLabel });
+          }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={previewUrl}
+            alt={altLabel}
+            className="pointer-events-none h-full w-full object-cover"
+          />
+        </button>
+      );
+    }
+
     return (
-      <div
-        data-testid={testId}
-        className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md border border-slate-200 bg-slate-100"
-      >
-        {previewUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={previewUrl} alt={altLabel} className="h-full w-full object-cover" />
-        ) : previewLoading ? (
+      <div data-testid={testId} className={thumbFrameClass}>
+        {previewLoading ? (
           <span className="text-[10px] text-slate-400">Loading…</span>
         ) : (
           <span className="text-[10px] text-slate-400">No preview</span>
@@ -761,7 +812,7 @@ export function ReportBuilderForm({
                 {jobId ? (
                   <input
                     type="file"
-                    accept="image/*"
+                    accept="image/png,image/jpeg,image/jpg,image/webp,image/gif,image/bmp,image/tiff,.tif,.tiff"
                     multiple
                     onChange={(e) => void onUploadToSection(sec.localKey, e)}
                     className="text-sm"
@@ -784,6 +835,14 @@ export function ReportBuilderForm({
           </div>
         ))}
       </div>
+      {imagePreviewOverlay ? (
+        <ImagePreviewLightbox
+          url={imagePreviewOverlay.url}
+          alt={imagePreviewOverlay.alt}
+          onClose={() => setImagePreviewOverlay(null)}
+        />
+      ) : null}
+
       {showEmailModal && reportId && (
         <SendEmailModal
           title="Send report by email"

@@ -26,5 +26,8 @@ public class PublicEstimateDto {
     private String customerName;
     private String customerAddress;
 
+    /** Roofing company / tenant name shown to the customer (public-safe). */
+    private String companyName;
+
     private List<PublicEstimateItemDto> items;
 }

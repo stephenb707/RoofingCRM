@@ -10,6 +10,7 @@ import com.roofingcrm.api.v1.lead.LeadDto;
 import com.roofingcrm.api.v1.lead.NewLeadCustomerRequest;
 import com.roofingcrm.api.v1.lead.UpdateLeadStatusRequest;
 import com.roofingcrm.domain.entity.Customer;
+import com.roofingcrm.domain.entity.Lead;
 import com.roofingcrm.domain.entity.Tenant;
 import com.roofingcrm.domain.entity.TenantUserMembership;
 import com.roofingcrm.domain.entity.User;
@@ -18,6 +19,7 @@ import com.roofingcrm.domain.enums.PipelineType;
 import com.roofingcrm.domain.enums.UserRole;
 import com.roofingcrm.domain.repository.CustomerRepository;
 import com.roofingcrm.domain.repository.JobRepository;
+import com.roofingcrm.domain.repository.LeadRepository;
 import com.roofingcrm.domain.repository.PipelineStatusDefinitionRepository;
 import com.roofingcrm.domain.repository.TenantRepository;
 import com.roofingcrm.domain.repository.TenantUserMembershipRepository;
@@ -50,6 +52,9 @@ class LeadServiceImplTest extends AbstractIntegrationTest {
 
     @Autowired
     private JobRepository jobRepository;
+
+    @Autowired
+    private LeadRepository leadRepository;
 
     @Autowired
     private UserRepository userRepository;
@@ -162,11 +167,14 @@ class LeadServiceImplTest extends AbstractIntegrationTest {
         request2.setPropertyAddress(createPropertyAddress());
         LeadDto lead2 = leadService.createLead(tenantId, userId, request2);
 
-        // Update second lead to WON
-        leadService.updateLeadStatus(tenantId, userId, lead2.getId(), leadStatusId("WON"), null);
+        // Update second lead to WON — auto-creates a job and archives the lead (no longer in active leads)
+        LeadDto afterWon = leadService.updateLeadStatus(tenantId, userId, lead2.getId(), leadStatusId("WON"), null);
+        assertNotNull(afterWon.getConvertedJobId());
+        assertEquals("WON", afterWon.getStatusKey());
 
         Page<LeadDto> newLeads = leadService.listLeads(tenantId, userId, leadStatusId("NEW"), null, PageRequest.of(0, 10));
         Page<LeadDto> wonLeads = leadService.listLeads(tenantId, userId, leadStatusId("WON"), null, PageRequest.of(0, 10));
+        Page<LeadDto> allActive = leadService.listLeads(tenantId, userId, null, null, PageRequest.of(0, 10));
 
         assertEquals(1, newLeads.getTotalElements());
         LeadDto firstNew = newLeads.getContent().get(0);
@@ -174,11 +182,9 @@ class LeadServiceImplTest extends AbstractIntegrationTest {
         assertEquals("Lead1", firstNew.getCustomerFirstName());
         assertEquals("New", firstNew.getCustomerLastName());
 
-        assertEquals(1, wonLeads.getTotalElements());
-        LeadDto firstWon = wonLeads.getContent().get(0);
-        assertEquals(lead2.getId(), firstWon.getId());
-        assertEquals("Lead2", firstWon.getCustomerFirstName());
-        assertEquals("Won", firstWon.getCustomerLastName());
+        assertEquals(0, wonLeads.getTotalElements());
+        assertEquals(1, allActive.getTotalElements());
+        assertTrue(leadRepository.findById(Objects.requireNonNull(lead2.getId())).orElseThrow().isArchived());
     }
 
     @Test
@@ -331,9 +337,13 @@ class LeadServiceImplTest extends AbstractIntegrationTest {
         assertEquals("IL", job.getPropertyAddress().getState());
         assertEquals("60602", job.getPropertyAddress().getZip());
 
-        // Assert lead status updated to WON
-        LeadDto updatedLead = leadService.getLead(tenantId, userId, lead.getId());
-        assertEquals("WON", updatedLead.getStatusKey());
+        // Archived lead is not returned by getLead; persisted row is WON + archived
+        assertThrows(ResourceNotFoundException.class,
+                () -> leadService.getLead(tenantId, userId, lead.getId()));
+        Lead persisted = leadRepository.findWithStatusDefinitionById(Objects.requireNonNull(lead.getId()))
+                .orElseThrow();
+        assertTrue(persisted.isArchived());
+        assertEquals("WON", persisted.getStatusDefinition().getSystemKey());
     }
 
     @Test
@@ -398,7 +408,7 @@ class LeadServiceImplTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void getLead_whenConverted_setsConvertedJobId() {
+    void getLead_whenConverted_archivesLeadAndGetActiveLeadReturnsNotFound() {
         Tenant tenant = tenantRepository.findById(tenantId).orElseThrow();
         Customer customer = new Customer();
         customer.setTenant(tenant);
@@ -416,7 +426,29 @@ class LeadServiceImplTest extends AbstractIntegrationTest {
         convertRequest.setType(JobType.REPLACEMENT);
         JobDto job = leadService.convertLeadToJob(tenantId, userId, lead.getId(), convertRequest);
 
-        LeadDto got = leadService.getLead(tenantId, userId, lead.getId());
-        assertEquals(job.getId(), got.getConvertedJobId());
+        assertEquals(lead.getId(), job.getLeadId());
+        assertThrows(ResourceNotFoundException.class,
+                () -> leadService.getLead(tenantId, userId, lead.getId()));
+        assertTrue(leadRepository.findById(Objects.requireNonNull(lead.getId())).orElseThrow().isArchived());
+    }
+
+    @Test
+    void updateLeadStatus_toWon_rejectsWhenLeadLost() {
+        Tenant tenant = tenantRepository.findById(tenantId).orElseThrow();
+        Customer customer = new Customer();
+        customer.setTenant(tenant);
+        customer.setFirstName("L");
+        customer.setLastName("X");
+        customer.setPrimaryPhone("1");
+        customer = customerRepository.save(customer);
+
+        CreateLeadRequest leadRequest = new CreateLeadRequest();
+        leadRequest.setCustomerId(customer.getId());
+        leadRequest.setPropertyAddress(createPropertyAddress());
+        LeadDto lead = leadService.createLead(tenantId, userId, leadRequest);
+        leadService.updateLeadStatus(tenantId, userId, lead.getId(), leadStatusId("LOST"), null);
+
+        assertThrows(LeadConversionNotAllowedException.class,
+                () -> leadService.updateLeadStatus(tenantId, userId, lead.getId(), leadStatusId("WON"), null));
     }
 }

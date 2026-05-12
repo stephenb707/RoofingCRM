@@ -7,13 +7,12 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useAuthReady } from "@/lib/AuthContext";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { auth, logout, ready } = useAuthReady();
+  const { auth, logout } = useAuthReady();
   const router = useRouter();
   const queryClient = useQueryClient();
   const pathname = usePathname();
 
   useEffect(() => {
-    if (!ready) return;
     if (!auth.token) {
       router.replace("/auth/login");
       return;
@@ -22,9 +21,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       router.replace("/auth/select-tenant");
       return;
     }
-  }, [auth, ready, router]);
+  }, [auth, router]);
 
-  if (!ready || !auth.token || !auth.selectedTenantId) {
+  if (!auth.token || !auth.selectedTenantId) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-sky-600"></div>

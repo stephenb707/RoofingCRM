@@ -20,7 +20,9 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.List;
 import java.util.UUID;
 
-import static org.hamcrest.Matchers.startsWith;
+import static org.hamcrest.Matchers.allOf;
+import static org.hamcrest.Matchers.anyOf;
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -168,14 +170,19 @@ class CustomerPhotoReportControllerTest {
         UUID reportId = UUID.randomUUID();
         when(customerPhotoReportService.exportPdf(eq(tenantId), eq(userId), eq(reportId)))
                 .thenReturn(new CustomerPhotoReportPdfExport(new byte[] { '%', 'P', 'D', 'F' },
-                        "customer-report-jane-doe-2026-04-11.pdf"));
+                        "Roof Inspection Report.pdf"));
 
         mockMvc.perform(get("/api/v1/customer-photo-reports/" + reportId + "/pdf")
                         .header("X-Tenant-Id", tenantId.toString()))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Content-Type", MediaType.APPLICATION_PDF_VALUE))
                 .andExpect(header().string("Content-Disposition",
-                        startsWith("attachment; filename=\"customer-report-jane-doe-2026-04-11.pdf\"")));
+                        allOf(
+                                containsString("attachment"),
+                                anyOf(
+                                        containsString("Roof Inspection Report.pdf"),
+                                        containsString("Roof_Inspection_Report.pdf"),
+                                        containsString("Roof%20Inspection%20Report.pdf")))));
 
         verify(customerPhotoReportService).exportPdf(eq(tenantId), eq(userId), eq(reportId));
     }

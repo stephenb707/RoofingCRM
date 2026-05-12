@@ -15,6 +15,20 @@ import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBr
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
 
+/**
+ * Real-time message broker configuration.
+ *
+ * <p>Auth model:
+ * <ul>
+ *   <li>Handshake JWT is validated by {@link JwtHandshakeInterceptor}; the access token is
+ *       passed as a query param because browsers cannot set custom headers on WS upgrade.</li>
+ *   <li>Reverse proxies in front of this app must redact {@code token} from access logs.
+ *       See {@link WebSocketUrlRedactor} for our in-app redaction helper.</li>
+ *   <li>The JWT is only re-checked on (re)handshake. An open connection survives until the
+ *       client reconnects or the connection drops; short access-token lifetime keeps that
+ *       window small and the frontend already halts reconnects when refresh fails.</li>
+ * </ul>
+ */
 @Configuration
 @EnableWebSocketMessageBroker
 @Order(Ordered.HIGHEST_PRECEDENCE + 99)

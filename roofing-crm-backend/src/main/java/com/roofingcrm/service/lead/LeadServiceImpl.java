@@ -25,6 +25,7 @@ import com.roofingcrm.domain.repository.PipelineStatusDefinitionRepository;
 import com.roofingcrm.domain.value.Address;
 import com.roofingcrm.service.activity.ActivityEventService;
 import com.roofingcrm.service.audit.AuditSupport;
+import com.roofingcrm.domain.enums.JobType;
 import com.roofingcrm.service.exception.LeadConversionNotAllowedException;
 import com.roofingcrm.service.exception.ResourceNotFoundException;
 import com.roofingcrm.service.tenant.TenantAccessService;
@@ -36,6 +37,7 @@ import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -187,6 +189,10 @@ public class LeadServiceImpl implements LeadService {
         PipelineStatusDefinition oldDef = lead.getStatusDefinition();
         boolean statusChanged = !oldDef.getId().equals(newDef.getId());
 
+        if (statusChanged && "WON".equals(newDef.getSystemKey())) {
+            return handleWonStatusTransition(Objects.requireNonNull(tenant), userId, lead, oldDef, newDef, position);
+        }
+
         if (!statusChanged && position == null) {
             return toDto(lead);
         }
@@ -243,6 +249,11 @@ public class LeadServiceImpl implements LeadService {
                 "You do not have permission to convert leads.");
         Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
 
+        Optional<Job> existingJob = jobRepository.findByTenantAndLeadIdAndArchivedFalse(tenant, leadId);
+        if (existingJob.isPresent()) {
+            return toJobDto(existingJob.get());
+        }
+
         Lead lead = leadRepository.findByIdAndTenantAndArchivedFalse(leadId, tenant)
                 .orElseThrow(() -> new ResourceNotFoundException("Lead not found"));
 
@@ -250,44 +261,12 @@ public class LeadServiceImpl implements LeadService {
             throw new LeadConversionNotAllowedException("Cannot convert a lost lead to a job");
         }
 
-        Optional<Job> existingJob = jobRepository.findByTenantAndLeadIdAndArchivedFalse(tenant, leadId);
-        if (existingJob.isPresent()) {
-            return toJobDto(existingJob.get());
-        }
-
-        Customer customer = lead.getCustomer();
-        if (customer == null) {
-            throw new IllegalArgumentException("Lead has no associated customer");
-        }
-
-        Job job = new Job();
-        job.setTenant(tenant);
-        job.setCustomer(customer);
-        job.setLead(lead);
-        AuditSupport.touchForCreate(job, userId);
-        job.setJobType(request.getType());
-        job.setScheduledStartDate(request.getScheduledStartDate());
-        job.setScheduledEndDate(request.getScheduledEndDate());
-        PipelineStatusDefinition jobStatus = request.getScheduledStartDate() != null
-                ? requireJobDefByKey(tenant, "SCHEDULED")
-                : requireJobDefByKey(tenant, "UNSCHEDULED");
-        job.setStatusDefinition(jobStatus);
-        job.setAssignedCrew(request.getCrewName());
-        job.setJobNotes(request.getInternalNotes());
-
-        if (lead.getPropertyAddress() != null) {
-            Address propertyAddress = new Address();
-            copyAddress(lead.getPropertyAddress(), propertyAddress);
-            job.setPropertyAddress(propertyAddress);
-        }
-
-        Job saved = jobRepository.save(job);
+        Job saved = createJobFromLeadEntity(lead, tenant, userId, request);
 
         PipelineStatusDefinition won = requireLeadDefByKey(tenant, "WON");
-        int maxPos = leadRepository.findMaxPipelinePositionByTenantAndStatusDefinitionAndArchivedFalse(tenant, won);
         lead.setStatusDefinition(won);
-        lead.setPipelinePosition(maxPos + 1);
         AuditSupport.touchForUpdate(lead, userId);
+        archiveLead(lead, userId);
         leadRepository.save(lead);
 
         Map<String, Object> meta = new HashMap<>();
@@ -308,6 +287,110 @@ public class LeadServiceImpl implements LeadService {
         String qNorm = (q == null || q.isBlank()) ? null : q.trim();
         List<Lead> leads = leadRepository.searchForPicker(tenant, qNorm, PageRequest.of(0, capped));
         return leads.stream().map(this::leadToPickerItem).toList();
+    }
+
+    /**
+     * When a lead moves into the built-in WON status (by stable {@link PipelineStatusDefinition#getSystemKey()},
+     * not label), create a job with defaults and archive the lead so it no longer appears in active lead lists.
+     */
+    private LeadDto handleWonStatusTransition(
+            @NonNull Tenant tenant,
+            @NonNull UUID userId,
+            Lead lead,
+            PipelineStatusDefinition oldDef,
+            PipelineStatusDefinition newDef,
+            Integer position) {
+        if ("LOST".equals(oldDef.getSystemKey())) {
+            throw new LeadConversionNotAllowedException("Cannot mark a lost lead as won");
+        }
+
+        // Remove this lead from its current column (do not add to a column — lead will be archived)
+        List<Lead> oldColumn = leadRepository
+                .findByTenantAndStatusDefinitionAndArchivedFalseOrderByPipelinePositionAscCreatedAtAsc(tenant, oldDef);
+        List<Lead> oldList = new ArrayList<>(oldColumn);
+        oldList.removeIf(l -> Objects.equals(l.getId(), lead.getId()));
+        for (int i = 0; i < oldList.size(); i++) {
+            oldList.get(i).setPipelinePosition(i);
+        }
+        leadRepository.saveAll(oldList);
+
+        Optional<Job> existingJob = jobRepository.findByTenantAndLeadIdAndArchivedFalse(tenant, lead.getId());
+        if (existingJob.isPresent()) {
+            if (!lead.isArchived()) {
+                lead.setStatusDefinition(newDef);
+                AuditSupport.touchForUpdate(lead, userId);
+                archiveLead(lead, userId);
+                leadRepository.save(lead);
+                Map<String, Object> meta = new HashMap<>();
+                meta.put("leadId", lead.getId());
+                meta.put("jobId", existingJob.get().getId());
+                activityEventService.recordEvent(tenant, userId, ActivityEntityType.LEAD,
+                        Objects.requireNonNull(lead.getId()),
+                        ActivityEventType.LEAD_STATUS_CHANGED,
+                        "Lead marked won (job already exists); archived from active lead lists", meta);
+            }
+            return toDto(lead, existingJob.get().getId());
+        }
+
+        ConvertLeadToJobRequest auto = new ConvertLeadToJobRequest();
+        auto.setType(JobType.REPLACEMENT);
+        auto.setInternalNotes(null);
+
+        Job job = createJobFromLeadEntity(lead, tenant, userId, auto);
+        lead.setStatusDefinition(newDef);
+        AuditSupport.touchForUpdate(lead, userId);
+        archiveLead(lead, userId);
+        leadRepository.save(lead);
+
+        Map<String, Object> meta = new HashMap<>();
+        meta.put("leadId", lead.getId());
+        meta.put("fromStatus", oldDef.getSystemKey());
+        meta.put("toStatus", newDef.getSystemKey());
+        meta.put("jobId", job.getId());
+        activityEventService.recordEvent(tenant, userId, ActivityEntityType.LEAD,
+                Objects.requireNonNull(lead.getId()),
+                ActivityEventType.LEAD_STATUS_CHANGED,
+                "Lead status changed from " + oldDef.getLabel() + " to " + newDef.getLabel() + " (job created)", meta);
+        activityEventService.recordEvent(tenant, userId, ActivityEntityType.LEAD,
+                Objects.requireNonNull(lead.getId()),
+                ActivityEventType.LEAD_CONVERTED_TO_JOB, "Lead converted to job (won status)", meta);
+
+        return toDto(lead, job.getId());
+    }
+
+    private void archiveLead(Lead lead, UUID userId) {
+        if (lead.isArchived()) {
+            return;
+        }
+        lead.setArchived(true);
+        lead.setArchivedAt(Instant.now());
+    }
+
+    private Job createJobFromLeadEntity(Lead lead, Tenant tenant, UUID userId, ConvertLeadToJobRequest request) {
+        Customer customer = lead.getCustomer();
+        if (customer == null) {
+            throw new IllegalArgumentException("Lead has no associated customer");
+        }
+        Job job = new Job();
+        job.setTenant(tenant);
+        job.setCustomer(customer);
+        job.setLead(lead);
+        AuditSupport.touchForCreate(job, userId);
+        job.setJobType(request.getType());
+        job.setScheduledStartDate(request.getScheduledStartDate());
+        job.setScheduledEndDate(request.getScheduledEndDate());
+        PipelineStatusDefinition jobStatus = request.getScheduledStartDate() != null
+                ? requireJobDefByKey(tenant, "SCHEDULED")
+                : requireJobDefByKey(tenant, "UNSCHEDULED");
+        job.setStatusDefinition(jobStatus);
+        job.setAssignedCrew(request.getCrewName());
+        job.setJobNotes(request.getInternalNotes());
+        if (lead.getPropertyAddress() != null) {
+            Address propertyAddress = new Address();
+            copyAddress(lead.getPropertyAddress(), propertyAddress);
+            job.setPropertyAddress(propertyAddress);
+        }
+        return jobRepository.save(job);
     }
 
     private PipelineStatusDefinition requireLeadDef(Tenant tenant, UUID id) {

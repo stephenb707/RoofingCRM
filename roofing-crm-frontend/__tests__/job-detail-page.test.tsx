@@ -485,6 +485,56 @@ describe("JobDetailPage", () => {
     expect(screen.getByTestId("attachments-scroll-region").className).toMatch(/overflow-y-auto/);
   });
 
+  it("opens attachment image lightbox from thumbnail and skips preview for non-images", async () => {
+    mockedAttachmentsApi.listJobAttachments.mockResolvedValue([
+      {
+        id: "att-1",
+        fileName: "damage.jpg",
+        contentType: "image/jpeg",
+        fileSize: 100,
+        leadId: null,
+        jobId: "job-1",
+        tag: "DAMAGE",
+        createdAt: "2024-01-01T00:00:00Z",
+        updatedAt: "2024-01-01T00:00:00Z",
+      },
+      {
+        id: "att-2",
+        fileName: "notes.pdf",
+        contentType: "application/pdf",
+        fileSize: 200,
+        leadId: null,
+        jobId: "job-1",
+        tag: "OTHER",
+        createdAt: "2024-01-01T00:00:00Z",
+        updatedAt: "2024-01-01T00:00:00Z",
+      },
+    ]);
+    mockedAttachmentsApi.downloadAttachment.mockResolvedValue(new Blob(["image"], { type: "image/jpeg" }));
+
+    render(<JobDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /view full size: damage\.jpg/i })).toBeInTheDocument();
+      expect(screen.getByText("notes.pdf")).toBeInTheDocument();
+    });
+
+    expect(screen.queryByRole("button", { name: /view full size: notes\.pdf/i })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("image-preview-lightbox")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /view full size: damage\.jpg/i }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("image-preview-lightbox")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("image-preview-close"));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("image-preview-lightbox")).not.toBeInTheDocument();
+    });
+  });
+
   it("adding communication log calls addJobCommunicationLog", async () => {
     const user = userEvent.setup();
     mockedCommLogsApi.addJobCommunicationLog.mockResolvedValue({

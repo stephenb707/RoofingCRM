@@ -10,6 +10,7 @@ import com.roofingcrm.service.exception.MailConfigurationException;
 import com.roofingcrm.service.exception.MailDeliveryException;
 import com.roofingcrm.service.exception.NoPaidInvoicesForYearException;
 import com.roofingcrm.service.exception.ResourceNotFoundException;
+import com.roofingcrm.service.auth.AuthSessionException;
 import com.roofingcrm.service.tenant.TenantAccessDeniedException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
@@ -50,6 +51,19 @@ public class GlobalExceptionHandler {
                 request.getRequestURI()
         );
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
+    }
+
+    @ExceptionHandler(AuthSessionException.class)
+    public ResponseEntity<ApiErrorResponse> handleAuthSession(AuthSessionException ex,
+                                                             HttpServletRequest request) {
+        ApiErrorResponse body = new ApiErrorResponse(
+                Instant.now(),
+                HttpStatus.UNAUTHORIZED.value(),
+                HttpStatus.UNAUTHORIZED.getReasonPhrase(),
+                ex.getMessage(),
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(body);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

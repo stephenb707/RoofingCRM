@@ -68,7 +68,13 @@ public final class CustomerPhotoReportPresentationHelper {
             }
         }
 
-        return job.getId() != null ? "Job reference " + job.getId().toString().substring(0, 8) : "Related job";
+        if (job.getStatusDefinition() != null
+                && job.getStatusDefinition().getLabel() != null
+                && !job.getStatusDefinition().getLabel().isBlank()) {
+            return job.getStatusDefinition().getLabel().trim();
+        }
+
+        return "Related job";
     }
 
     private static String formatAddress(Address address) {

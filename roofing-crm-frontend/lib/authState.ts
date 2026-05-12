@@ -2,6 +2,15 @@ import { TenantSummary } from "./types";
 
 export type AuthState = {
   token: string | null;
+  /**
+   * Per-session CSRF token paired with the HttpOnly refresh cookie. Stored alongside
+   * non-sensitive metadata so we can survive a page reload and still send the matching
+   * X-CSRF-Refresh header on the bootstrap refresh call.
+   *
+   * NOT a session secret on its own — the refresh cookie is HttpOnly. This token only
+   * proves the request originated from our SPA (CSRF defense), not that it's authenticated.
+   */
+  csrfToken: string | null;
   userId: string | null;
   email: string | null;
   fullName: string | null;
@@ -11,6 +20,7 @@ export type AuthState = {
 
 export const emptyAuthState: AuthState = {
   token: null,
+  csrfToken: null,
   userId: null,
   email: null,
   fullName: null,
@@ -30,7 +40,9 @@ export function loadAuthStateFromStorage(): AuthState {
     const parsed = JSON.parse(raw) as Partial<AuthState>;
 
     return {
-      token: parsed.token ?? null,
+      // Access tokens are intentionally memory-only. The HttpOnly refresh cookie is the session.
+      token: null,
+      csrfToken: parsed.csrfToken ?? null,
       userId: parsed.userId ?? null,
       email: parsed.email ?? null,
       fullName: parsed.fullName ?? null,
@@ -44,7 +56,10 @@ export function loadAuthStateFromStorage(): AuthState {
 
 export function saveAuthStateToStorage(state: AuthState) {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
+    ...state,
+    token: null,
+  }));
 }
 
 export function clearAuthStateFromStorage() {

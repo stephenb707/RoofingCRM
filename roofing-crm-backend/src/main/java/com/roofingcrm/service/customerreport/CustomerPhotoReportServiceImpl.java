@@ -29,20 +29,19 @@ import com.roofingcrm.service.mail.EmailAttachment;
 import com.roofingcrm.service.mail.EmailService;
 import com.roofingcrm.service.report.CustomerPhotoReportPdfGenerator;
 import com.roofingcrm.service.tenant.TenantAccessService;
+import com.roofingcrm.util.SafeDownloadPdfFilename;
 import org.hibernate.Hibernate;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -247,15 +246,7 @@ public class CustomerPhotoReportServiceImpl implements CustomerPhotoReportServic
 
     private CustomerPhotoReportPdfExport buildPdfExport(CustomerPhotoReport report, Tenant tenant) {
         byte[] content = pdfGenerator.generate(report, tenant);
-        String namePart = formatCustomerName(report.getCustomer())
-                .replaceAll("[^a-zA-Z0-9]+", "-")
-                .replaceAll("(^-+)|(-+$)", "")
-                .toLowerCase(Locale.ROOT);
-        if (namePart.isBlank()) {
-            namePart = report.getCustomer().getId().toString().substring(0, 8);
-        }
-        LocalDate reportDate = CustomerPhotoReportPresentationHelper.resolveReportLocalDate(report);
-        String filename = "customer-report-" + namePart + "-" + reportDate + ".pdf";
+        String filename = SafeDownloadPdfFilename.fromReportTitle(report.getTitle());
         return new CustomerPhotoReportPdfExport(content, filename);
     }
 
@@ -278,7 +269,10 @@ public class CustomerPhotoReportServiceImpl implements CustomerPhotoReportServic
         } else {
             list = attachmentRepository.findReportableForCustomer(tenant, customer.getId());
         }
-        return list.stream().map(this::toAttachmentDto).toList();
+        return list.stream()
+                .filter(a -> ReportGalleryImageMime.isSupported(a.getContentType()))
+                .map(this::toAttachmentDto)
+                .toList();
     }
 
     private Job resolveJob(Tenant tenant, Customer customer, UUID jobId) {
@@ -327,6 +321,7 @@ public class CustomerPhotoReportServiceImpl implements CustomerPhotoReportServic
                     continue;
                 }
                 Attachment att = resolveReportableAttachment(tenant, customer, job, attachmentId);
+                ReportGalleryImageMime.requireSupportedReportGalleryImage(att);
                 CustomerPhotoReportSectionPhoto photo = new CustomerPhotoReportSectionPhoto();
                 photo.setSection(section);
                 photo.setAttachment(att);

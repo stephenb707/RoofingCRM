@@ -108,6 +108,10 @@ public class PublicEstimateService {
         dto.setTotal(e.getTotal());
         dto.setPublicExpiresAt(e.getPublicExpiresAt());
 
+        if (e.getTenant() != null && e.getTenant().getName() != null && !e.getTenant().getName().isBlank()) {
+            dto.setCompanyName(e.getTenant().getName().trim());
+        }
+
         if (e.getJob() != null && e.getJob().getCustomer() != null) {
             Customer c = e.getJob().getCustomer();
             dto.setCustomerName(formatCustomerName(c.getFirstName(), c.getLastName()));

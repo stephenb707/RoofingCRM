@@ -97,14 +97,14 @@ class AccountingJobsReportServiceTest {
         try (Workbook wb = new XSSFWorkbook(new ByteArrayInputStream(xlsx))) {
             Sheet sheet = wb.getSheetAt(0);
             Row header = sheet.getRow(0);
-            assertEquals("Job ID", header.getCell(0).getStringCellValue());
-            assertEquals("Agreed Amount", header.getCell(CellReference.convertColStringToIndex("E")).getStringCellValue());
-            assertEquals("Materials Cost", header.getCell(CellReference.convertColStringToIndex("M")).getStringCellValue());
+            assertEquals("Job Name", header.getCell(0).getStringCellValue());
+            assertEquals("Agreed Amount", header.getCell(CellReference.convertColStringToIndex("D")).getStringCellValue());
+            assertEquals("Materials Cost", header.getCell(CellReference.convertColStringToIndex("L")).getStringCellValue());
 
             Row data = sheet.getRow(1);
-            assertEquals(jobId.toString(), data.getCell(0).getStringCellValue());
-            assertEquals(new BigDecimal("1000.00"), BigDecimal.valueOf(data.getCell(4).getNumericCellValue()).setScale(2, java.math.RoundingMode.UNNECESSARY));
-            assertEquals(new BigDecimal("100.00"), BigDecimal.valueOf(data.getCell(12).getNumericCellValue()).setScale(2, java.math.RoundingMode.UNNECESSARY));
+            assertEquals("Repair – 100 Pine Rd, Denver, CO", data.getCell(0).getStringCellValue());
+            assertEquals(new BigDecimal("1000.00"), BigDecimal.valueOf(data.getCell(3).getNumericCellValue()).setScale(2, java.math.RoundingMode.UNNECESSARY));
+            assertEquals(new BigDecimal("100.00"), BigDecimal.valueOf(data.getCell(11).getNumericCellValue()).setScale(2, java.math.RoundingMode.UNNECESSARY));
         }
 
         verify(jobAccountingService).getJobAccountingSummary(tenantId, userId, jobId);

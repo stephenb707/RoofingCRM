@@ -19,6 +19,9 @@ import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 import org.springframework.stereotype.Component;
 
 import javax.imageio.ImageIO;
+import java.awt.Graphics2D;
+import java.awt.Color;
+import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -43,8 +46,18 @@ public class CustomerPhotoReportPdfGenerator {
     private static final float LINE_LEADING = 13f;
     private static final float SECTION_SPACING = 12f;
     private static final float IMAGE_BOTTOM_PADDING = 10f;
-    private static final float IMAGE_TOP_PADDING = 4f;
-    private static final float MAX_IMAGE_HEIGHT = PDRectangle.LETTER.getHeight() - MIN_Y - MARGIN - 12f;
+    private static final float IMAGE_TOP_PADDING = 8f;
+    /** Max drawable width/heights so section text + multiple photos fit on a page more often. */
+    private static final float MAX_IMAGE_DISPLAY_WIDTH_PT = CONTENT_WIDTH * 0.78f;
+    private static final float MAX_IMAGE_DISPLAY_HEIGHT_PT = 200f;
+    /**
+     * Minimum vertical space (pt) we want free below the cursor before starting a section
+     * (section heading + a bit of body and/or first photo slot). Avoids orphaned headings.
+     */
+    private static final float MIN_SECTION_START_FLOOR_PT = 72f;
+    /** Reasonable display height budget for "first photo" when estimating section-start fit. pt */
+    private static final float FIRST_PHOTO_BLOCK_ESTIMATE_PT = 140f;
+
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("MMMM d, yyyy", Locale.US);
 
     private final AttachmentStorageService storageService;
@@ -65,6 +78,8 @@ public class CustomerPhotoReportPdfGenerator {
             sections.sort((a, b) -> Integer.compare(a.getSortOrder(), b.getSortOrder()));
 
             for (CustomerPhotoReportSection section : sections) {
+                ensureRoomForSectionStart(state, section);
+
                 state.y = writeBlock(state,
                         section.getTitle() != null ? section.getTitle() : "Section",
                         PDType1Font.HELVETICA_BOLD,
@@ -158,8 +173,8 @@ public class CustomerPhotoReportPdfGenerator {
 
         float natW = Math.max(1f, img.getWidth());
         float natH = Math.max(1f, img.getHeight());
-        float scale = Math.min(1f, CONTENT_WIDTH / natW);
-        scale = Math.min(scale, MAX_IMAGE_HEIGHT / natH);
+        float scale = Math.min(1f, MAX_IMAGE_DISPLAY_WIDTH_PT / natW);
+        scale = Math.min(scale, MAX_IMAGE_DISPLAY_HEIGHT_PT / natH);
         float dispW = natW * scale;
         float dispH = natH * scale;
 
@@ -169,20 +184,93 @@ public class CustomerPhotoReportPdfGenerator {
         return drawY - IMAGE_BOTTOM_PADDING;
     }
 
+    /**
+     * If too little room remains for this section's opening block (title + initial content chunk),
+     * start the section on the next page. Otherwise continue on the current page so multiple
+     * short sections can share a page.
+     */
+    private void ensureRoomForSectionStart(PageState state, CustomerPhotoReportSection section) throws IOException {
+        float requiredBelowCursor = estimateSectionStartMinHeight(section);
+        if (insufficientRemainingSpace(state.y, MIN_Y, requiredBelowCursor)) {
+            beginSectionOnFreshPage(state);
+        }
+    }
+
+    /**
+     * Rough minimum height needed below the cursor to begin a section without cramming the heading
+     * against the footer: wrapped section title lines, a small body chunk, and/or first photo block.
+     */
+    float estimateSectionStartMinHeight(CustomerPhotoReportSection section) throws IOException {
+        String titleText = section.getTitle() != null && !section.getTitle().isBlank()
+                ? section.getTitle()
+                : "Section";
+        float lineAdvance = HEADING_SIZE + 6f;
+        int titleLines = wrapParagraph(titleText, PDType1Font.HELVETICA_BOLD, HEADING_SIZE, CONTENT_WIDTH).size();
+        float h = titleLines * lineAdvance;
+        h += 6f;
+        if (section.getBody() != null && !section.getBody().isBlank()) {
+            h += LINE_LEADING * 2;
+        }
+        List<CustomerPhotoReportSectionPhoto> photos = section.getPhotos();
+        if (photos != null && !photos.isEmpty()) {
+            float photoH = Math.min(MAX_IMAGE_DISPLAY_HEIGHT_PT, FIRST_PHOTO_BLOCK_ESTIMATE_PT);
+            h += IMAGE_TOP_PADDING + photoH + IMAGE_BOTTOM_PADDING;
+        }
+        return Math.max(MIN_SECTION_START_FLOOR_PT, h);
+    }
+
+    /**
+     * @return true when the vertical gap between the cursor and the page footer is less than required
+     */
+    static boolean insufficientRemainingSpace(float cursorY, float pageContentFloorY, float requiredBelowCursor) {
+        return cursorY - pageContentFloorY < requiredBelowCursor;
+    }
+
+    private void beginSectionOnFreshPage(PageState state) throws IOException {
+        state.content.close();
+        PDPage page = new PDPage(PDRectangle.LETTER);
+        state.document.addPage(page);
+        state.content = new PDPageContentStream(state.document, page);
+        state.y = page.getMediaBox().getHeight() - MARGIN;
+    }
+
     private PDImageXObject toImage(PDDocument doc, byte[] data, String contentType) throws IOException {
         String ct = contentType != null ? contentType.toLowerCase(Locale.ROOT) : "";
-        if (ct.contains("jpeg") || ct.contains("jpg")) {
+        if (ct.contains("jpeg") || ct.contains("jpg") || ct.contains("pjpeg")) {
             try {
                 return JPEGFactory.createFromByteArray(doc, data);
             } catch (IOException ignored) {
-                // Fall through to ImageIO for mislabeled image bytes.
+                // Fall through to ImageIO when bytes are mislabeled or CMYK-heavy.
             }
         }
         BufferedImage bi = ImageIO.read(new ByteArrayInputStream(data));
         if (bi == null) {
             return null;
         }
-        return LosslessFactory.createFromImage(doc, bi);
+        return losslessPdfImage(doc, bi);
+    }
+
+    private PDImageXObject losslessPdfImage(PDDocument doc, BufferedImage bi) throws IOException {
+        try {
+            return LosslessFactory.createFromImage(doc, bi);
+        } catch (Exception ex) {
+            BufferedImage rgb = copyToRgb(bi);
+            return LosslessFactory.createFromImage(doc, rgb);
+        }
+    }
+
+    private static BufferedImage copyToRgb(BufferedImage src) {
+        BufferedImage rgb = new BufferedImage(src.getWidth(), src.getHeight(), BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = rgb.createGraphics();
+        try {
+            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            g.setColor(Color.WHITE);
+            g.fillRect(0, 0, rgb.getWidth(), rgb.getHeight());
+            g.drawImage(src, 0, 0, null);
+        } finally {
+            g.dispose();
+        }
+        return rgb;
     }
 
     private float ensureSpace(PageState state, float neededHeight) throws IOException {

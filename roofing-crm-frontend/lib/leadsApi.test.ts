@@ -88,5 +88,19 @@ describe("leadsApi", () => {
         statusDefinitionId: contactedDef,
       });
     });
+
+    it("returns convertedJobId from API when lead moves to WON and auto-converts", async () => {
+      mockApi.post.mockResolvedValue({
+        data: {
+          id: "lead-1",
+          statusDefinitionId: "def-won",
+          statusKey: "WON",
+          convertedJobId: "job-from-won",
+        },
+      });
+
+      const result = await updateLeadStatus(mockApi, "lead-1", "def-won");
+      expect(result.convertedJobId).toBe("job-from-won");
+    });
   });
 });
