@@ -72,6 +72,11 @@ export default function PublicInvoicePage() {
           <div className="p-6 border-b border-slate-200">
             <div className="flex items-start justify-between gap-4">
               <div>
+                {invoice.companyName ? (
+                  <p className="text-sm font-semibold text-slate-700 mb-1" data-testid="public-invoice-company">
+                    {invoice.companyName}
+                  </p>
+                ) : null}
                 <h1 className="text-2xl font-bold text-slate-800">
                   Invoice #{invoice.invoiceNumber}
                 </h1>

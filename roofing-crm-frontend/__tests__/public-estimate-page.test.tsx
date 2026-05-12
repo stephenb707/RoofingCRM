@@ -21,6 +21,7 @@ const mockPublicEstimate: PublicEstimateDto = {
   subtotal: 5000,
   total: 5000,
   publicExpiresAt: "2026-02-16T00:00:00Z",
+  companyName: "Acme Roofing Co",
   customerName: "Jane Doe",
   customerAddress: "123 Main St, Chicago, IL",
   items: [
@@ -41,6 +42,7 @@ describe("PublicEstimatePage", () => {
       expect(screen.getByText("Roof Estimate")).toBeInTheDocument();
     });
 
+    expect(screen.getByTestId("public-estimate-company")).toHaveTextContent("Acme Roofing Co");
     expect(screen.getByText(/EST-1001/)).toBeInTheDocument();
     expect(screen.getByText("Jane Doe")).toBeInTheDocument();
     expect(screen.getByText("123 Main St, Chicago, IL")).toBeInTheDocument();

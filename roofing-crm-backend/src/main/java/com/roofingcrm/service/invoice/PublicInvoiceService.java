@@ -50,6 +50,10 @@ public class PublicInvoiceService {
         dto.setNotes(invoice.getNotes());
         dto.setPublicExpiresAt(invoice.getPublicExpiresAt());
 
+        if (invoice.getTenant() != null && invoice.getTenant().getName() != null && !invoice.getTenant().getName().isBlank()) {
+            dto.setCompanyName(invoice.getTenant().getName().trim());
+        }
+
         if (invoice.getJob() != null && invoice.getJob().getCustomer() != null) {
             Customer c = invoice.getJob().getCustomer();
             dto.setCustomerName(formatCustomerName(c.getFirstName(), c.getLastName()));

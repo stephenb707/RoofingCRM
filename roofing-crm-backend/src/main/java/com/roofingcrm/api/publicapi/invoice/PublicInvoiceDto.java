@@ -24,5 +24,8 @@ public class PublicInvoiceDto {
     private String customerName;
     private String customerAddress;
 
+    /** Roofing company / tenant name shown to the customer (public-safe). */
+    private String companyName;
+
     private List<PublicInvoiceItemDto> items;
 }

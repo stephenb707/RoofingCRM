@@ -88,6 +88,14 @@ describe("LeadDetailPage", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockPush.mockClear();
+    Object.defineProperty(URL, "createObjectURL", {
+      value: jest.fn(() => "blob:attachment-preview"),
+      configurable: true,
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      value: jest.fn(),
+      configurable: true,
+    });
     mockedLeadsApi.updateLeadStatus.mockReset();
     mockedPipelineApi.listPipelineStatuses.mockResolvedValue([defNew, defWon, defLost]);
     mockedLeadsApi.getLead.mockResolvedValue(mockLead);
@@ -235,6 +243,94 @@ describe("LeadDetailPage", () => {
       );
     });
     expect(mockPush).toHaveBeenCalledWith("/app/jobs/job-from-won-1");
+  });
+
+  it("renders image attachment thumbnails by downloading blobs like Job Details", async () => {
+    mockedAttachmentsApi.listLeadAttachments.mockResolvedValue([
+      {
+        id: "att-img",
+        fileName: "damage.jpg",
+        contentType: "image/jpeg",
+        fileSize: 100,
+        leadId: "lead-1",
+        jobId: null,
+        tag: "DAMAGE",
+        createdAt: "2024-01-01T00:00:00Z",
+        updatedAt: "2024-01-01T00:00:00Z",
+      },
+    ]);
+    mockedAttachmentsApi.downloadAttachment.mockResolvedValue(new Blob(["x"], { type: "image/jpeg" }));
+
+    render(<LeadDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("attachment-thumbnail-att-img")).toBeInTheDocument();
+      expect(screen.getByAltText("damage.jpg")).toBeInTheDocument();
+    });
+    expect(mockedAttachmentsApi.downloadAttachment).toHaveBeenCalledWith(
+      expect.anything(),
+      "att-img"
+    );
+  });
+
+  it("does not download previews for non-image lead attachments", async () => {
+    mockedAttachmentsApi.listLeadAttachments.mockResolvedValue([
+      {
+        id: "att-pdf",
+        fileName: "notes.pdf",
+        contentType: "application/pdf",
+        fileSize: 200,
+        leadId: "lead-1",
+        jobId: null,
+        tag: "OTHER",
+        createdAt: "2024-01-01T00:00:00Z",
+        updatedAt: "2024-01-01T00:00:00Z",
+      },
+    ]);
+
+    render(<LeadDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("notes.pdf")).toBeInTheDocument();
+    });
+
+    expect(mockedAttachmentsApi.downloadAttachment).not.toHaveBeenCalled();
+    expect(screen.queryByRole("img", { name: /notes\.pdf/i })).not.toBeInTheDocument();
+  });
+
+  it("opens image lightbox from lead attachment thumbnail", async () => {
+    mockedAttachmentsApi.listLeadAttachments.mockResolvedValue([
+      {
+        id: "att-1",
+        fileName: "damage.jpg",
+        contentType: "image/jpeg",
+        fileSize: 100,
+        leadId: "lead-1",
+        jobId: null,
+        tag: "DAMAGE",
+        createdAt: "2024-01-01T00:00:00Z",
+        updatedAt: "2024-01-01T00:00:00Z",
+      },
+    ]);
+    mockedAttachmentsApi.downloadAttachment.mockResolvedValue(new Blob(["image"], { type: "image/jpeg" }));
+
+    render(<LeadDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /view full size: damage\.jpg/i })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /view full size: damage\.jpg/i }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("image-preview-lightbox")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("image-preview-close"));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("image-preview-lightbox")).not.toBeInTheDocument();
+    });
   });
 
   it("renders — when customer name fields are missing", async () => {

@@ -71,6 +71,7 @@ public class SecurityConfig {
                 }
                 config.setAllowedMethods(corsProperties.getAllowedMethods());
                 config.setAllowedHeaders(corsProperties.getAllowedHeaders());
+                config.addAllowedHeader("X-CSRF-Refresh");
                 config.setAllowCredentials(corsProperties.isAllowCredentials());
                 config.setMaxAge(corsProperties.getMaxAge());
                 config.addExposedHeader(HttpHeaders.CONTENT_DISPOSITION);

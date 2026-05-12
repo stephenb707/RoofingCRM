@@ -52,10 +52,14 @@ export interface ActivitySectionProps {
 }
 
 export function ActivitySection({ entityType, entityId }: ActivitySectionProps) {
-  const { api, auth, ready } = useAuthReady();
+  const { api, auth, ready, refreshAccessToken } = useAuthReady();
   const queryClient = useQueryClient();
   const [noteBody, setNoteBody] = useState("");
   const [noteError, setNoteError] = useState<string | null>(null);
+
+  const tokenRef = useRef<string | null>(null);
+  tokenRef.current = auth.token ?? null;
+  const lastTerminalLogAtRef = useRef(0);
 
   const activityKey = queryKeys.activityForEntity(
     auth.selectedTenantId,
@@ -75,7 +79,6 @@ export function ActivitySection({ entityType, entityId }: ActivitySectionProps) 
     ) {
       return;
     }
-    const token = auth.token;
     const tenantId = auth.selectedTenantId;
     const topic = activityTopic(tenantId, entityType, entityId);
     const keyToInvalidate = queryKeys.activityForEntity(
@@ -85,17 +88,28 @@ export function ActivitySection({ entityType, entityId }: ActivitySectionProps) 
     );
     subRef.current = null;
 
-    const client = createStompClient(
-      token,
-      (c) => {
+    const client = createStompClient({
+      getToken: () => tokenRef.current,
+      refreshAccessToken,
+      onConnect: (c) => {
         subRef.current = c.subscribe(topic, () => {
           queryClient.invalidateQueries({ queryKey: keyToInvalidate });
         });
       },
-      (err) => {
-        console.error("[ActivitySection] STOMP error:", err);
-      }
-    );
+      onConnectionIssue: (issue) => {
+        if (issue.kind === "auth" && issue.terminal) {
+          const now = Date.now();
+          if (now - lastTerminalLogAtRef.current > 120_000) {
+            lastTerminalLogAtRef.current = now;
+            console.info("[ActivitySection] " + issue.summary);
+          }
+          return;
+        }
+        if (process.env.NODE_ENV !== "production") {
+          console.debug("[ActivitySection] " + issue.summary);
+        }
+      },
+    });
     client.activate();
 
     return () => {
@@ -103,9 +117,10 @@ export function ActivitySection({ entityType, entityId }: ActivitySectionProps) 
         subRef.current.unsubscribe();
         subRef.current = null;
       }
-      client.deactivate();
+      client.reconnectDelay = 0;
+      void client.deactivate();
     };
-  }, [auth.token, auth.selectedTenantId, entityType, entityId, queryClient]);
+  }, [auth.token, auth.selectedTenantId, entityType, entityId, queryClient, refreshAccessToken]);
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: activityKey,

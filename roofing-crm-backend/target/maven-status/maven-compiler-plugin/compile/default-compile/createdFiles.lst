@@ -49,6 +49,7 @@ com\roofingcrm\api\v1\common\PickerItemDto.class
 com\roofingcrm\api\v1\invoice\InvoiceDto.class
 com\roofingcrm\domain\enums\EstimateStatus.class
 com\roofingcrm\domain\entity\TenantUserMembership.class
+com\roofingcrm\domain\repository\AuthRefreshTokenSessionRepository.class
 com\roofingcrm\domain\entity\ActivityEvent.class
 com\roofingcrm\api\v1\task\CreateTaskRequest.class
 com\roofingcrm\api\v1\task\TaskDto.class

@@ -3,6 +3,7 @@ import { render, screen, waitFor } from "./test-utils";
 import userEvent from "@testing-library/user-event";
 import { ActivitySection } from "@/components/ActivitySection";
 import * as activityApi from "@/lib/activityApi";
+import { createStompClient } from "@/lib/stompClient";
 
 jest.mock("@/lib/activityApi");
 
@@ -164,5 +165,24 @@ describe("ActivitySection", () => {
     await waitFor(() => {
       expect(screen.getByText("New note text")).toBeInTheDocument();
     });
+  });
+
+  it("unmount deactivates the STOMP client to avoid stale connections", async () => {
+    const deactivate = jest.fn();
+    const activate = jest.fn();
+    jest.mocked(createStompClient).mockReturnValueOnce({
+      activate,
+      deactivate,
+      reconnectDelay: 5000,
+    } as unknown as ReturnType<typeof createStompClient>);
+
+    const { unmount } = render(<ActivitySection entityType="LEAD" entityId="lead-1" />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Called customer")).toBeInTheDocument();
+    });
+
+    unmount();
+    expect(deactivate).toHaveBeenCalled();
   });
 });

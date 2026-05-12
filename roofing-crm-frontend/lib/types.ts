@@ -33,6 +33,12 @@ export interface AcceptInviteResponse {
 
 export interface AuthResponse {
   token: string;
+  /**
+   * Per-session CSRF token to send back as the X-CSRF-Refresh header on
+   * /api/v1/auth/refresh and /api/v1/auth/logout. JS-readable on purpose; the
+   * actual refresh credential is the HttpOnly refresh cookie.
+   */
+  csrfToken?: string | null;
   userId: string;
   email: string;
   fullName: string | null;
@@ -413,6 +419,8 @@ export interface PublicEstimateDto {
   publicExpiresAt?: string | null;
   customerName?: string | null;
   customerAddress?: string | null;
+  /** Roofing company name (tenant) — safe for customers. */
+  companyName?: string | null;
   items: PublicEstimateItemDto[];
 }
 
@@ -490,6 +498,8 @@ export interface PublicInvoiceDto {
   publicExpiresAt?: string | null;
   customerName?: string | null;
   customerAddress?: string | null;
+  /** Roofing company name (tenant) — safe for customers. */
+  companyName?: string | null;
   items: PublicInvoiceItemDto[];
 }
 

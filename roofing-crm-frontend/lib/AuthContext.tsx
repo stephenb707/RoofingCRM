@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useMemo, useEffect, useState, useRef } from "react";
+import React, { createContext, useCallback, useContext, useMemo, useEffect, useState, useRef } from "react";
 import { AuthResponse, TenantSummary } from "./types";
 import {
   AuthState,
@@ -9,7 +9,7 @@ import {
   clearAuthStateFromStorage,
   emptyAuthState,
 } from "./authState";
-import { createApiClient } from "./apiClient";
+import { createApiClient, logoutSessionRequest, refreshSessionRequest } from "./apiClient";
 
 type AuthContextValue = {
   auth: AuthState;
@@ -17,6 +17,7 @@ type AuthContextValue = {
   setAuthFromLogin: (response: AuthResponse) => void;
   selectTenant: (tenantId: string) => void;
   addTenant: (tenantSummary: TenantSummary) => void;
+  refreshAccessToken: () => Promise<string | null>;
   logout: () => void;
 };
 
@@ -30,31 +31,95 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const authRef = useRef<AuthState>(auth);
 
   useEffect(() => {
-    setAuth(loadAuthStateFromStorage());
-    setHydrated(true);
-  }, []);
-
-  useEffect(() => {
     authRef.current = auth;
   }, [auth]);
 
-  const api = useMemo(() => createApiClient(() => authRef.current), []);
-
-  const setAuthFromLogin = (response: AuthResponse) => {
+  const applyAuthResponse = useCallback((response: AuthResponse, preferredTenantId?: string | null) => {
+    const tenants = response.tenants ?? [];
+    const preferredStillAvailable =
+      preferredTenantId && tenants.some((t) => t.tenantId === preferredTenantId);
     const next: AuthState = {
       token: response.token,
+      csrfToken: response.csrfToken ?? null,
       userId: response.userId,
       email: response.email,
       fullName: response.fullName ?? null,
-      tenants: response.tenants ?? [],
-      selectedTenantId:
-        response.tenants && response.tenants.length === 1
-          ? response.tenants[0].tenantId
+      tenants,
+      selectedTenantId: preferredStillAvailable
+        ? preferredTenantId
+        : tenants.length === 1
+          ? tenants[0].tenantId
           : null,
     };
     setAuth(next);
+    authRef.current = next;
     saveAuthStateToStorage(next);
+    return next;
+  }, []);
+
+  const clearAuth = useCallback(() => {
+    setAuth(emptyAuthState);
+    authRef.current = emptyAuthState;
+    clearAuthStateFromStorage();
+  }, []);
+
+  const handleUnauthenticated = useCallback(() => {
+    clearAuth();
+    if (typeof window !== "undefined" && window.location.pathname.startsWith("/app")) {
+      const next = `${window.location.pathname}${window.location.search}`;
+      window.location.assign(`/auth/login?next=${encodeURIComponent(next)}`);
+    }
+  }, [clearAuth]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const stored = loadAuthStateFromStorage();
+    setAuth(stored);
+    authRef.current = stored;
+
+    refreshSessionRequest(stored.csrfToken)
+      .then((response) => {
+        if (!cancelled) {
+          applyAuthResponse(response, stored.selectedTenantId);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          clearAuth();
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setHydrated(true);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [applyAuthResponse, clearAuth]);
+
+  const api = useMemo(() => createApiClient(() => authRef.current, {
+    onAuthRefreshed: (response) => {
+      applyAuthResponse(response, authRef.current.selectedTenantId);
+    },
+    onUnauthenticated: handleUnauthenticated,
+  }), [applyAuthResponse, handleUnauthenticated]);
+
+  const setAuthFromLogin = (response: AuthResponse) => {
+    applyAuthResponse(response);
   };
+
+  const refreshAccessToken = useCallback(async () => {
+    try {
+      const response = await refreshSessionRequest(authRef.current.csrfToken);
+      applyAuthResponse(response, authRef.current.selectedTenantId);
+      return response.token;
+    } catch {
+      handleUnauthenticated();
+      return null;
+    }
+  }, [applyAuthResponse, handleUnauthenticated]);
 
   const selectTenant = (tenantId: string) => {
     const next: AuthState = {
@@ -79,15 +144,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const logout = () => {
-    setAuth({
-      token: null,
-      userId: null,
-      email: null,
-      fullName: null,
-      tenants: [],
-      selectedTenantId: null,
+    const csrf = authRef.current.csrfToken;
+    void logoutSessionRequest(csrf).catch(() => {
+      // Local logout should still complete even if the server is unreachable
+      // or the CSRF token is stale.
     });
-    clearAuthStateFromStorage();
+    clearAuth();
   };
 
   const value: AuthContextValue = {
@@ -96,6 +158,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     setAuthFromLogin,
     selectTenant,
     addTenant,
+    refreshAccessToken,
     logout,
   };
 

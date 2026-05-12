@@ -289,6 +289,11 @@ export default function JobDetailPage() {
 
     return () => {
       cancelled = true;
+      for (const attachment of missing) {
+        if (attachmentPreviewUrlRef.current[attachment.id] === "") {
+          delete attachmentPreviewUrlRef.current[attachment.id];
+        }
+      }
     };
   }, [api, nonReceiptAttachments]);
 

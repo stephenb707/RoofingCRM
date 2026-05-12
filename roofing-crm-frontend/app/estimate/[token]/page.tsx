@@ -113,6 +113,11 @@ export default function PublicEstimatePage() {
           <div className="p-6 border-b border-slate-200">
             <div className="flex items-start justify-between gap-4">
               <div>
+                {estimate.companyName ? (
+                  <p className="text-sm font-semibold text-slate-700 mb-1" data-testid="public-estimate-company">
+                    {estimate.companyName}
+                  </p>
+                ) : null}
                 <h1 className="text-2xl font-bold text-slate-800">
                   {estimate.title || "Estimate"}
                 </h1>

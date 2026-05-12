@@ -4,6 +4,7 @@ C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\c
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\com\roofingcrm\api\v1\team\TeamControllerTest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\com\roofingcrm\api\v1\customer\CustomerControllerTest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\com\roofingcrm\service\accounting\ReceiptSummaryTextParserTest.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\com\roofingcrm\api\publicapi\invoice\PublicInvoiceControllerTest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\com\roofingcrm\api\GlobalExceptionHandlerTest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\com\roofingcrm\service\report\PaidInvoicesReportServiceTest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\com\roofingcrm\api\v1\auth\AuthControllerTest.java
@@ -14,6 +15,7 @@ C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\c
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\com\roofingcrm\service\attachment\AttachmentServiceImplTest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\com\roofingcrm\customerreport\CustomerPhotoReportFetchIntegrationTest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\com\roofingcrm\api\v1\job\JobScheduleControllerTest.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\com\roofingcrm\security\RefreshCookieConfigSafetyCheckerTest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\com\roofingcrm\service\accounting\JobAccountingReceiptServiceImplUnitTest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\com\roofingcrm\api\v1\customerreport\CustomerPhotoReportControllerTest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\com\roofingcrm\service\accounting\ReceiptImagePreprocessorTest.java
@@ -57,4 +59,5 @@ C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\c
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\com\roofingcrm\api\v1\dashboard\DashboardControllerTest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\com\roofingcrm\api\v1\estimate\EstimateControllerTest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\com\roofingcrm\api\v1\report\AccountingReportControllerTest.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\com\roofingcrm\realtime\WebSocketUrlRedactorTest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\com\roofingcrm\service\report\ReportServiceImplCsvExportIdsTest.java

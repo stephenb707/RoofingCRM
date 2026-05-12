@@ -55,8 +55,23 @@ app:
     max-age: 3600
   security:
     jwt:
-      secret: "REPLACE_WITH_A_LONG_RANDOM_SECRET_KEY_FOR_DEV_ONLY_MIN_32_CHARS"
-      expiration-seconds: 36000
+      secret: ${APP_SECURITY_JWT_SECRET:REPLACE_WITH_A_LONG_RANDOM_SECRET_KEY_FOR_DEV_ONLY_MIN_32_CHARS}
+      expiration-seconds: ${APP_SECURITY_JWT_EXPIRATION_SECONDS:900}
+    refresh-token:
+      cookie-name: ${APP_SECURITY_REFRESH_COOKIE_NAME:rc_refresh_token}
+      expiration-days: ${APP_SECURITY_REFRESH_EXPIRATION_DAYS:14}
+      # secure-cookie:
+      #   Local dev over plain http://localhost: keep false.
+      #   PRODUCTION (any https deployment): MUST be true so the HttpOnly refresh cookie is
+      #   only sent over TLS.
+      secure-cookie: ${APP_SECURITY_REFRESH_COOKIE_SECURE:false}
+      # same-site:
+      #   Same-site dev (frontend + backend on localhost): Lax is fine.
+      #   PRODUCTION cross-site (frontend on app.example.com, backend on api.example.com):
+      #   MUST be None, and Secure MUST be true. Browsers will reject SameSite=None without Secure.
+      #   See RefreshCookieConfigSafetyChecker for startup validation.
+      same-site: ${APP_SECURITY_REFRESH_COOKIE_SAME_SITE:Lax}
+      cookie-path: ${APP_SECURITY_REFRESH_COOKIE_PATH:/api/v1/auth}
   storage:
     local:
       base-dir: "./uploads"
