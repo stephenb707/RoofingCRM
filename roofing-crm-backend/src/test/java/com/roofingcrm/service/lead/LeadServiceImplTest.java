@@ -340,7 +340,8 @@ class LeadServiceImplTest extends AbstractIntegrationTest {
         // Archived lead is not returned by getLead; persisted row is WON + archived
         assertThrows(ResourceNotFoundException.class,
                 () -> leadService.getLead(tenantId, userId, lead.getId()));
-        Lead persisted = leadRepository.findById(Objects.requireNonNull(lead.getId())).orElseThrow();
+        Lead persisted = leadRepository.findWithStatusDefinitionById(Objects.requireNonNull(lead.getId()))
+                .orElseThrow();
         assertTrue(persisted.isArchived());
         assertEquals("WON", persisted.getStatusDefinition().getSystemKey());
     }

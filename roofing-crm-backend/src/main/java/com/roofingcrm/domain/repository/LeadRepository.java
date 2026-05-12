@@ -65,6 +65,14 @@ public interface LeadRepository extends JpaRepository<Lead, UUID> {
     @EntityGraph(attributePaths = {"customer", "statusDefinition"})
     Optional<Lead> findByIdAndTenantAndArchivedFalse(UUID id, Tenant tenant);
 
+    /**
+     * Load a lead by id with {@link com.roofingcrm.domain.entity.Lead#getStatusDefinition() statusDefinition}
+     * initialized (e.g. archived / converted leads not returned by {@link #findByIdAndTenantAndArchivedFalse}).
+     */
+    @EntityGraph(attributePaths = {"statusDefinition"})
+    @Query("select l from Lead l where l.id = :id")
+    Optional<Lead> findWithStatusDefinitionById(@Param("id") UUID id);
+
     @Query("""
         select distinct l from Lead l
         left join fetch l.statusDefinition
