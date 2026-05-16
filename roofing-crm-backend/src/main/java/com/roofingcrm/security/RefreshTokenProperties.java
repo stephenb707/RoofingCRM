@@ -1,9 +1,7 @@
 package com.roofingcrm.security;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.stereotype.Component;
 
-@Component
 @ConfigurationProperties(prefix = "app.security.refresh-token")
 public class RefreshTokenProperties {
 

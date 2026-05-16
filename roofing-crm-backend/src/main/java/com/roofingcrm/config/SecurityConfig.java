@@ -41,11 +41,16 @@ public class SecurityConfig {
         }
 
         @Bean
+        public JwtAuthenticationFilter jwtAuthenticationFilter(JwtService jwtService) {
+                return new JwtAuthenticationFilter(jwtService);
+        }
+
+        @Bean
         public SecurityFilterChain securityFilterChain(HttpSecurity http,
-                                                       JwtService jwtService,
                                                        SecurityErrorHandlers errorHandlers,
                                                        CorsProperties corsProperties,
-                                                       HighRiskEndpointRateLimitFilter highRiskEndpointRateLimitFilter) throws Exception {
+                                                       HighRiskEndpointRateLimitFilter highRiskEndpointRateLimitFilter,
+                                                       JwtAuthenticationFilter jwtAuthenticationFilter) throws Exception {
             http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource(corsProperties)))
@@ -62,9 +67,9 @@ public class SecurityConfig {
                     .requestMatchers("/ws", "/ws/**").permitAll()
                     .anyRequest().authenticated()
                 )
-                .addFilterBefore(highRiskEndpointRateLimitFilter, JwtAuthenticationFilter.class)
-                .addFilterBefore(new JwtAuthenticationFilter(jwtService), UsernamePasswordAuthenticationFilter.class);
-        
+                .addFilterBefore(highRiskEndpointRateLimitFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+
             return http.build();
         }
 
