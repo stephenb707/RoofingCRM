@@ -15,6 +15,7 @@ import com.roofingcrm.domain.repository.LeadRepository;
 import com.roofingcrm.service.activity.ActivityEventService;
 import com.roofingcrm.service.exception.ResourceNotFoundException;
 import com.roofingcrm.service.tenant.TenantAccessService;
+import com.roofingcrm.storage.AttachmentFilenameSanitizer;
 import com.roofingcrm.storage.AttachmentStorageService;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
@@ -40,6 +41,7 @@ public class AttachmentServiceImpl implements AttachmentService {
     private final JobRepository jobRepository;
     private final AttachmentStorageService storageService;
     private final ActivityEventService activityEventService;
+    private final AttachmentUploadValidator uploadValidator;
 
     public AttachmentServiceImpl(TenantAccessService tenantAccessService,
                                   AttachmentRepository attachmentRepository,
@@ -47,7 +49,8 @@ public class AttachmentServiceImpl implements AttachmentService {
                                   LeadRepository leadRepository,
                                   JobRepository jobRepository,
                                   AttachmentStorageService storageService,
-                                  ActivityEventService activityEventService) {
+                                  ActivityEventService activityEventService,
+                                  AttachmentUploadValidator uploadValidator) {
         this.tenantAccessService = tenantAccessService;
         this.attachmentRepository = attachmentRepository;
         this.reportSectionPhotoRepository = reportSectionPhotoRepository;
@@ -55,6 +58,7 @@ public class AttachmentServiceImpl implements AttachmentService {
         this.jobRepository = jobRepository;
         this.storageService = storageService;
         this.activityEventService = activityEventService;
+        this.uploadValidator = uploadValidator;
     }
 
     @Override
@@ -64,6 +68,8 @@ public class AttachmentServiceImpl implements AttachmentService {
 
         Lead lead = leadRepository.findByIdAndTenantAndArchivedFalse(leadId, tenant)
                 .orElseThrow(() -> new ResourceNotFoundException("Lead not found"));
+
+        uploadValidator.validate(Objects.requireNonNull(file), AttachmentUploadContext.LEAD_ATTACHMENT);
 
         Attachment attachment = createAttachment(tenant, userId, file, tag, description);
         attachment.setLead(lead);
@@ -98,6 +104,8 @@ public class AttachmentServiceImpl implements AttachmentService {
 
         Job job = jobRepository.findByIdAndTenantAndArchivedFalse(jobId, tenant)
                 .orElseThrow(() -> new ResourceNotFoundException("Job not found"));
+
+        uploadValidator.validate(Objects.requireNonNull(file), AttachmentUploadContext.JOB_ATTACHMENT);
 
         Attachment attachment = createAttachment(tenant, userId, file, tag, description);
         attachment.setJob(job);
@@ -179,6 +187,11 @@ public class AttachmentServiceImpl implements AttachmentService {
         return storageService.loadAsStream(attachment.getStorageKey());
     }
 
+    /**
+     * Soft-deletes an attachment by archiving its row. The binary in local (or other) storage is
+     * <strong>not</strong> removed; only metadata is hidden from normal queries. There is no automatic
+     * physical cleanup in this release.
+     */
     @Override
     public void deleteAttachment(@NonNull UUID tenantId, @NonNull UUID userId, @NonNull UUID attachmentId) {
         Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
@@ -202,7 +215,7 @@ public class AttachmentServiceImpl implements AttachmentService {
         attachment.setTenant(tenant);
         attachment.setCreatedByUserId(userId);
         attachment.setUpdatedByUserId(userId);
-        attachment.setFileName(file.getOriginalFilename());
+        attachment.setFileName(AttachmentFilenameSanitizer.sanitizeUploadedFilename(file.getOriginalFilename()));
         attachment.setContentType(file.getContentType());
         attachment.setFileSize(file.getSize());
         attachment.setStorageProvider("LOCAL");

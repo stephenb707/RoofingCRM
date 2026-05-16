@@ -6,9 +6,12 @@ import com.roofingcrm.domain.entity.Estimate;
 import com.roofingcrm.domain.entity.EstimateItem;
 import com.roofingcrm.domain.entity.Job;
 import com.roofingcrm.domain.entity.Tenant;
+import com.roofingcrm.domain.enums.ActivityEntityType;
+import com.roofingcrm.domain.enums.ActivityEventType;
 import com.roofingcrm.domain.enums.EstimateStatus;
 import com.roofingcrm.domain.repository.EstimateRepository;
 import com.roofingcrm.domain.repository.JobRepository;
+import com.roofingcrm.security.PublicShareTokenHasher;
 import com.roofingcrm.service.activity.ActivityEventService;
 import com.roofingcrm.service.mail.EmailService;
 import com.roofingcrm.service.mail.PublicUrlProperties;
@@ -19,12 +22,14 @@ import com.roofingcrm.service.tenant.TenantAccessDeniedException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -34,7 +39,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-@SuppressWarnings("null")
+@SuppressWarnings({"null", "unchecked"})
 class EstimateServiceImplUnitTest {
 
     @Mock
@@ -154,13 +159,31 @@ class EstimateServiceImplUnitTest {
         assertEquals(EstimateStatus.SENT, estimate.getStatus());
         assertTrue(estimate.isPublicEnabled());
         assertEquals(userId, estimate.getUpdatedByUserId());
+        assertEquals(
+                PublicShareTokenHasher.sha256HexUtf8(response.getToken()),
+                estimate.getPublicTokenHash());
         verify(estimateRepository).save(eq(estimate));
+
+        ArgumentCaptor<Map<String, Object>> sharedMetaCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(activityEventService).recordEvent(eq(tenant), eq(userId), eq(ActivityEntityType.JOB), eq(job.getId()),
+                eq(ActivityEventType.ESTIMATE_SHARED), anyString(), sharedMetaCaptor.capture());
+        Map<String, Object> sharedMeta = sharedMetaCaptor.getValue();
+        assertEquals(estimateId.toString(), sharedMeta.get("estimateId"));
+        assertEquals("EST-1001", sharedMeta.get("estimateNumber"));
+        assertNotNull(sharedMeta.get("expiresAt"));
+        assertEquals(Boolean.TRUE, sharedMeta.get("publicLinkSent"));
+        assertEquals("LINK", sharedMeta.get("deliveryMethod"));
+        assertFalse(sharedMeta.containsKey("publicUrl"));
+        assertFalse(sharedMeta.containsKey("publicToken"));
+        assertFalse(sharedMeta.containsKey("token"));
     }
 
     @Test
-    void shareEstimate_whenAlreadySent_keepsSentStatus() {
+    void shareEstimate_whenAlreadySent_mintsNewTokenEachShare() {
         estimate.setStatus(EstimateStatus.SENT);
-        estimate.setPublicToken("existing-token");
+        estimate.setPublicTokenHash(PublicShareTokenHasher.sha256HexUtf8("existing-token"));
+        estimate.setPublicEnabled(true);
+        estimate.setPublicExpiresAt(java.time.Instant.now().plusSeconds(3600));
         when(tenantAccessService.requireAnyRole(eq(tenantId), eq(userId), any(), anyString()))
                 .thenReturn(mock(com.roofingcrm.domain.entity.TenantUserMembership.class));
         when(tenantAccessService.loadTenantForUserOrThrow(tenantId, userId)).thenReturn(tenant);
@@ -170,8 +193,34 @@ class EstimateServiceImplUnitTest {
         var response = service.shareEstimate(tenantId, userId, estimateId, new ShareEstimateRequest());
 
         assertEquals(EstimateStatus.SENT, estimate.getStatus());
-        assertEquals("existing-token", response.getToken());
+        assertNotNull(response.getToken());
+        assertNotEquals(
+                PublicShareTokenHasher.sha256HexUtf8("existing-token"),
+                estimate.getPublicTokenHash());
+        assertEquals(
+                PublicShareTokenHasher.sha256HexUtf8(response.getToken()),
+                estimate.getPublicTokenHash());
         verify(estimateRepository).save(eq(estimate));
+    }
+
+    @Test
+    void shareEstimate_secondConsecutiveShare_returnsDifferentToken() {
+        estimate.setStatus(EstimateStatus.SENT);
+        when(tenantAccessService.requireAnyRole(eq(tenantId), eq(userId), any(), anyString()))
+                .thenReturn(mock(com.roofingcrm.domain.entity.TenantUserMembership.class));
+        when(tenantAccessService.loadTenantForUserOrThrow(tenantId, userId)).thenReturn(tenant);
+        when(estimateRepository.findByIdAndTenantAndArchivedFalse(estimateId, tenant)).thenReturn(Optional.of(estimate));
+        when(estimateRepository.save(any(Estimate.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        var first = service.shareEstimate(tenantId, userId, estimateId, new ShareEstimateRequest());
+        String hashAfterFirst = estimate.getPublicTokenHash();
+        var second = service.shareEstimate(tenantId, userId, estimateId, new ShareEstimateRequest());
+
+        assertNotNull(first.getToken());
+        assertNotNull(second.getToken());
+        assertNotEquals(first.getToken(), second.getToken());
+        assertNotEquals(hashAfterFirst, estimate.getPublicTokenHash());
+        assertEquals(PublicShareTokenHasher.sha256HexUtf8(second.getToken()), estimate.getPublicTokenHash());
     }
 
     @Test
@@ -193,19 +242,28 @@ class EstimateServiceImplUnitTest {
         assertTrue(response.isSuccess());
         assertEquals(EstimateStatus.SENT, estimate.getStatus());
         assertTrue(response.getPublicUrl().contains("/estimate/"));
-        assertFalse(response.isReusedExistingToken());
         verify(emailService).send(argThat(message ->
                 "customer@example.com".equals(message.toEmail())
                         && message.subject().contains("EST-1001")
                         && message.text().contains("View Estimate")
         ));
-        verify(activityEventService).recordEvent(eq(tenant), eq(userId), eq(com.roofingcrm.domain.enums.ActivityEntityType.JOB), any(),
-                eq(com.roofingcrm.domain.enums.ActivityEventType.ESTIMATE_EMAIL_SENT), any(), any());
+        ArgumentCaptor<Map<String, Object>> emailMetaCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(activityEventService).recordEvent(eq(tenant), eq(userId), eq(ActivityEntityType.JOB), eq(job.getId()),
+                eq(ActivityEventType.ESTIMATE_EMAIL_SENT), anyString(), emailMetaCaptor.capture());
+        Map<String, Object> emailMeta = emailMetaCaptor.getValue();
+        assertEquals(estimateId.toString(), emailMeta.get("estimateId"));
+        assertEquals("EST-1001", emailMeta.get("estimateNumber"));
+        assertEquals("customer@example.com", emailMeta.get("recipientEmail"));
+        assertEquals(Boolean.TRUE, emailMeta.get("publicLinkSent"));
+        assertEquals("EMAIL", emailMeta.get("deliveryMethod"));
+        assertFalse(emailMeta.containsKey("publicUrl"));
+        assertFalse(emailMeta.containsKey("publicToken"));
+        assertFalse(emailMeta.containsKey("token"));
     }
 
     @Test
-    void sendEstimateEmail_whenTokenValid_reusesExistingToken() {
-        estimate.setPublicToken("existing-token");
+    void sendEstimateEmail_whenTokenValid_rotatesTokenForEmailBody() {
+        estimate.setPublicTokenHash(PublicShareTokenHasher.sha256HexUtf8("existing-token"));
         estimate.setPublicEnabled(true);
         estimate.setPublicExpiresAt(java.time.Instant.now().plusSeconds(3600));
         when(tenantAccessService.requireAnyRole(eq(tenantId), eq(userId), any(), anyString()))
@@ -219,8 +277,10 @@ class EstimateServiceImplUnitTest {
 
         var response = service.sendEstimateEmail(tenantId, userId, estimateId, request);
 
-        assertTrue(response.isReusedExistingToken());
-        assertTrue(response.getPublicUrl().endsWith("/estimate/existing-token"));
+        assertTrue(response.getPublicUrl().contains("/estimate/"));
+        assertFalse(response.getPublicUrl().endsWith("/estimate/existing-token"));
+        String suffix = response.getPublicUrl().substring(response.getPublicUrl().lastIndexOf('/') + 1);
+        assertEquals(PublicShareTokenHasher.sha256HexUtf8(suffix), estimate.getPublicTokenHash());
         verify(emailService).send(any());
     }
 

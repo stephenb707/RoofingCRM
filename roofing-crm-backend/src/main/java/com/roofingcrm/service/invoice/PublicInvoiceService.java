@@ -6,6 +6,7 @@ import com.roofingcrm.domain.entity.Customer;
 import com.roofingcrm.domain.entity.Invoice;
 import com.roofingcrm.domain.entity.InvoiceItem;
 import com.roofingcrm.domain.repository.InvoiceRepository;
+import com.roofingcrm.security.PublicShareTokenHasher;
 import com.roofingcrm.domain.value.Address;
 import com.roofingcrm.service.exception.InvoiceLinkExpiredException;
 import com.roofingcrm.service.exception.ResourceNotFoundException;
@@ -28,8 +29,12 @@ public class PublicInvoiceService {
 
     @Transactional(readOnly = true)
     public PublicInvoiceDto getByToken(@NonNull String token) {
+        if (token.isBlank()) {
+            throw new ResourceNotFoundException("Invoice not found");
+        }
+        String tokenHash = PublicShareTokenHasher.sha256HexUtf8(token);
         Invoice invoice = invoiceRepository
-                .findByPublicTokenAndPublicEnabledTrueAndArchivedFalse(token)
+                .findByPublicTokenHashAndPublicEnabledTrueAndArchivedFalse(tokenHash)
                 .orElseThrow(() -> new ResourceNotFoundException("Invoice not found"));
 
         if (invoice.getPublicExpiresAt() != null && Instant.now().isAfter(invoice.getPublicExpiresAt())) {

@@ -1,6 +1,6 @@
 package com.roofingcrm.api.v1.dashboard;
 
-import com.roofingcrm.api.GlobalExceptionHandler;
+import com.roofingcrm.api.GlobalExceptionHandlerTestSupport;
 import com.roofingcrm.security.AuthenticatedUser;
 import com.roofingcrm.service.dashboard.DashboardService;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,7 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(controllers = DashboardController.class)
 @AutoConfigureMockMvc(addFilters = false)
-@Import(GlobalExceptionHandler.class)
+@Import(GlobalExceptionHandlerTestSupport.class)
 @SuppressWarnings("null")
 class DashboardControllerTest {
 

@@ -61,8 +61,9 @@ export default function InvoiceDetailPage() {
   const shareMutation = useMutation({
     mutationFn: () => shareInvoice(api, invoiceId, { expiresInDays: 14 }),
     onSuccess: async (data) => {
-      const url = buildPublicInvoiceUrl(data.token);
-      setShareLink(url);
+      const token = data.token ?? null;
+      const url = token ? buildPublicInvoiceUrl(token) : "";
+      setShareLink(url || null);
       setShareExpiresAt(data.expiresAt ?? null);
       queryClient.invalidateQueries({
         queryKey: queryKeys.invoice(auth.selectedTenantId, invoiceId),
@@ -86,7 +87,7 @@ export default function InvoiceDetailPage() {
       const dueAt = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString();
       return createTask(api, {
         title: `Follow up on invoice ${invoice.invoiceNumber}`,
-        description: shareLink ? `Shared invoice link: ${shareLink}` : "Follow up on shared invoice.",
+        description: "Follow up on shared invoice.",
         priority: "MEDIUM",
         status: "TODO",
         dueAt,
@@ -110,7 +111,7 @@ export default function InvoiceDetailPage() {
       expiresInDays?: number;
     }) => sendInvoiceEmail(api, invoiceId, payload),
     onSuccess: (data, variables) => {
-      setShareLink(data.publicUrl);
+      setShareLink(data.publicUrl ?? null);
       setShareExpiresAt(null);
       setEmailSuccess(`Email sent to ${variables.recipientEmail}.`);
       setShowEmailModal(false);

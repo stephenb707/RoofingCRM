@@ -1,5 +1,6 @@
 package com.roofingcrm.api;
 
+import com.roofingcrm.service.attachment.AttachmentUploadProperties;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -15,7 +16,7 @@ class GlobalExceptionHandlerTest {
 
     private final MockMvc mockMvc = MockMvcBuilders
             .standaloneSetup(new ThrowingController())
-            .setControllerAdvice(new GlobalExceptionHandler())
+            .setControllerAdvice(new GlobalExceptionHandler(new AttachmentUploadProperties()))
             .build();
 
     @Test

@@ -62,7 +62,11 @@ public final class AppPreferencesDefaults {
         return m;
     }
 
-    /** Defaults: empty — frontend treats missing keys as legacy behavior. */
+    /**
+     * Defaults: empty map — hub resolves to leads-only ({@code pipelineNav}).
+     * {@link AppPreferencesSanitizer#sanitizePipeline(Object)} only persists {@code defaultView}
+     * when it is {@code leads}, {@code jobs}, or {@code combined}.
+     */
     public static Map<String, Object> pipeline() {
         return new LinkedHashMap<>();
     }

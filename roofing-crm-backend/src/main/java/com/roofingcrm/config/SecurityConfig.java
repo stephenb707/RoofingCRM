@@ -1,6 +1,10 @@
 package com.roofingcrm.config;
 
 import com.roofingcrm.security.JwtAuthenticationFilter;
+import com.roofingcrm.security.RefreshTokenProperties;
+import com.roofingcrm.security.ratelimit.HighRiskEndpointRateLimitFilter;
+import com.roofingcrm.security.ratelimit.MinuteWindowRateLimiter;
+import com.roofingcrm.security.ratelimit.RateLimitProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.roofingcrm.security.JwtService;
@@ -23,10 +27,30 @@ public class SecurityConfig {
         private static final Logger log = LoggerFactory.getLogger(SecurityConfig.class);
 
         @Bean
+        public MinuteWindowRateLimiter minuteWindowRateLimiter() {
+                return new MinuteWindowRateLimiter();
+        }
+
+        @Bean
+        public HighRiskEndpointRateLimitFilter highRiskEndpointRateLimitFilter(
+                RateLimitProperties rateLimitProperties,
+                MinuteWindowRateLimiter minuteWindowRateLimiter,
+                RefreshTokenProperties refreshTokenProperties) {
+                return new HighRiskEndpointRateLimitFilter(
+                        rateLimitProperties, minuteWindowRateLimiter, refreshTokenProperties);
+        }
+
+        @Bean
+        public JwtAuthenticationFilter jwtAuthenticationFilter(JwtService jwtService) {
+                return new JwtAuthenticationFilter(jwtService);
+        }
+
+        @Bean
         public SecurityFilterChain securityFilterChain(HttpSecurity http,
-                                                       JwtService jwtService,
                                                        SecurityErrorHandlers errorHandlers,
-                                                       CorsProperties corsProperties) throws Exception {
+                                                       CorsProperties corsProperties,
+                                                       HighRiskEndpointRateLimitFilter highRiskEndpointRateLimitFilter,
+                                                       JwtAuthenticationFilter jwtAuthenticationFilter) throws Exception {
             http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource(corsProperties)))
@@ -43,8 +67,9 @@ public class SecurityConfig {
                     .requestMatchers("/ws", "/ws/**").permitAll()
                     .anyRequest().authenticated()
                 )
-                .addFilterBefore(new JwtAuthenticationFilter(jwtService), UsernamePasswordAuthenticationFilter.class);
-        
+                .addFilterBefore(highRiskEndpointRateLimitFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+
             return http.build();
         }
 

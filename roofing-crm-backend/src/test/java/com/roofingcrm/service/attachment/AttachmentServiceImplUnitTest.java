@@ -22,10 +22,14 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.util.unit.DataSize;
 
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+
+import static com.roofingcrm.service.attachment.UploadValidationTestFixtures.MINIMAL_JPEG_BYTES;
+import static com.roofingcrm.service.attachment.UploadValidationTestFixtures.MINIMAL_PNG_BYTES;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -62,9 +66,10 @@ class AttachmentServiceImplUnitTest {
 
     @BeforeEach
     void setUp() {
+        AttachmentUploadValidator uploadValidator = new AttachmentUploadValidator(new AttachmentUploadProperties());
         service = new AttachmentServiceImpl(
                 tenantAccessService, attachmentRepository, reportSectionPhotoRepository, leadRepository, jobRepository,
-                storageService, activityEventService);
+                storageService, activityEventService, uploadValidator);
 
         tenant = new Tenant();
         tenant.setId(UUID.randomUUID());
@@ -91,8 +96,8 @@ class AttachmentServiceImplUnitTest {
 
         Attachment savedAttachment = new Attachment();
         savedAttachment.setId(UUID.randomUUID());
-        savedAttachment.setFileName("damage.jpg");
-        savedAttachment.setContentType("image/jpeg");
+        savedAttachment.setFileName("damage.png");
+        savedAttachment.setContentType("image/png");
         savedAttachment.setFileSize(1024L);
         savedAttachment.setTag(AttachmentTag.DAMAGE);
         when(attachmentRepository.save(any(Attachment.class))).thenAnswer(inv -> {
@@ -104,14 +109,14 @@ class AttachmentServiceImplUnitTest {
             a.setTag(savedAttachment.getTag());
             return a;
         });
-        when(storageService.store(anyString(), any(UUID.class), any())).thenReturn("storage/key/damage.jpg");
+        when(storageService.store(anyString(), any(UUID.class), any())).thenReturn("storage/key/damage.png");
 
-        MockMultipartFile file = new MockMultipartFile("file", "damage.jpg", "image/jpeg", "bytes".getBytes());
+        MockMultipartFile file = new MockMultipartFile("file", "damage.png", "image/png", MINIMAL_PNG_BYTES);
 
         AttachmentDto dto = service.uploadForLead(tenantId, userId, leadId, file, AttachmentTag.DAMAGE, "Roof damage photo");
 
         assertNotNull(dto.getId());
-        assertEquals("damage.jpg", dto.getFileName());
+        assertEquals("damage.png", dto.getFileName());
         assertEquals(AttachmentTag.DAMAGE, dto.getTag());
 
         ArgumentCaptor<Map<String, Object>> metaCaptor = ArgumentCaptor.forClass(Map.class);
@@ -120,10 +125,33 @@ class AttachmentServiceImplUnitTest {
 
         Map<String, Object> meta = metaCaptor.getValue();
         assertNotNull(meta.get("attachmentId"));
-        assertEquals("damage.jpg", meta.get("fileName"));
-        assertEquals("image/jpeg", meta.get("contentType"));
+        assertEquals("damage.png", meta.get("fileName"));
+        assertEquals("image/png", meta.get("contentType"));
         assertEquals(1024L, meta.get("fileSize"));
         assertEquals("DAMAGE", meta.get("tag"));
+    }
+
+    @Test
+    void uploadForLead_sanitizesOriginalFilenameBeforePersisting() {
+        when(tenantAccessService.loadTenantForUserOrThrow(tenantId, userId)).thenReturn(tenant);
+        when(leadRepository.findByIdAndTenantAndArchivedFalse(leadId, tenant)).thenReturn(Optional.of(lead));
+
+        UUID attachmentUuid = UUID.randomUUID();
+        when(attachmentRepository.save(any(Attachment.class))).thenAnswer(inv -> {
+            Attachment a = inv.getArgument(0);
+            if (a.getId() == null) {
+                a.setId(attachmentUuid);
+            }
+            return a;
+        });
+        when(storageService.store(anyString(), any(UUID.class), any())).thenReturn("test-tenant/" + attachmentUuid + "_evil.dll");
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "..\\..\\windows\\evil.dll", "image/png", MINIMAL_PNG_BYTES);
+
+        service.uploadForLead(tenantId, userId, leadId, file, AttachmentTag.DAMAGE, null);
+
+        verify(attachmentRepository, times(2)).save(argThat(a -> "evil.dll".equals(a.getFileName())));
     }
 
     @Test
@@ -148,7 +176,7 @@ class AttachmentServiceImplUnitTest {
         });
         when(storageService.store(anyString(), any(UUID.class), any())).thenReturn("storage/key/after.jpg");
 
-        MockMultipartFile file = new MockMultipartFile("file", "after.jpg", "image/jpeg", "bytes".getBytes());
+        MockMultipartFile file = new MockMultipartFile("file", "after.jpg", "image/jpeg", MINIMAL_JPEG_BYTES);
 
         AttachmentDto dto = service.uploadForJob(tenantId, userId, jobId, file, AttachmentTag.AFTER, null);
 
@@ -157,6 +185,19 @@ class AttachmentServiceImplUnitTest {
 
         verify(activityEventService).recordEvent(eq(tenant), eq(userId), eq(ActivityEntityType.JOB), eq(jobId),
                 eq(ActivityEventType.ATTACHMENT_ADDED), contains("Added "), any(Map.class));
+    }
+
+    @Test
+    void uploadForLead_rejectsNonImageBytesWithImageContentType() {
+        when(tenantAccessService.loadTenantForUserOrThrow(tenantId, userId)).thenReturn(tenant);
+        when(leadRepository.findByIdAndTenantAndArchivedFalse(leadId, tenant)).thenReturn(Optional.of(lead));
+
+        MockMultipartFile fake = new MockMultipartFile("file", "x.jpg", "image/jpeg", "hello-not-jpeg".getBytes());
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> service.uploadForLead(tenantId, userId, leadId, fake, null, null));
+        assertTrue(ex.getMessage().contains("image could not be read"));
+        verify(attachmentRepository, never()).save(any());
     }
 
     @Test
@@ -193,6 +234,52 @@ class AttachmentServiceImplUnitTest {
                 () -> service.deleteAttachment(tenantId, userId, attachmentId));
 
         assertTrue(ex.getMessage().contains("customer photo report"));
+        verify(attachmentRepository, never()).save(any());
+    }
+
+    @Test
+    void uploadForLead_rejectsEmptyFile() {
+        when(tenantAccessService.loadTenantForUserOrThrow(tenantId, userId)).thenReturn(tenant);
+        when(leadRepository.findByIdAndTenantAndArchivedFalse(leadId, tenant)).thenReturn(Optional.of(lead));
+
+        MockMultipartFile empty = new MockMultipartFile("file", "x.jpg", "image/jpeg", new byte[0]);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> service.uploadForLead(tenantId, userId, leadId, empty, null, null));
+        assertTrue(ex.getMessage().toLowerCase().contains("empty"));
+        verify(attachmentRepository, never()).save(any());
+    }
+
+    @Test
+    void uploadForLead_rejectsOversizedFile() {
+        AttachmentUploadProperties props = new AttachmentUploadProperties();
+        props.setMaxFileSize(DataSize.ofBytes(10));
+        AttachmentUploadValidator strictValidator = new AttachmentUploadValidator(props);
+        AttachmentServiceImpl strictService = new AttachmentServiceImpl(
+                tenantAccessService, attachmentRepository, reportSectionPhotoRepository, leadRepository, jobRepository,
+                storageService, activityEventService, strictValidator);
+
+        when(tenantAccessService.loadTenantForUserOrThrow(tenantId, userId)).thenReturn(tenant);
+        when(leadRepository.findByIdAndTenantAndArchivedFalse(leadId, tenant)).thenReturn(Optional.of(lead));
+
+        MockMultipartFile big = new MockMultipartFile("file", "x.jpg", "image/jpeg", new byte[11]);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> strictService.uploadForLead(tenantId, userId, leadId, big, null, null));
+        assertTrue(ex.getMessage().contains("too large"));
+        verify(attachmentRepository, never()).save(any());
+    }
+
+    @Test
+    void uploadForLead_rejectsUnsupportedContentType() {
+        when(tenantAccessService.loadTenantForUserOrThrow(tenantId, userId)).thenReturn(tenant);
+        when(leadRepository.findByIdAndTenantAndArchivedFalse(leadId, tenant)).thenReturn(Optional.of(lead));
+
+        MockMultipartFile exe = new MockMultipartFile("file", "a.exe", "application/x-msdownload", new byte[] { 1, 2, 3 });
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> service.uploadForLead(tenantId, userId, leadId, exe, null, null));
+        assertTrue(ex.getMessage().contains("Unsupported file type"));
         verify(attachmentRepository, never()).save(any());
     }
 }

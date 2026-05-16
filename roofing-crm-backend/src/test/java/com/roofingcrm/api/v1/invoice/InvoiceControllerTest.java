@@ -185,7 +185,6 @@ class InvoiceControllerTest {
         response.setSuccess(true);
         response.setPublicUrl("https://crm.example.com/invoice/abc123");
         response.setSentAt(Instant.now());
-        response.setReusedExistingToken(true);
 
         when(invoiceService.sendInvoiceEmail(eq(tenantId), eq(userId), eq(invoiceId), any(SendInvoiceEmailRequest.class)))
                 .thenReturn(response);
@@ -198,8 +197,7 @@ class InvoiceControllerTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success", is(true)))
-                .andExpect(jsonPath("$.publicUrl", is("https://crm.example.com/invoice/abc123")))
-                .andExpect(jsonPath("$.reusedExistingToken", is(true)));
+                .andExpect(jsonPath("$.publicUrl", is("https://crm.example.com/invoice/abc123")));
 
         verify(invoiceService).sendInvoiceEmail(eq(tenantId), eq(userId), eq(invoiceId), any(SendInvoiceEmailRequest.class));
     }

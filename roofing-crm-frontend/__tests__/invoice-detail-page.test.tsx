@@ -119,7 +119,6 @@ describe("InvoiceDetailPage", () => {
       success: true,
       sentAt: "2026-03-15T00:00:00Z",
       publicUrl: "http://localhost:3000/invoice/tok-abc",
-      reusedExistingToken: true,
     });
 
     render(<InvoiceDetailPage />);
@@ -197,5 +196,41 @@ describe("InvoiceDetailPage", () => {
 
     expect((within(dialog).getByLabelText(/recipient email/i) as HTMLInputElement).value).toBe("");
     expect((within(dialog).getByLabelText(/recipient name/i) as HTMLInputElement).value).toBe("");
+  });
+
+  it("follow-up task uses safe description without public share URL", async () => {
+    mockedInvoicesApi.shareInvoice.mockResolvedValue({
+      token: "sekret-token",
+      expiresAt: "2026-03-15T00:00:00Z",
+    });
+    mockedInvoicesApi.buildPublicInvoiceUrl.mockReturnValue("http://localhost:3000/invoice/super-secret");
+
+    render(<InvoiceDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Invoice INV-1")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Generate link/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /set follow-up in 2 days/i })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /set follow-up in 2 days/i }));
+
+    await waitFor(() => {
+      expect(mockedTasksApi.createTask).toHaveBeenCalled();
+    });
+
+    expect(mockedTasksApi.createTask).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        description: "Follow up on shared invoice.",
+      })
+    );
+    const taskPayload = mockedTasksApi.createTask.mock.calls[0][1] as { description?: string };
+    expect(String(taskPayload.description)).not.toMatch(/http/i);
+    expect(String(taskPayload.description)).not.toContain("super-secret");
   });
 });

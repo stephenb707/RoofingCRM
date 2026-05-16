@@ -9,6 +9,7 @@ describe("reportGalleryImageMime", () => {
     expect(supportsReportGalleryImage("image/webp")).toBe(true);
     expect(supportsReportGalleryImage("image/gif")).toBe(true);
     expect(supportsReportGalleryImage("image/tiff")).toBe(true);
+    expect(supportsReportGalleryImage("image/x-tiff")).toBe(true);
     expect(supportsReportGalleryImage("image/bmp")).toBe(true);
   });
 

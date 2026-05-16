@@ -4,6 +4,8 @@ import com.roofingcrm.domain.enums.AttachmentTag;
 import com.roofingcrm.security.SecurityUtils;
 import com.roofingcrm.service.attachment.AttachmentService;
 import org.springframework.core.io.InputStreamResource;
+import com.roofingcrm.storage.AttachmentFilenameSanitizer;
+import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -14,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -102,13 +105,18 @@ public class AttachmentController {
                 ? metadata.getContentType() 
                 : MediaType.APPLICATION_OCTET_STREAM_VALUE);
         
-        String fileName = metadata.getFileName() != null 
-                ? metadata.getFileName() 
+        String fileName = metadata.getFileName() != null
+                ? metadata.getFileName()
                 : attachmentId.toString();
+
+        String safeFileName = AttachmentFilenameSanitizer.sanitizeForContentDisposition(fileName, attachmentId);
+        ContentDisposition disposition = ContentDisposition.attachment()
+                .filename(safeFileName, StandardCharsets.UTF_8)
+                .build();
 
         return ResponseEntity.ok()
                 .contentType(Objects.requireNonNull(MediaType.parseMediaType(contentType)))
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
                 .body(new InputStreamResource(Objects.requireNonNull(content)));
     }
 

@@ -52,55 +52,87 @@ public class AppPreferencesServiceImpl implements AppPreferencesService {
                     return fresh;
                 });
 
-        Map<String, Object> merged = new LinkedHashMap<>(entity.getPreferences());
-        if (request.getDashboard() != null) merged.put("dashboard", request.getDashboard());
-        if (request.getJobsList() != null) merged.put("jobsList", request.getJobsList());
-        if (request.getLeadsList() != null) merged.put("leadsList", request.getLeadsList());
-        if (request.getCustomersList() != null) merged.put("customersList", request.getCustomersList());
-        if (request.getTasksList() != null) merged.put("tasksList", request.getTasksList());
-        if (request.getEstimatesList() != null) merged.put("estimatesList", request.getEstimatesList());
-        if (request.getPipeline() != null) merged.put("pipeline", request.getPipeline());
-        entity.setPreferences(merged);
+        Map<String, Object> merged = new LinkedHashMap<>();
+        if (entity.getPreferences() != null) {
+            merged.putAll(entity.getPreferences());
+        }
+        if (request.getDashboard() != null) {
+            merged.put("dashboard", request.getDashboard());
+        }
+        if (request.getJobsList() != null) {
+            merged.put("jobsList", request.getJobsList());
+        }
+        if (request.getLeadsList() != null) {
+            merged.put("leadsList", request.getLeadsList());
+        }
+        if (request.getCustomersList() != null) {
+            merged.put("customersList", request.getCustomersList());
+        }
+        if (request.getTasksList() != null) {
+            merged.put("tasksList", request.getTasksList());
+        }
+        if (request.getEstimatesList() != null) {
+            merged.put("estimatesList", request.getEstimatesList());
+        }
+        if (request.getPipeline() != null) {
+            merged.put("pipeline", request.getPipeline());
+        }
+
+        entity.setPreferences(buildSanitizedSnapshot(merged));
 
         TenantAppPreferences saved = preferencesRepository.save(entity);
         return toDto(saved);
     }
 
     private AppPreferencesDto toDto(TenantAppPreferences entity) {
-        Map<String, Object> prefs = entity.getPreferences();
+        Map<String, Object> prefs = entity.getPreferences() != null ? entity.getPreferences() : Map.of();
         AppPreferencesDto dto = new AppPreferencesDto();
-        dto.setDashboard(resolveSection(prefs, "dashboard", AppPreferencesDefaults.dashboard()));
-        dto.setJobsList(resolveSection(prefs, "jobsList", AppPreferencesDefaults.jobsList()));
-        dto.setLeadsList(resolveSection(prefs, "leadsList", AppPreferencesDefaults.leadsList()));
-        dto.setCustomersList(resolveSection(prefs, "customersList", AppPreferencesDefaults.customersList()));
-        dto.setTasksList(resolveSection(prefs, "tasksList", AppPreferencesDefaults.tasksList()));
-        dto.setEstimatesList(resolveSection(prefs, "estimatesList", AppPreferencesDefaults.estimatesList()));
-        dto.setPipeline(resolveSection(prefs, "pipeline", AppPreferencesDefaults.pipeline()));
+        dto.setDashboard(AppPreferencesSanitizer.sanitizeDashboard(prefs.get("dashboard")));
+        dto.setJobsList(AppPreferencesSanitizer.sanitizeJobsList(prefs.get("jobsList")));
+        dto.setLeadsList(AppPreferencesSanitizer.sanitizeLeadsList(prefs.get("leadsList")));
+        dto.setCustomersList(AppPreferencesSanitizer.sanitizeCustomersList(prefs.get("customersList")));
+        dto.setTasksList(AppPreferencesSanitizer.sanitizeTasksList(prefs.get("tasksList")));
+        dto.setEstimatesList(AppPreferencesSanitizer.sanitizeEstimatesList(prefs.get("estimatesList")));
+        dto.setPipeline(AppPreferencesSanitizer.sanitizePipeline(prefs.get("pipeline")));
         dto.setUpdatedAt(entity.getUpdatedAt());
         return dto;
     }
 
     static AppPreferencesDto defaultDto() {
         AppPreferencesDto dto = new AppPreferencesDto();
-        dto.setDashboard(AppPreferencesDefaults.dashboard());
-        dto.setJobsList(AppPreferencesDefaults.jobsList());
-        dto.setLeadsList(AppPreferencesDefaults.leadsList());
-        dto.setCustomersList(AppPreferencesDefaults.customersList());
-        dto.setTasksList(AppPreferencesDefaults.tasksList());
-        dto.setEstimatesList(AppPreferencesDefaults.estimatesList());
-        dto.setPipeline(AppPreferencesDefaults.pipeline());
+        dto.setDashboard(AppPreferencesSanitizer.sanitizeDashboard(null));
+        dto.setJobsList(AppPreferencesSanitizer.sanitizeJobsList(null));
+        dto.setLeadsList(AppPreferencesSanitizer.sanitizeLeadsList(null));
+        dto.setCustomersList(AppPreferencesSanitizer.sanitizeCustomersList(null));
+        dto.setTasksList(AppPreferencesSanitizer.sanitizeTasksList(null));
+        dto.setEstimatesList(AppPreferencesSanitizer.sanitizeEstimatesList(null));
+        dto.setPipeline(AppPreferencesSanitizer.sanitizePipeline(null));
         dto.setUpdatedAt(null);
         return dto;
     }
 
-    @SuppressWarnings("unchecked")
-    private static Map<String, Object> resolveSection(Map<String, Object> prefs, String key,
-                                                       Map<String, Object> defaults) {
-        Object val = prefs.get(key);
-        if (val instanceof Map<?, ?>) {
-            return (Map<String, Object>) val;
+    /**
+     * Normalizes known preference sections and drops unknown top-level keys from merged state.
+     */
+    static Map<String, Object> buildSanitizedSnapshot(Map<String, Object> merged) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        for (Map.Entry<String, Object> e : merged.entrySet()) {
+            String key = e.getKey();
+            Object val = e.getValue();
+            switch (key) {
+                case "dashboard" -> out.put(key, AppPreferencesSanitizer.sanitizeDashboard(val));
+                case "jobsList" -> out.put(key, AppPreferencesSanitizer.sanitizeJobsList(val));
+                case "leadsList" -> out.put(key, AppPreferencesSanitizer.sanitizeLeadsList(val));
+                case "customersList" -> out.put(key, AppPreferencesSanitizer.sanitizeCustomersList(val));
+                case "tasksList" -> out.put(key, AppPreferencesSanitizer.sanitizeTasksList(val));
+                case "estimatesList" -> out.put(key, AppPreferencesSanitizer.sanitizeEstimatesList(val));
+                case "pipeline" -> out.put(key, AppPreferencesSanitizer.sanitizePipeline(val));
+                default -> {
+                    /* ignore unknown / legacy top-level keys */
+                }
+            }
         }
-        return defaults;
+        return out;
     }
 
     private void requireAdmin(UUID tenantId, UUID userId) {

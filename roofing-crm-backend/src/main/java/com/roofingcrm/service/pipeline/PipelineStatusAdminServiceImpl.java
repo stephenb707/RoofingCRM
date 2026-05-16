@@ -17,8 +17,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -113,20 +116,22 @@ public class PipelineStatusAdminServiceImpl implements PipelineStatusAdminServic
         if (!expected.equals(new HashSet<>(request.getOrderedDefinitionIds()))) {
             throw new IllegalArgumentException("Reorder list must include every status definition for this pipeline exactly once.");
         }
-        List<PipelineStatusDefinition> byId = new ArrayList<>();
+        Map<UUID, PipelineStatusDefinition> byId = new HashMap<>();
+        for (PipelineStatusDefinition d : all) {
+            byId.put(d.getId(), d);
+        }
+        List<PipelineStatusDefinition> reordered = new ArrayList<>();
         for (UUID id : request.getOrderedDefinitionIds()) {
-            PipelineStatusDefinition d = definitionRepository
-                    .findByIdAndTenantAndArchivedFalse(id, tenant)
-                    .orElseThrow(() -> new ResourceNotFoundException("Status definition not found"));
+            PipelineStatusDefinition d = Objects.requireNonNull(byId.get(id));
             if (d.getPipelineType() != type) {
                 throw new IllegalArgumentException("Mismatched pipeline type");
             }
-            byId.add(d);
+            reordered.add(d);
         }
-        for (int i = 0; i < byId.size(); i++) {
-            byId.get(i).setSortOrder(i);
+        for (int i = 0; i < reordered.size(); i++) {
+            reordered.get(i).setSortOrder(i);
         }
-        definitionRepository.saveAll(byId);
+        definitionRepository.saveAll(reordered);
     }
 
     @Override
@@ -136,6 +141,9 @@ public class PipelineStatusAdminServiceImpl implements PipelineStatusAdminServic
         Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
         List<PipelineStatusDefinition> all =
                 definitionRepository.findByTenantAndPipelineTypeAndArchivedFalseOrderBySortOrderAsc(tenant, type);
+        all.sort(Comparator.comparingInt(PipelineStatusDefinition::getSortOrder)
+                .thenComparing(PipelineStatusDefinition::getId));
+        List<PipelineStatusDefinition> fetchOrder = new ArrayList<>(all);
         List<String> required = PipelineStatusDefaults.requiredBuiltInKeys(type);
         for (PipelineStatusDefinition def : all) {
             if (!def.isBuiltIn()) {
@@ -146,7 +154,6 @@ public class PipelineStatusAdminServiceImpl implements PipelineStatusAdminServic
                 continue;
             }
             def.setLabel(PipelineStatusDefaults.defaultLabel(type, key));
-            def.setSortOrder(PipelineStatusDefaults.defaultSortOrder(type, key));
             def.setActive(true);
         }
         if (deactivateUnusedCustom) {
@@ -163,6 +170,46 @@ public class PipelineStatusAdminServiceImpl implements PipelineStatusAdminServic
                                     + "\" because it is still in use. Reassign those records first.");
                 }
             }
+        }
+        Map<String, PipelineStatusDefinition> builtInByKey = new HashMap<>();
+        for (PipelineStatusDefinition def : all) {
+            if (def.isBuiltIn()) {
+                builtInByKey.put(def.getSystemKey(), def);
+            }
+        }
+        List<PipelineStatusDefinition> activeCustoms = new ArrayList<>();
+        List<PipelineStatusDefinition> inactiveCustoms = new ArrayList<>();
+        for (PipelineStatusDefinition def : fetchOrder) {
+            if (def.isBuiltIn()) {
+                continue;
+            }
+            if (def.isActive()) {
+                activeCustoms.add(def);
+            } else {
+                inactiveCustoms.add(def);
+            }
+        }
+        List<PipelineStatusDefinition> otherBuiltIns = new ArrayList<>();
+        for (PipelineStatusDefinition def : fetchOrder) {
+            if (!def.isBuiltIn()) {
+                continue;
+            }
+            if (!required.contains(def.getSystemKey())) {
+                otherBuiltIns.add(def);
+            }
+        }
+        List<PipelineStatusDefinition> finalOrder = new ArrayList<>();
+        for (String key : required) {
+            PipelineStatusDefinition def = builtInByKey.get(key);
+            if (def != null) {
+                finalOrder.add(def);
+            }
+        }
+        finalOrder.addAll(otherBuiltIns);
+        finalOrder.addAll(activeCustoms);
+        finalOrder.addAll(inactiveCustoms);
+        for (int i = 0; i < finalOrder.size(); i++) {
+            finalOrder.get(i).setSortOrder(i);
         }
         definitionRepository.saveAll(Objects.requireNonNull(all));
     }

@@ -9,10 +9,13 @@ import com.roofingcrm.domain.entity.Invoice;
 import com.roofingcrm.domain.entity.InvoiceItem;
 import com.roofingcrm.domain.entity.Job;
 import com.roofingcrm.domain.entity.Tenant;
+import com.roofingcrm.domain.enums.ActivityEntityType;
+import com.roofingcrm.domain.enums.ActivityEventType;
 import com.roofingcrm.domain.enums.EstimateStatus;
 import com.roofingcrm.domain.enums.InvoiceStatus;
 import com.roofingcrm.domain.repository.EstimateRepository;
 import com.roofingcrm.domain.repository.InvoiceRepository;
+import com.roofingcrm.security.PublicShareTokenHasher;
 import com.roofingcrm.service.activity.ActivityEventService;
 import com.roofingcrm.service.exception.InvoiceConflictException;
 import com.roofingcrm.service.mail.EmailService;
@@ -29,6 +32,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -37,7 +41,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-@SuppressWarnings("null")
+@SuppressWarnings({"null", "unchecked"})
 class InvoiceServiceImplUnitTest {
 
     @Mock
@@ -285,13 +289,26 @@ class InvoiceServiceImplUnitTest {
         assertNotNull(invoice.getSentAt());
         assertTrue(invoice.isPublicEnabled());
         assertEquals(userId, invoice.getUpdatedByUserId());
+        assertEquals(
+                PublicShareTokenHasher.sha256HexUtf8(response.getToken()),
+                invoice.getPublicTokenHash());
         verify(invoiceRepository).save(eq(invoice));
-        verify(activityEventService).recordEvent(eq(tenant), eq(userId), eq(com.roofingcrm.domain.enums.ActivityEntityType.JOB), any(),
-                eq(com.roofingcrm.domain.enums.ActivityEventType.INVOICE_SHARED), any(), any());
+        ArgumentCaptor<Map<String, Object>> sharedMetaCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(activityEventService).recordEvent(eq(tenant), eq(userId), eq(ActivityEntityType.JOB), eq(job.getId()),
+                eq(ActivityEventType.INVOICE_SHARED), anyString(), sharedMetaCaptor.capture());
+        Map<String, Object> sharedMeta = sharedMetaCaptor.getValue();
+        assertEquals(invoice.getId().toString(), sharedMeta.get("invoiceId"));
+        assertEquals("INV-200", sharedMeta.get("invoiceNumber"));
+        assertNotNull(sharedMeta.get("expiresAt"));
+        assertEquals(Boolean.TRUE, sharedMeta.get("publicLinkSent"));
+        assertEquals("LINK", sharedMeta.get("deliveryMethod"));
+        assertFalse(sharedMeta.containsKey("publicUrl"));
+        assertFalse(sharedMeta.containsKey("publicToken"));
+        assertFalse(sharedMeta.containsKey("token"));
     }
 
     @Test
-    void shareInvoice_whenTokenPresentNotExpired_reusesToken_updatesExpires() {
+    void shareInvoice_whenTokenPresentNotExpired_rotatesToken_updatesExpires() {
         Invoice invoice = new Invoice();
         invoice.setId(UUID.randomUUID());
         invoice.setTenant(tenant);
@@ -300,7 +317,7 @@ class InvoiceServiceImplUnitTest {
         invoice.setStatus(InvoiceStatus.SENT);
         invoice.setIssuedAt(Instant.now());
         invoice.setTotal(BigDecimal.valueOf(1200));
-        invoice.setPublicToken("existing-token");
+        invoice.setPublicTokenHash(PublicShareTokenHasher.sha256HexUtf8("existing-token"));
         invoice.setPublicEnabled(true);
         invoice.setPublicExpiresAt(Instant.now().plusSeconds(3600));
 
@@ -314,10 +331,43 @@ class InvoiceServiceImplUnitTest {
         request.setExpiresInDays(30);
         var response = service.shareInvoice(tenantId, userId, invoice.getId(), request);
 
-        assertEquals("existing-token", response.getToken());
-        assertEquals("existing-token", invoice.getPublicToken());
+        assertNotNull(response.getToken());
+        assertNotEquals(
+                PublicShareTokenHasher.sha256HexUtf8("existing-token"),
+                invoice.getPublicTokenHash());
+        assertEquals(
+                PublicShareTokenHasher.sha256HexUtf8(response.getToken()),
+                invoice.getPublicTokenHash());
         assertNotNull(invoice.getPublicExpiresAt());
         verify(invoiceRepository).save(eq(invoice));
+    }
+
+    @Test
+    void shareInvoice_secondConsecutiveShare_returnsDifferentToken() {
+        Invoice invoice = new Invoice();
+        invoice.setId(UUID.randomUUID());
+        invoice.setTenant(tenant);
+        invoice.setJob(job);
+        invoice.setInvoiceNumber("INV-210");
+        invoice.setStatus(InvoiceStatus.SENT);
+        invoice.setIssuedAt(Instant.now());
+        invoice.setTotal(BigDecimal.valueOf(1200));
+
+        when(tenantAccessService.requireAnyRole(eq(tenantId), eq(userId), any(), anyString()))
+                .thenReturn(mock(com.roofingcrm.domain.entity.TenantUserMembership.class));
+        when(tenantAccessService.loadTenantForUserOrThrow(tenantId, userId)).thenReturn(tenant);
+        when(invoiceRepository.findByIdAndTenantAndArchivedFalse(invoice.getId(), tenant)).thenReturn(Optional.of(invoice));
+        when(invoiceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        var first = service.shareInvoice(tenantId, userId, invoice.getId(), new ShareInvoiceRequest());
+        String hashAfterFirst = invoice.getPublicTokenHash();
+        var second = service.shareInvoice(tenantId, userId, invoice.getId(), new ShareInvoiceRequest());
+
+        assertNotNull(first.getToken());
+        assertNotNull(second.getToken());
+        assertNotEquals(first.getToken(), second.getToken());
+        assertNotEquals(hashAfterFirst, invoice.getPublicTokenHash());
+        assertEquals(PublicShareTokenHasher.sha256HexUtf8(second.getToken()), invoice.getPublicTokenHash());
     }
 
     @Test
@@ -330,7 +380,7 @@ class InvoiceServiceImplUnitTest {
         invoice.setStatus(InvoiceStatus.SENT);
         invoice.setIssuedAt(Instant.now());
         invoice.setTotal(BigDecimal.valueOf(1200));
-        invoice.setPublicToken("expired-token");
+        invoice.setPublicTokenHash(PublicShareTokenHasher.sha256HexUtf8("expired-token"));
         invoice.setPublicEnabled(true);
         invoice.setPublicExpiresAt(Instant.now().minusSeconds(60));
 
@@ -346,7 +396,9 @@ class InvoiceServiceImplUnitTest {
 
         assertNotNull(response.getToken());
         assertNotEquals("expired-token", response.getToken());
-        assertEquals(response.getToken(), invoice.getPublicToken());
+        assertEquals(
+                PublicShareTokenHasher.sha256HexUtf8(response.getToken()),
+                invoice.getPublicTokenHash());
         verify(invoiceRepository).save(eq(invoice));
     }
 
@@ -382,12 +434,22 @@ class InvoiceServiceImplUnitTest {
                         && message.subject().contains("INV-300")
                         && message.text().contains("View Invoice")
         ));
-        verify(activityEventService).recordEvent(eq(tenant), eq(userId), eq(com.roofingcrm.domain.enums.ActivityEntityType.JOB), any(),
-                eq(com.roofingcrm.domain.enums.ActivityEventType.INVOICE_EMAIL_SENT), any(), any());
+        ArgumentCaptor<Map<String, Object>> emailMetaCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(activityEventService).recordEvent(eq(tenant), eq(userId), eq(ActivityEntityType.JOB), eq(job.getId()),
+                eq(ActivityEventType.INVOICE_EMAIL_SENT), anyString(), emailMetaCaptor.capture());
+        Map<String, Object> emailMeta = emailMetaCaptor.getValue();
+        assertEquals(invoice.getId().toString(), emailMeta.get("invoiceId"));
+        assertEquals("INV-300", emailMeta.get("invoiceNumber"));
+        assertEquals("customer@example.com", emailMeta.get("recipientEmail"));
+        assertEquals(Boolean.TRUE, emailMeta.get("publicLinkSent"));
+        assertEquals("EMAIL", emailMeta.get("deliveryMethod"));
+        assertFalse(emailMeta.containsKey("publicUrl"));
+        assertFalse(emailMeta.containsKey("publicToken"));
+        assertFalse(emailMeta.containsKey("token"));
     }
 
     @Test
-    void sendInvoiceEmail_whenTokenValid_reusesExistingToken() {
+    void sendInvoiceEmail_whenTokenValid_rotatesTokenForEmailBody() {
         Invoice invoice = new Invoice();
         invoice.setId(UUID.randomUUID());
         invoice.setTenant(tenant);
@@ -396,7 +458,7 @@ class InvoiceServiceImplUnitTest {
         invoice.setStatus(InvoiceStatus.SENT);
         invoice.setIssuedAt(Instant.now());
         invoice.setTotal(BigDecimal.valueOf(1200));
-        invoice.setPublicToken("existing-token");
+        invoice.setPublicTokenHash(PublicShareTokenHasher.sha256HexUtf8("existing-token"));
         invoice.setPublicEnabled(true);
         invoice.setPublicExpiresAt(Instant.now().plusSeconds(3600));
 
@@ -411,8 +473,10 @@ class InvoiceServiceImplUnitTest {
 
         var response = service.sendInvoiceEmail(tenantId, userId, invoice.getId(), request);
 
-        assertTrue(response.isReusedExistingToken());
-        assertTrue(response.getPublicUrl().endsWith("/invoice/existing-token"));
+        assertTrue(response.getPublicUrl().contains("/invoice/"));
+        assertFalse(response.getPublicUrl().endsWith("/invoice/existing-token"));
+        String suffix = response.getPublicUrl().substring(response.getPublicUrl().lastIndexOf('/') + 1);
+        assertEquals(PublicShareTokenHasher.sha256HexUtf8(suffix), invoice.getPublicTokenHash());
         verify(emailService).send(any());
     }
 }

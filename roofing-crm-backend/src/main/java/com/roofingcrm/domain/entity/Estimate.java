@@ -66,8 +66,8 @@ public class Estimate extends TenantAuditedEntity {
     @OneToMany(mappedBy = "estimate", cascade = CascadeType.ALL, orphanRemoval = true)
     private java.util.List<EstimateItem> items = new java.util.ArrayList<>();
 
-    @Column(name = "public_token", length = 64)
-    private String publicToken;
+    @Column(name = "public_token_hash", length = 64)
+    private String publicTokenHash;
 
     @Column(name = "public_enabled", nullable = false)
     private boolean publicEnabled = false;

@@ -58,6 +58,12 @@ public class CustomerPhotoReportPdfGenerator {
     /** Reasonable display height budget for "first photo" when estimating section-start fit. pt */
     private static final float FIRST_PHOTO_BLOCK_ESTIMATE_PT = 140f;
 
+    /**
+     * Cap longest edge (px) for decoded raster before embedding. On-page layout uses smaller dimensions;
+     * this bounds decode cost and PDF payload size for multi-megapixel phone photos.
+     */
+    static final int MAX_EMBED_LONG_SIDE_PX = 1400;
+
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("MMMM d, yyyy", Locale.US);
 
     private final AttachmentStorageService storageService;
@@ -236,18 +242,82 @@ public class CustomerPhotoReportPdfGenerator {
 
     private PDImageXObject toImage(PDDocument doc, byte[] data, String contentType) throws IOException {
         String ct = contentType != null ? contentType.toLowerCase(Locale.ROOT) : "";
-        if (ct.contains("jpeg") || ct.contains("jpg") || ct.contains("pjpeg")) {
+        BufferedImage bi = ImageIO.read(new ByteArrayInputStream(data));
+        if (bi != null) {
+            if (!needsDownscale(bi)) {
+                if (isJpegContentType(ct)) {
+                    try {
+                        return JPEGFactory.createFromByteArray(doc, data);
+                    } catch (IOException ignored) {
+                        // Mislabeled bytes or formats ImageIO handled but PDFBox JPEG rejects — embed from raster.
+                    }
+                }
+                return losslessPdfImage(doc, bi);
+            }
+            BufferedImage scaled = downscaleForPdfEmbed(bi);
+            if (scaled.getColorModel().hasAlpha()) {
+                return losslessPdfImage(doc, scaled);
+            }
+            return embedOpaqueAsJpeg(doc, scaled);
+        }
+        if (isJpegContentType(ct)) {
             try {
                 return JPEGFactory.createFromByteArray(doc, data);
             } catch (IOException ignored) {
-                // Fall through to ImageIO when bytes are mislabeled or CMYK-heavy.
             }
         }
-        BufferedImage bi = ImageIO.read(new ByteArrayInputStream(data));
-        if (bi == null) {
-            return null;
+        return null;
+    }
+
+    static boolean needsDownscale(BufferedImage bi) {
+        return Math.max(bi.getWidth(), bi.getHeight()) > MAX_EMBED_LONG_SIDE_PX;
+    }
+
+    static BufferedImage downscaleForPdfEmbed(BufferedImage src) {
+        int maxSide = Math.max(src.getWidth(), src.getHeight());
+        if (maxSide <= MAX_EMBED_LONG_SIDE_PX) {
+            return src;
         }
-        return losslessPdfImage(doc, bi);
+        double scale = MAX_EMBED_LONG_SIDE_PX / (double) maxSide;
+        int nw = Math.max(1, (int) Math.round(src.getWidth() * scale));
+        int nh = Math.max(1, (int) Math.round(src.getHeight() * scale));
+        int imageType = src.getColorModel().hasAlpha()
+                ? BufferedImage.TYPE_INT_ARGB
+                : BufferedImage.TYPE_INT_RGB;
+        BufferedImage dst = new BufferedImage(nw, nh, imageType);
+        Graphics2D g = dst.createGraphics();
+        try {
+            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+            g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+            if (!src.getColorModel().hasAlpha()) {
+                g.setColor(Color.WHITE);
+                g.fillRect(0, 0, nw, nh);
+            }
+            g.drawImage(src, 0, 0, nw, nh, null);
+        } finally {
+            g.dispose();
+        }
+        return dst;
+    }
+
+    private static boolean isJpegContentType(String ctLowercase) {
+        return ctLowercase.contains("jpeg") || ctLowercase.contains("jpg") || ctLowercase.contains("pjpeg");
+    }
+
+    private PDImageXObject embedOpaqueAsJpeg(PDDocument doc, BufferedImage bi) throws IOException {
+        BufferedImage rgb = ensureRgbForJpeg(bi);
+        try {
+            return JPEGFactory.createFromImage(doc, rgb);
+        } catch (Exception ex) {
+            return losslessPdfImage(doc, rgb);
+        }
+    }
+
+    private static BufferedImage ensureRgbForJpeg(BufferedImage src) {
+        if (src.getType() == BufferedImage.TYPE_INT_RGB) {
+            return src;
+        }
+        return copyToRgb(src);
     }
 
     private PDImageXObject losslessPdfImage(PDDocument doc, BufferedImage bi) throws IOException {

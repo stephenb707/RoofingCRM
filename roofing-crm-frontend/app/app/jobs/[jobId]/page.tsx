@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -17,6 +17,7 @@ import { queryKeys } from "@/lib/queryKeys";
 import { supportsReportGalleryImage } from "@/lib/reportGalleryImageMime";
 import { formatAddress, formatDate, formatDateTime, formatMoney, formatPhone } from "@/lib/format";
 import { listJobAttachments, uploadJobAttachment, downloadAttachment, deleteAttachment } from "@/lib/attachmentsApi";
+import { useAttachmentPreviewUrls } from "@/lib/useAttachmentPreviewUrls";
 import {
   listJobCommunicationLogs,
   addJobCommunicationLog,
@@ -49,9 +50,6 @@ export default function JobDetailPage() {
   const [commLogError, setCommLogError] = useState<string | null>(null);
   const [latestEstimateError, setLatestEstimateError] = useState<string | null>(null);
   const [createFromEstimateId, setCreateFromEstimateId] = useState<string | null>(null);
-  const [attachmentPreviewUrls, setAttachmentPreviewUrls] = useState<Record<string, string>>({});
-  const [loadingAttachmentPreviewIds, setLoadingAttachmentPreviewIds] = useState<string[]>([]);
-  const attachmentPreviewUrlRef = useRef<Record<string, string>>({});
 
   const { data: job, isLoading, isError, error } = useQuery({
     queryKey: queryKeys.job(auth.selectedTenantId, jobId),
@@ -232,70 +230,16 @@ export default function JobDetailPage() {
     [attachmentsQuery.data]
   );
 
-  useEffect(() => {
-    return () => {
-      if (typeof URL.revokeObjectURL !== "function") {
-        return;
-      }
-      for (const url of Object.values(attachmentPreviewUrlRef.current)) {
-        URL.revokeObjectURL(url);
-      }
-    };
-  }, []);
+  const galleryAttachments = useMemo(
+    () =>
+      nonReceiptAttachments.filter((attachment) => supportsReportGalleryImage(attachment.contentType)),
+    [nonReceiptAttachments],
+  );
 
-  useEffect(() => {
-    if (typeof URL.createObjectURL !== "function") {
-      return;
-    }
-    const imageAttachments = nonReceiptAttachments.filter((attachment) =>
-      supportsReportGalleryImage(attachment.contentType)
-    );
-    const missing = imageAttachments.filter(
-      (attachment) => !Object.prototype.hasOwnProperty.call(attachmentPreviewUrlRef.current, attachment.id)
-    );
-    if (missing.length === 0) {
-      return;
-    }
-
-    let cancelled = false;
-    const ids = missing.map((attachment) => attachment.id);
-    for (const attachment of missing) {
-      attachmentPreviewUrlRef.current[attachment.id] = "";
-    }
-    setLoadingAttachmentPreviewIds((prev) => Array.from(new Set([...prev, ...ids])));
-
-    void Promise.all(
-      missing.map(async (attachment) => {
-        try {
-          const blob = await downloadAttachment(api, attachment.id);
-          if (cancelled || !(blob instanceof Blob)) {
-            return;
-          }
-          const url = URL.createObjectURL(blob);
-          attachmentPreviewUrlRef.current[attachment.id] = url;
-          setAttachmentPreviewUrls((prev) => ({ ...prev, [attachment.id]: url }));
-        } catch {
-          if (!cancelled) {
-            attachmentPreviewUrlRef.current[attachment.id] = "";
-            setAttachmentPreviewUrls((prev) => ({ ...prev, [attachment.id]: "" }));
-          }
-        } finally {
-          if (!cancelled) {
-            setLoadingAttachmentPreviewIds((prev) => prev.filter((id) => id !== attachment.id));
-          }
-        }
-      })
-    );
-
-    return () => {
-      cancelled = true;
-      for (const attachment of missing) {
-        if (attachmentPreviewUrlRef.current[attachment.id] === "") {
-          delete attachmentPreviewUrlRef.current[attachment.id];
-        }
-      }
-    };
-  }, [api, nonReceiptAttachments]);
+  const { previewUrls: attachmentPreviewUrls, loadingAttachmentPreviewIds } = useAttachmentPreviewUrls(
+    api,
+    galleryAttachments,
+  );
 
   const uploadAttachmentMutation = useMutation({
     mutationFn: ({

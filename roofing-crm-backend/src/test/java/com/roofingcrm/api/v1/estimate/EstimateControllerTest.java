@@ -168,6 +168,28 @@ class EstimateControllerTest {
     }
 
     @Test
+    void shareEstimate_alwaysReturnsPlaintextToken() throws Exception {
+        UUID tenantId = UUID.randomUUID();
+        UUID estimateId = UUID.randomUUID();
+
+        ShareEstimateResponse response = new ShareEstimateResponse();
+        response.setToken("fresh-token-value");
+        response.setExpiresAt(Instant.now().plusSeconds(86400 * 14));
+
+        when(estimateService.shareEstimate(eq(tenantId), eq(userId), eq(estimateId), any(ShareEstimateRequest.class)))
+                .thenReturn(response);
+
+        mockMvc.perform(post("/api/v1/estimates/{id}/share", estimateId)
+                        .header("X-Tenant-Id", tenantId.toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.token", is("fresh-token-value")));
+
+        verify(estimateService).shareEstimate(eq(tenantId), eq(userId), eq(estimateId), any(ShareEstimateRequest.class));
+    }
+
+    @Test
     void sendEstimateEmail_returnsSuccessPayload() throws Exception {
         UUID tenantId = UUID.randomUUID();
         UUID estimateId = UUID.randomUUID();
@@ -176,7 +198,6 @@ class EstimateControllerTest {
         response.setSuccess(true);
         response.setPublicUrl("https://crm.example.com/estimate/abc123");
         response.setSentAt(Instant.now());
-        response.setReusedExistingToken(false);
 
         when(estimateService.sendEstimateEmail(eq(tenantId), eq(userId), eq(estimateId), any(SendEstimateEmailRequest.class)))
                 .thenReturn(response);

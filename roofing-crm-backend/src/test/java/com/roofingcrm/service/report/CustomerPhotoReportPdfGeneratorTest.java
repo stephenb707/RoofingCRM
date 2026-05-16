@@ -19,10 +19,12 @@ import java.awt.Graphics2D;
 import java.awt.Color;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
+import java.util.Arrays;
 import java.util.Objects;
 import java.util.TimeZone;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -113,6 +115,28 @@ class CustomerPhotoReportPdfGeneratorTest {
     }
 
     @Test
+    void generate_embedsJpegRasterWithoutCrashing() throws Exception {
+        TimeZone previous = TimeZone.getDefault();
+        TimeZone.setDefault(TimeZone.getTimeZone("America/Denver"));
+        try {
+            byte[] jpg = tryWriteRasterAsFormat("jpg", 80, 60, Color.GREEN);
+            Assumptions.assumeTrue(jpg != null && jpg.length > 0);
+            AttachmentStorageService storageService = mock(AttachmentStorageService.class);
+            CustomerPhotoReportPdfGenerator generator = new CustomerPhotoReportPdfGenerator(storageService);
+            CustomerPhotoReport report =
+                    buildReportWithImage(storageService, "photo.jpg", "report/photo.jpg", jpg);
+            Objects.requireNonNull(report.getSections().getFirst().getPhotos().getFirst().getAttachment())
+                    .setContentType("image/jpeg");
+
+            byte[] pdf = generator.generate(report, tenant());
+
+            assertSinglePageHealthyPdf(pdf);
+        } finally {
+            TimeZone.setDefault(previous);
+        }
+    }
+
+    @Test
     void generate_embedsBmpRasterWithoutCrashing() throws Exception {
         TimeZone previous = TimeZone.getDefault();
         TimeZone.setDefault(TimeZone.getTimeZone("America/Denver"));
@@ -183,6 +207,141 @@ class CustomerPhotoReportPdfGeneratorTest {
         float a = generator.estimateSectionStartMinHeight(titleOnly);
         float b = generator.estimateSectionStartMinHeight(withPhoto);
         assertTrue(b > a, "Sections with photos should reserve more vertical start space.");
+    }
+
+    @Test
+    void generate_embedsTiffRasterWhenWriterAvailable() throws Exception {
+        TimeZone previous = TimeZone.getDefault();
+        TimeZone.setDefault(TimeZone.getTimeZone("America/Denver"));
+        try {
+            byte[] tiff = tryWriteRasterAsFormat("tiff", 96, 72, Color.YELLOW);
+            Assumptions.assumeTrue(tiff != null && tiff.length > 0);
+            AttachmentStorageService storageService = mock(AttachmentStorageService.class);
+            CustomerPhotoReportPdfGenerator generator = new CustomerPhotoReportPdfGenerator(storageService);
+            CustomerPhotoReport report =
+                    buildReportWithImage(storageService, "roof.tif", "report/roof.tif", tiff);
+            Objects.requireNonNull(report.getSections().getFirst().getPhotos().getFirst().getAttachment())
+                    .setContentType("image/tiff");
+
+            byte[] pdf = generator.generate(report, tenant());
+
+            assertSinglePageHealthyPdf(pdf);
+        } finally {
+            TimeZone.setDefault(previous);
+        }
+    }
+
+    @Test
+    void generate_embedsWebpRasterWhenWriterAvailable() throws Exception {
+        TimeZone previous = TimeZone.getDefault();
+        TimeZone.setDefault(TimeZone.getTimeZone("America/Denver"));
+        try {
+            Assumptions.assumeTrue(Arrays.stream(ImageIO.getWriterFormatNames()).anyMatch(w -> w.equalsIgnoreCase("webp")));
+
+            BufferedImage image = new BufferedImage(64, 48, BufferedImage.TYPE_INT_RGB);
+            Graphics2D g = image.createGraphics();
+            try {
+                g.setColor(Color.CYAN);
+                g.fillRect(0, 0, 64, 48);
+            } finally {
+                g.dispose();
+            }
+            ByteArrayOutputStream bout = new ByteArrayOutputStream();
+            Assumptions.assumeTrue(ImageIO.write(image, "webp", bout));
+            byte[] webp = bout.toByteArray();
+
+            AttachmentStorageService storageService = mock(AttachmentStorageService.class);
+            CustomerPhotoReportPdfGenerator generator = new CustomerPhotoReportPdfGenerator(storageService);
+            CustomerPhotoReport report =
+                    buildReportWithImage(storageService, "photo.webp", "report/photo.webp", webp);
+            Objects.requireNonNull(report.getSections().getFirst().getPhotos().getFirst().getAttachment())
+                    .setContentType("image/webp");
+
+            byte[] pdf = generator.generate(report, tenant());
+
+            assertSinglePageHealthyPdf(pdf);
+        } finally {
+            TimeZone.setDefault(previous);
+        }
+    }
+
+    @Test
+    void generate_downscaledRasterKeepsPdfMuchSmallerThanRawBitmapPayload() throws Exception {
+        TimeZone previous = TimeZone.getDefault();
+        TimeZone.setDefault(TimeZone.getTimeZone("America/Denver"));
+        try {
+            byte[] hugeBmp = tryWriteRasterAsFormat("bmp", 2200, 2200, Color.DARK_GRAY);
+            Assumptions.assumeTrue(hugeBmp != null && hugeBmp.length > 2_000_000);
+            byte[] hugeBmpData = Objects.requireNonNull(hugeBmp);
+
+            AttachmentStorageService storageService = mock(AttachmentStorageService.class);
+            CustomerPhotoReportPdfGenerator generator = new CustomerPhotoReportPdfGenerator(storageService);
+            CustomerPhotoReport report =
+                    buildReportWithImage(storageService, "big-roof.bmp", "report/big-roof.bmp", hugeBmpData);
+            Objects.requireNonNull(report.getSections().getFirst().getPhotos().getFirst().getAttachment())
+                    .setContentType("image/bmp");
+
+            byte[] pdf = generator.generate(report, tenant());
+
+            assertTrue(pdf.length < hugeBmpData.length / 10,
+                    "Downscaled JPEG embed should dwarf uncompressed BMP payload");
+            assertSinglePageHealthyPdf(pdf);
+        } finally {
+            TimeZone.setDefault(previous);
+        }
+    }
+
+    @Test
+    void generate_pdfPayloadStableAcrossLargeSourceDimensions() throws Exception {
+        TimeZone previous = TimeZone.getDefault();
+        TimeZone.setDefault(TimeZone.getTimeZone("America/Denver"));
+        try {
+            byte[] bmpWide = tryWriteRasterAsFormat("bmp", 3000, 1000, Color.RED);
+            byte[] bmpTall = tryWriteRasterAsFormat("bmp", 1000, 3000, Color.RED);
+            Assumptions.assumeTrue(bmpWide != null && bmpTall != null);
+            byte[] bmpWideData = Objects.requireNonNull(bmpWide);
+            byte[] bmpTallData = Objects.requireNonNull(bmpTall);
+            Assumptions.assumeTrue(bmpWideData.length > 1_500_000 && bmpTallData.length > 1_500_000);
+
+            AttachmentStorageService storageService = mock(AttachmentStorageService.class);
+            CustomerPhotoReportPdfGenerator generator = new CustomerPhotoReportPdfGenerator(storageService);
+
+            CustomerPhotoReport wideReport =
+                    buildReportWithImage(storageService, "w.bmp", "report/w.bmp", bmpWideData);
+            Objects.requireNonNull(wideReport.getSections().getFirst().getPhotos().getFirst().getAttachment())
+                    .setContentType("image/bmp");
+            CustomerPhotoReport tallReport =
+                    buildReportWithImage(storageService, "t.bmp", "report/t.bmp", bmpTallData);
+            Objects.requireNonNull(tallReport.getSections().getFirst().getPhotos().getFirst().getAttachment())
+                    .setContentType("image/bmp");
+
+            byte[] pdfWide = generator.generate(wideReport, tenant());
+            byte[] pdfTall = generator.generate(tallReport, tenant());
+
+            assertTrue(Math.abs(pdfWide.length - pdfTall.length) < 250_000,
+                    "Same visual cap implies similar embedded raster weight");
+        } finally {
+            TimeZone.setDefault(previous);
+        }
+    }
+
+    @Test
+    void downscaleForPdfEmbed_capsLongEdge() {
+        BufferedImage huge = new BufferedImage(5000, 2000, BufferedImage.TYPE_INT_RGB);
+        BufferedImage out = CustomerPhotoReportPdfGenerator.downscaleForPdfEmbed(huge);
+        assertTrue(Math.max(out.getWidth(), out.getHeight()) <= CustomerPhotoReportPdfGenerator.MAX_EMBED_LONG_SIDE_PX);
+    }
+
+    @Test
+    void downscaleForPdfEmbed_preservesSmallInstances() {
+        BufferedImage small = new BufferedImage(400, 300, BufferedImage.TYPE_INT_RGB);
+        assertSame(small, CustomerPhotoReportPdfGenerator.downscaleForPdfEmbed(small));
+    }
+
+    @Test
+    void needsDownscale_dependsOnLongEdgeVsCap() {
+        assertFalse(CustomerPhotoReportPdfGenerator.needsDownscale(new BufferedImage(800, 600, BufferedImage.TYPE_INT_RGB)));
+        assertTrue(CustomerPhotoReportPdfGenerator.needsDownscale(new BufferedImage(2000, 1500, BufferedImage.TYPE_INT_RGB)));
     }
 
     @Test

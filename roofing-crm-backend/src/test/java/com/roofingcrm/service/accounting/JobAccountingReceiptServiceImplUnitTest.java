@@ -18,6 +18,8 @@ import com.roofingcrm.domain.repository.AttachmentRepository;
 import com.roofingcrm.domain.repository.JobCostEntryRepository;
 import com.roofingcrm.domain.repository.JobRepository;
 import com.roofingcrm.service.activity.ActivityEventService;
+import com.roofingcrm.service.attachment.AttachmentUploadProperties;
+import com.roofingcrm.service.attachment.AttachmentUploadValidator;
 import com.roofingcrm.service.tenant.TenantAccessService;
 import com.roofingcrm.storage.AttachmentStorageService;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,6 +28,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.util.unit.DataSize;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -36,6 +39,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -44,6 +48,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static com.roofingcrm.service.attachment.UploadValidationTestFixtures.MINIMAL_PDF_BYTES;
 
 @ExtendWith(MockitoExtension.class)
 @SuppressWarnings("null")
@@ -86,7 +91,8 @@ class JobAccountingReceiptServiceImplUnitTest {
                 activityEventService,
                 jobAccountingService,
                 receiptExtractionService,
-                new ObjectMapper());
+                new ObjectMapper(),
+                new AttachmentUploadValidator(new AttachmentUploadProperties()));
 
         tenantId = UUID.randomUUID();
         userId = UUID.randomUUID();
@@ -128,7 +134,7 @@ class JobAccountingReceiptServiceImplUnitTest {
 
     @Test
     void uploadReceiptForJob_savesAttachmentAndEmitsActivity() {
-        MockMultipartFile file = new MockMultipartFile("file", "receipt.pdf", "application/pdf", "pdf".getBytes());
+        MockMultipartFile file = new MockMultipartFile("file", "receipt.pdf", "application/pdf", MINIMAL_PDF_BYTES);
 
         when(tenantAccessService.requireAnyRole(eq(tenantId), eq(userId), any(), anyString()))
                 .thenReturn(mock(com.roofingcrm.domain.entity.TenantUserMembership.class));
@@ -410,11 +416,68 @@ class JobAccountingReceiptServiceImplUnitTest {
 
     @Test
     void uploadReceiptForJob_requiresMutationRole() {
-        MockMultipartFile file = new MockMultipartFile("file", "receipt.pdf", "application/pdf", "pdf".getBytes());
+        MockMultipartFile file = new MockMultipartFile("file", "receipt.pdf", "application/pdf", MINIMAL_PDF_BYTES);
         doThrow(new RuntimeException("denied"))
                 .when(tenantAccessService).requireAnyRole(eq(tenantId), eq(userId), any(), anyString());
 
         assertThrows(RuntimeException.class, () -> service.uploadReceiptForJob(tenantId, userId, jobId, file, null));
+    }
+
+    @Test
+    void uploadReceiptForJob_rejectsEmptyFile() {
+        when(tenantAccessService.requireAnyRole(eq(tenantId), eq(userId), any(), anyString()))
+                .thenReturn(mock(com.roofingcrm.domain.entity.TenantUserMembership.class));
+        when(tenantAccessService.loadTenantForUserOrThrow(tenantId, userId)).thenReturn(tenant);
+        when(jobRepository.findByIdAndTenantAndArchivedFalse(jobId, tenant)).thenReturn(Optional.of(job));
+
+        MockMultipartFile empty = new MockMultipartFile("file", "r.pdf", "application/pdf", new byte[0]);
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> service.uploadReceiptForJob(tenantId, userId, jobId, empty, null));
+        assertTrue(ex.getMessage().toLowerCase().contains("empty"));
+        verify(attachmentRepository, never()).save(any());
+    }
+
+    @Test
+    void uploadReceiptForJob_rejectsOversizedFile() {
+        AttachmentUploadProperties props = new AttachmentUploadProperties();
+        props.setMaxFileSize(DataSize.ofBytes(5));
+        JobAccountingReceiptServiceImpl strictService = new JobAccountingReceiptServiceImpl(
+                tenantAccessService,
+                attachmentRepository,
+                jobRepository,
+                jobCostEntryRepository,
+                attachmentStorageService,
+                activityEventService,
+                jobAccountingService,
+                receiptExtractionService,
+                new ObjectMapper(),
+                new AttachmentUploadValidator(props));
+
+        when(tenantAccessService.requireAnyRole(eq(tenantId), eq(userId), any(), anyString()))
+                .thenReturn(mock(com.roofingcrm.domain.entity.TenantUserMembership.class));
+        when(tenantAccessService.loadTenantForUserOrThrow(tenantId, userId)).thenReturn(tenant);
+        when(jobRepository.findByIdAndTenantAndArchivedFalse(jobId, tenant)).thenReturn(Optional.of(job));
+
+        MockMultipartFile big = new MockMultipartFile("file", "r.pdf", "application/pdf", new byte[6]);
+        IllegalArgumentException ex =
+                assertThrows(IllegalArgumentException.class,
+                        () -> strictService.uploadReceiptForJob(tenantId, userId, jobId, big, null));
+        assertTrue(ex.getMessage().contains("too large"));
+        verify(attachmentRepository, never()).save(any());
+    }
+
+    @Test
+    void uploadReceiptForJob_rejectsUnsupportedType() {
+        when(tenantAccessService.requireAnyRole(eq(tenantId), eq(userId), any(), anyString()))
+                .thenReturn(mock(com.roofingcrm.domain.entity.TenantUserMembership.class));
+        when(tenantAccessService.loadTenantForUserOrThrow(tenantId, userId)).thenReturn(tenant);
+        when(jobRepository.findByIdAndTenantAndArchivedFalse(jobId, tenant)).thenReturn(Optional.of(job));
+
+        MockMultipartFile bad = new MockMultipartFile("file", "x.zip", "application/zip", new byte[] { 1, 2 });
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> service.uploadReceiptForJob(tenantId, userId, jobId, bad, null));
+        assertTrue(ex.getMessage().contains("Unsupported"));
+        verify(attachmentRepository, never()).save(any());
     }
 
     private Attachment receipt() {

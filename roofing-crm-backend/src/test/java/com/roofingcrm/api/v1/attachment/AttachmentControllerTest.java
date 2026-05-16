@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.ContentDisposition;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -19,6 +20,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
@@ -153,7 +156,42 @@ class AttachmentControllerTest {
                         .header("X-Tenant-Id", tenantId.toString()))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Content-Type", "application/pdf"))
-                .andExpect(header().string("Content-Disposition", "attachment; filename=\"download.pdf\""));
+                .andExpect(result -> {
+                    String raw = result.getResponse().getHeader("Content-Disposition");
+                    assertNotNull(raw);
+                    ContentDisposition cd = ContentDisposition.parse(raw);
+                    assertEquals("attachment", cd.getType());
+                    assertEquals("download.pdf", cd.getFilename());
+                });
+    }
+
+    @Test
+    void downloadAttachment_contentDispositionOmitsHeaderInjectionCharacters() throws Exception {
+        UUID tenantId = UUID.randomUUID();
+        UUID attachmentId = UUID.randomUUID();
+
+        AttachmentDto metadata = new AttachmentDto();
+        metadata.setId(attachmentId);
+        metadata.setFileName("good.pdf\r\nSet-Cookie: a=b");
+        metadata.setContentType("application/pdf");
+
+        when(attachmentService.getAttachment(eq(Objects.requireNonNull(tenantId)), eq(Objects.requireNonNull(userId)), eq(Objects.requireNonNull(attachmentId))))
+                .thenReturn(metadata);
+
+        when(attachmentService.loadAttachmentContent(eq(Objects.requireNonNull(tenantId)), eq(Objects.requireNonNull(userId)), eq(Objects.requireNonNull(attachmentId))))
+                .thenReturn(new ByteArrayInputStream(new byte[]{1}));
+
+        mockMvc.perform(get("/api/v1/attachments/{id}/download", attachmentId)
+                        .header("X-Tenant-Id", tenantId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(result -> {
+                    String raw = result.getResponse().getHeader("Content-Disposition");
+                    assertNotNull(raw);
+                    assertEquals(-1, raw.indexOf('\r'));
+                    assertEquals(-1, raw.indexOf('\n'));
+                    ContentDisposition cd = ContentDisposition.parse(raw);
+                    assertEquals("good.pdfSet-Cookie: a=b", cd.getFilename());
+                });
     }
 
     @Test

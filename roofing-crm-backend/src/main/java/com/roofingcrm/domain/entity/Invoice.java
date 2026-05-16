@@ -68,8 +68,8 @@ public class Invoice extends TenantAuditedEntity {
     @Column(columnDefinition = "text")
     private String notes;
 
-    @Column(name = "public_token", length = 64)
-    private String publicToken;
+    @Column(name = "public_token_hash", length = 64)
+    private String publicTokenHash;
 
     @Column(name = "public_enabled", nullable = false)
     private boolean publicEnabled = false;

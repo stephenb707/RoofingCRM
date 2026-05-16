@@ -7,7 +7,6 @@ public class SendEstimateEmailResponse {
     private boolean success;
     private Instant sentAt;
     private String publicUrl;
-    private boolean reusedExistingToken;
 
     public boolean isSuccess() {
         return success;
@@ -31,13 +30,5 @@ public class SendEstimateEmailResponse {
 
     public void setPublicUrl(String publicUrl) {
         this.publicUrl = publicUrl;
-    }
-
-    public boolean isReusedExistingToken() {
-        return reusedExistingToken;
-    }
-
-    public void setReusedExistingToken(boolean reusedExistingToken) {
-        this.reusedExistingToken = reusedExistingToken;
     }
 }

@@ -27,6 +27,7 @@ class ReportGalleryImageMimeTest {
         assertTrue(ReportGalleryImageMime.isSupported("image/x-ms-bmp"));
         assertTrue(ReportGalleryImageMime.isSupported("image/tiff"));
         assertTrue(ReportGalleryImageMime.isSupported("image/tif"));
+        assertTrue(ReportGalleryImageMime.isSupported("image/x-tiff"));
     }
 
     @Test
