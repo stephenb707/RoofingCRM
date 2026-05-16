@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuthReady } from "@/lib/AuthContext";
 import {
   createCustomerPhotoReport,
@@ -16,6 +16,7 @@ import {
 import { listCustomers } from "@/lib/customersApi";
 import { listJobs } from "@/lib/jobsApi";
 import { downloadAttachment, uploadJobAttachment } from "@/lib/attachmentsApi";
+import { useAttachmentPreviewUrls } from "@/lib/useAttachmentPreviewUrls";
 import { queryKeys } from "@/lib/queryKeys";
 import { supportsReportGalleryImage } from "@/lib/reportGalleryImageMime";
 import { getApiErrorMessage } from "@/lib/apiError";
@@ -81,8 +82,6 @@ export function ReportBuilderForm({
   const [recentUploadsById, setRecentUploadsById] = useState<Record<string, AttachmentDto>>({});
   const [uploadingSectionKey, setUploadingSectionKey] = useState<string | null>(null);
   const [openPhotoPickerKeys, setOpenPhotoPickerKeys] = useState<string[]>([]);
-  const [photoPreviewUrls, setPhotoPreviewUrls] = useState<Record<string, string>>({});
-  const [loadingPhotoPreviewIds, setLoadingPhotoPreviewIds] = useState<string[]>([]);
   const [imagePreviewOverlay, setImagePreviewOverlay] = useState<{
     url: string;
     alt: string;
@@ -91,7 +90,6 @@ export function ReportBuilderForm({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [emailSuccess, setEmailSuccess] = useState<string | null>(null);
-  const previewUrlRef = useRef<Record<string, string>>({});
 
   const { data: report, isLoading: reportLoading } = useQuery({
     queryKey: queryKeys.customerPhotoReport(auth.selectedTenantId, reportId ?? ""),
@@ -152,6 +150,11 @@ export function ReportBuilderForm({
     return list;
   }, [imageCandidates, recentUploadsById]);
 
+  const { previewUrls: photoPreviewUrls, loadingAttachmentPreviewIds: loadingPhotoPreviewIds } =
+    useAttachmentPreviewUrls(api, imageAttachmentsForPreview, {
+      revokeStalePlaceholderKeysOnCleanup: false,
+    });
+
   const imageOptionById = useMemo(() => {
     const map = new Map<string, AttachmentDto>();
     for (const attachment of imageCandidates) {
@@ -164,63 +167,6 @@ export function ReportBuilderForm({
     }
     return map;
   }, [imageCandidates, recentUploadsById]);
-
-  useEffect(() => {
-    return () => {
-      if (typeof URL.revokeObjectURL !== "function") {
-        return;
-      }
-      for (const url of Object.values(previewUrlRef.current)) {
-        URL.revokeObjectURL(url);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (typeof URL.createObjectURL !== "function") {
-      return;
-    }
-    const missing = imageAttachmentsForPreview.filter(
-      (attachment) => !Object.prototype.hasOwnProperty.call(previewUrlRef.current, attachment.id)
-    );
-    if (missing.length === 0) {
-      return;
-    }
-
-    let cancelled = false;
-    const ids = missing.map((attachment) => attachment.id);
-    for (const attachment of missing) {
-      previewUrlRef.current[attachment.id] = "";
-    }
-    setLoadingPhotoPreviewIds((prev) => Array.from(new Set([...prev, ...ids])));
-
-    void Promise.all(
-      missing.map(async (attachment) => {
-        try {
-          const blob = await downloadAttachment(api, attachment.id);
-          if (cancelled || !(blob instanceof Blob)) {
-            return;
-          }
-          const url = URL.createObjectURL(blob);
-          previewUrlRef.current[attachment.id] = url;
-          setPhotoPreviewUrls((prev) => ({ ...prev, [attachment.id]: url }));
-        } catch {
-          if (!cancelled) {
-            previewUrlRef.current[attachment.id] = "";
-            setPhotoPreviewUrls((prev) => ({ ...prev, [attachment.id]: "" }));
-          }
-        } finally {
-          if (!cancelled) {
-            setLoadingPhotoPreviewIds((prev) => prev.filter((id) => id !== attachment.id));
-          }
-        }
-      })
-    );
-
-    return () => {
-      cancelled = true;
-    };
-  }, [api, imageAttachmentsForPreview]);
 
   const selectedCustomer = useMemo(
     () => customersPage?.content?.find((c) => c.id === customerId) ?? null,

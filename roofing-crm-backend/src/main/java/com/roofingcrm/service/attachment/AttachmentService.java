@@ -25,5 +25,8 @@ public interface AttachmentService {
 
     InputStream loadAttachmentContent(@NonNull UUID tenantId, @NonNull UUID userId, @NonNull UUID attachmentId);
 
+    /**
+     * Archives attachment metadata. Physical files are not deleted from storage in the current implementation.
+     */
     void deleteAttachment(@NonNull UUID tenantId, @NonNull UUID userId, @NonNull UUID attachmentId);
 }

@@ -316,6 +316,14 @@ describe("EstimateDetailPage", () => {
     await waitFor(() => {
       expect(mockedTasksApi.createTask).toHaveBeenCalled();
     });
+    expect(mockedTasksApi.createTask).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        description: "Follow up on shared estimate.",
+      })
+    );
+    const taskPayload = mockedTasksApi.createTask.mock.calls[0][1] as { description?: string };
+    expect(String(taskPayload.description)).not.toMatch(/http/i);
     expect(mockPush).toHaveBeenCalledWith("/app/tasks/task-1");
   });
 
@@ -335,7 +343,6 @@ describe("EstimateDetailPage", () => {
       success: true,
       sentAt: "2026-02-16T00:00:00Z",
       publicUrl: "http://localhost:3000/estimate/abc123",
-      reusedExistingToken: false,
     });
 
     render(<EstimateDetailPage />);

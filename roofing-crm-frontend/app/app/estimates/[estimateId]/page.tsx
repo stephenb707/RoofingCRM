@@ -116,7 +116,6 @@ export default function EstimateDetailPage() {
       }
     },
     onError: (err) => {
-      console.error("Update estimate status failed:", err);
       setStatusError(getApiErrorMessage(err, "Failed to update status."));
       if (estimate) setSelectedStatus(estimate.status as EstimateStatus);
     },
@@ -135,7 +134,6 @@ export default function EstimateDetailPage() {
       }
     },
     onError: (err) => {
-      console.error("Update estimate items failed:", err);
       setItemsError(getApiErrorMessage(err, "Failed to update items."));
     },
   });

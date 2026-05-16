@@ -11,6 +11,7 @@ import com.roofingcrm.domain.enums.ActivityEntityType;
 import com.roofingcrm.domain.enums.ActivityEventType;
 import com.roofingcrm.domain.enums.EstimateStatus;
 import com.roofingcrm.domain.repository.EstimateRepository;
+import com.roofingcrm.security.PublicShareTokenHasher;
 import com.roofingcrm.service.activity.ActivityEventService;
 import com.roofingcrm.service.exception.EstimateConflictException;
 import com.roofingcrm.service.exception.EstimateLinkExpiredException;
@@ -41,8 +42,12 @@ public class PublicEstimateService {
 
     @Transactional(readOnly = true)
     public PublicEstimateDto getByToken(@NonNull String token) {
+        if (token.isBlank()) {
+            throw new ResourceNotFoundException("Estimate not found");
+        }
+        String tokenHash = PublicShareTokenHasher.sha256HexUtf8(token);
         Estimate estimate = estimateRepository
-                .findByPublicTokenAndPublicEnabledTrueAndArchivedFalse(token)
+                .findByPublicTokenHashAndPublicEnabledTrueAndArchivedFalse(tokenHash)
                 .orElseThrow(() -> new ResourceNotFoundException("Estimate not found"));
 
         if (estimate.getPublicExpiresAt() != null && Instant.now().isAfter(estimate.getPublicExpiresAt())) {
@@ -54,8 +59,12 @@ public class PublicEstimateService {
 
     @Transactional
     public PublicEstimateDto decide(@NonNull String token, @NonNull PublicEstimateDecisionRequest request) {
+        if (token.isBlank()) {
+            throw new ResourceNotFoundException("Estimate not found");
+        }
+        String tokenHash = PublicShareTokenHasher.sha256HexUtf8(token);
         Estimate estimate = estimateRepository
-                .findByPublicTokenAndPublicEnabledTrueAndArchivedFalse(token)
+                .findByPublicTokenHashAndPublicEnabledTrueAndArchivedFalse(tokenHash)
                 .orElseThrow(() -> new ResourceNotFoundException("Estimate not found"));
 
         if (estimate.getPublicExpiresAt() != null && Instant.now().isAfter(estimate.getPublicExpiresAt())) {

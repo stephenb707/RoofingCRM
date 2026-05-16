@@ -1,4 +1,8 @@
-/** MIME allowlist aligned with backend `ReportGalleryImageMime` — raster images for reports & thumbnails. */
+/**
+ * MIME allowlist aligned with backend `ReportGalleryImageMime`.
+ * Used for picker eligibility, thumbnails, and lightbox previews (browser-native decoding).
+ * PDF export additionally decodes on the server via ImageIO + PDFBox (WebP/TIFF need TwelveMonkeys plugins).
+ */
 
 const ALLOWED_PRIMARY = new Set([
   "image/png",

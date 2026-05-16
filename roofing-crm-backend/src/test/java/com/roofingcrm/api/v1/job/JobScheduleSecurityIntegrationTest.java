@@ -1,6 +1,6 @@
 package com.roofingcrm.api.v1.job;
 
-import com.roofingcrm.api.GlobalExceptionHandler;
+import com.roofingcrm.api.GlobalExceptionHandlerTestSupport;
 import com.roofingcrm.config.CorsProperties;
 import com.roofingcrm.config.SecurityConfig;
 import com.roofingcrm.config.SecurityErrorHandlers;
@@ -38,7 +38,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @WebMvcTest(controllers = JobController.class)
 @AutoConfigureMockMvc(addFilters = true)
-@Import({GlobalExceptionHandler.class, SecurityConfig.class, SecurityErrorHandlers.class, JobScheduleSecurityIntegrationTest.TestCorsConfig.class})
+@Import({GlobalExceptionHandlerTestSupport.class, SecurityConfig.class, SecurityErrorHandlers.class, JobScheduleSecurityIntegrationTest.TestCorsConfig.class})
 @SuppressWarnings("null")
 class JobScheduleSecurityIntegrationTest {
 

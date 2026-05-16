@@ -65,9 +65,10 @@ export const EstimateSharePanel = forwardRef<
   const shareMutation = useMutation({
     mutationFn: () => shareEstimate(api, estimateId, { expiresInDays: 14 }),
     onSuccess: async (data) => {
-      const url =
-        typeof window !== "undefined" ? `${window.location.origin}/estimate/${data.token}` : "";
-      setShareLink(url);
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      const token = data.token ?? null;
+      const url = token ? `${origin}/estimate/${token}` : "";
+      setShareLink(url || null);
       setShareExpiresAt(data.expiresAt ?? null);
       queryClient.invalidateQueries({ queryKey: queryKeys.estimate(auth.selectedTenantId, estimateId) });
       if (jobId) {
@@ -89,7 +90,7 @@ export const EstimateSharePanel = forwardRef<
       const dueAt = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString();
       return createTask(api, {
         title: `Follow up on ${estimateTitle?.trim() || "estimate"}`,
-        description: shareLink ? `Shared estimate link: ${shareLink}` : "Follow up on shared estimate.",
+        description: "Follow up on shared estimate.",
         priority: "MEDIUM",
         status: "TODO",
         dueAt,
@@ -114,7 +115,7 @@ export const EstimateSharePanel = forwardRef<
       expiresInDays?: number;
     }) => sendEstimateEmail(api, estimateId, payload),
     onSuccess: (data, variables) => {
-      setShareLink(data.publicUrl);
+      setShareLink(data.publicUrl ?? null);
       setShareExpiresAt(null);
       setEmailSuccess(`Email sent to ${variables.recipientEmail}.`);
       setShowEmailModal(false);

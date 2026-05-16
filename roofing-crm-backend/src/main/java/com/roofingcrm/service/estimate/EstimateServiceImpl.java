@@ -19,6 +19,7 @@ import com.roofingcrm.domain.enums.UserRole;
 import com.roofingcrm.domain.enums.EstimateStatus;
 import com.roofingcrm.domain.repository.EstimateRepository;
 import com.roofingcrm.domain.repository.JobRepository;
+import com.roofingcrm.security.PublicShareTokenHasher;
 import com.roofingcrm.service.activity.ActivityEventService;
 import com.roofingcrm.service.audit.AuditSupport;
 import com.roofingcrm.service.exception.MailConfigurationException;
@@ -216,20 +217,22 @@ public class EstimateServiceImpl implements EstimateService {
 
         int days = (request != null && request.getExpiresInDays() != null) ? request.getExpiresInDays() : 14;
         Instant now = Instant.now();
-        TokenState tokenState = ensurePublicShare(estimate, userId, now, days);
+        PublicSharePrepareResult prep = ensurePublicShare(estimate, userId, now, days);
         Estimate saved = estimateRepository.save(Objects.requireNonNull(estimate));
 
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("estimateId", saved.getId().toString());
         metadata.put("estimateNumber", saved.getEstimateNumber());
-        metadata.put("expiresAt", tokenState.expiresAt().toString());
+        metadata.put("expiresAt", prep.expiresAt().toString());
+        metadata.put("publicLinkSent", Boolean.TRUE);
+        metadata.put("deliveryMethod", "LINK");
         activityEventService.recordEvent(tenant, userId, ActivityEntityType.JOB,
                 Objects.requireNonNull(saved.getJob().getId()),
                 ActivityEventType.ESTIMATE_SHARED, "Estimate shared via public link", metadata);
 
         ShareEstimateResponse response = new ShareEstimateResponse();
-        response.setToken(saved.getPublicToken());
-        response.setExpiresAt(tokenState.expiresAt());
+        response.setToken(prep.plaintextToken());
+        response.setExpiresAt(prep.expiresAt());
         return response;
     }
 
@@ -244,9 +247,10 @@ public class EstimateServiceImpl implements EstimateService {
 
         int days = request.getExpiresInDays() != null ? request.getExpiresInDays() : 14;
         Instant now = Instant.now();
-        TokenState tokenState = ensurePublicShare(estimate, userId, now, days);
+        PublicSharePrepareResult prep = ensurePublicShare(estimate, userId, now, days);
+        String tokenForUrl = prep.plaintextToken();
         Estimate saved = estimateRepository.save(Objects.requireNonNull(estimate));
-        String publicUrl = buildPublicEstimateUrl(saved.getPublicToken());
+        String publicUrl = buildPublicEstimateUrl(tokenForUrl);
 
         emailService.send(estimateEmailTemplateBuilder.build(
                 tenant,
@@ -262,7 +266,8 @@ public class EstimateServiceImpl implements EstimateService {
         metadata.put("estimateId", saved.getId().toString());
         metadata.put("estimateNumber", saved.getEstimateNumber());
         metadata.put("recipientEmail", request.getRecipientEmail());
-        metadata.put("publicUrl", publicUrl);
+        metadata.put("publicLinkSent", Boolean.TRUE);
+        metadata.put("deliveryMethod", "EMAIL");
         activityEventService.recordEvent(tenant, userId, ActivityEntityType.JOB,
                 Objects.requireNonNull(saved.getJob().getId()),
                 ActivityEventType.ESTIMATE_EMAIL_SENT, "Estimate emailed to " + request.getRecipientEmail(), metadata);
@@ -271,7 +276,6 @@ public class EstimateServiceImpl implements EstimateService {
         response.setSuccess(true);
         response.setSentAt(now);
         response.setPublicUrl(publicUrl);
-        response.setReusedExistingToken(tokenState.reusedExistingToken());
         return response;
     }
 
@@ -296,7 +300,11 @@ public class EstimateServiceImpl implements EstimateService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
-    private TokenState ensurePublicShare(Estimate estimate, UUID userId, Instant now, int days) {
+    /**
+     * Prepares public sharing: always mints a new plaintext token (only its hash is persisted),
+     * replacing any prior link. Prior URLs stop working once this completes.
+     */
+    private PublicSharePrepareResult ensurePublicShare(Estimate estimate, UUID userId, Instant now, int days) {
         if (estimate.getStatus() == EstimateStatus.DRAFT) {
             estimate.setStatus(EstimateStatus.SENT);
         }
@@ -304,21 +312,24 @@ public class EstimateServiceImpl implements EstimateService {
         int normalizedDays = Math.min(365, Math.max(1, days));
         Instant expiresAt = now.plusSeconds(normalizedDays * 86400L);
 
-        boolean needNewToken = estimate.getPublicToken() == null || estimate.getPublicToken().isBlank()
-                || (estimate.getPublicExpiresAt() != null && estimate.getPublicExpiresAt().isBefore(now));
-
-        if (needNewToken) {
-            byte[] bytes = new byte[32];
-            secureRandom.nextBytes(bytes);
-            String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-            estimate.setPublicToken(token);
-        }
+        String plaintextToken = mintPublicShareToken(estimate);
 
         estimate.setPublicEnabled(true);
         estimate.setPublicExpiresAt(expiresAt);
         estimate.setPublicLastSharedAt(now);
         AuditSupport.touchForUpdate(estimate, userId);
-        return new TokenState(expiresAt, !needNewToken);
+        return new PublicSharePrepareResult(expiresAt, plaintextToken);
+    }
+
+    /**
+     * Returns a new URL-safe token and persists its SHA-256 hash on the estimate.
+     */
+    private String mintPublicShareToken(Estimate estimate) {
+        byte[] bytes = new byte[32];
+        secureRandom.nextBytes(bytes);
+        String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        estimate.setPublicTokenHash(PublicShareTokenHasher.sha256HexUtf8(Objects.requireNonNull(token)));
+        return token;
     }
 
     private String buildPublicEstimateUrl(String token) {
@@ -329,7 +340,7 @@ public class EstimateServiceImpl implements EstimateService {
         return baseUrl.replaceAll("/+$", "") + "/estimate/" + token;
     }
 
-    private record TokenState(Instant expiresAt, boolean reusedExistingToken) {
+    private record PublicSharePrepareResult(Instant expiresAt, String plaintextToken) {
     }
 
 }

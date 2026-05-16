@@ -37,7 +37,6 @@ com\roofingcrm\service\accounting\ReceiptDateCandidateRankerTest.class
 com\roofingcrm\api\v1\report\AccountingReportControllerTest.class
 com\roofingcrm\api\v1\attachment\AttachmentControllerTest.class
 com\roofingcrm\service\invoice\InvoiceMapperTest.class
-com\roofingcrm\service\estimate\EstimateServiceImplUnitTest.class
 com\roofingcrm\service\communication\CommunicationLogServiceImplTest.class
 com\roofingcrm\service\report\ReportServiceImplCsvExportIdsTest.class
 com\roofingcrm\api\v1\report\ReportControllerTest.class

@@ -34,7 +34,7 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
     Optional<Invoice> findDetailedByIdAndTenantAndArchivedFalse(UUID id, Tenant tenant);
 
     @EntityGraph(attributePaths = {"job", "job.customer", "items"})
-    Optional<Invoice> findByPublicTokenAndPublicEnabledTrueAndArchivedFalse(String token);
+    Optional<Invoice> findByPublicTokenHashAndPublicEnabledTrueAndArchivedFalse(String publicTokenHash);
 
     List<Invoice> findByTenantAndJobIdAndArchivedFalseOrderByCreatedAtDesc(Tenant tenant, UUID jobId);
 

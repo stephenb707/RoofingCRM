@@ -1,6 +1,6 @@
 package com.roofingcrm.api.v1.customerreport;
 
-import com.roofingcrm.api.GlobalExceptionHandler;
+import com.roofingcrm.api.GlobalExceptionHandlerTestSupport;
 import com.roofingcrm.security.AuthenticatedUser;
 import com.roofingcrm.service.customerreport.CustomerPhotoReportPdfExport;
 import com.roofingcrm.service.customerreport.CustomerPhotoReportService;
@@ -32,7 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(controllers = CustomerPhotoReportController.class)
 @AutoConfigureMockMvc(addFilters = false)
-@Import(GlobalExceptionHandler.class)
+@Import(GlobalExceptionHandlerTestSupport.class)
 @SuppressWarnings("null")
 class CustomerPhotoReportControllerTest {
 

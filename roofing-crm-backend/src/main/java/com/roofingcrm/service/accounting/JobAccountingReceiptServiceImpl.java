@@ -23,6 +23,8 @@ import com.roofingcrm.domain.repository.AttachmentRepository;
 import com.roofingcrm.domain.repository.JobCostEntryRepository;
 import com.roofingcrm.domain.repository.JobRepository;
 import com.roofingcrm.service.activity.ActivityEventService;
+import com.roofingcrm.service.attachment.AttachmentUploadContext;
+import com.roofingcrm.service.attachment.AttachmentUploadValidator;
 import com.roofingcrm.service.audit.AuditSupport;
 import com.roofingcrm.service.exception.ResourceNotFoundException;
 import com.roofingcrm.service.tenant.TenantAccessService;
@@ -62,6 +64,7 @@ public class JobAccountingReceiptServiceImpl implements JobAccountingReceiptServ
     private final JobAccountingService jobAccountingService;
     private final ReceiptExtractionService receiptExtractionService;
     private final ObjectMapper objectMapper;
+    private final AttachmentUploadValidator uploadValidator;
 
     @Autowired
     public JobAccountingReceiptServiceImpl(TenantAccessService tenantAccessService,
@@ -72,7 +75,8 @@ public class JobAccountingReceiptServiceImpl implements JobAccountingReceiptServ
                                            ActivityEventService activityEventService,
                                            JobAccountingService jobAccountingService,
                                            ReceiptExtractionService receiptExtractionService,
-                                           ObjectMapper objectMapper) {
+                                           ObjectMapper objectMapper,
+                                           AttachmentUploadValidator uploadValidator) {
         this.tenantAccessService = tenantAccessService;
         this.attachmentRepository = attachmentRepository;
         this.jobRepository = jobRepository;
@@ -82,6 +86,7 @@ public class JobAccountingReceiptServiceImpl implements JobAccountingReceiptServ
         this.jobAccountingService = jobAccountingService;
         this.receiptExtractionService = receiptExtractionService;
         this.objectMapper = objectMapper;
+        this.uploadValidator = uploadValidator;
     }
 
     @Override
@@ -101,7 +106,7 @@ public class JobAccountingReceiptServiceImpl implements JobAccountingReceiptServ
                 "You do not have permission to manage receipts.");
         Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
         Job job = loadJob(jobId, tenant);
-        validateReceiptFile(file);
+        uploadValidator.validate(Objects.requireNonNull(file), AttachmentUploadContext.JOB_RECEIPT);
 
         Attachment receipt = new Attachment();
         receipt.setTenant(tenant);
@@ -236,6 +241,10 @@ public class JobAccountingReceiptServiceImpl implements JobAccountingReceiptServ
         return toReceiptDto(saved);
     }
 
+    /**
+     * Archives the receipt attachment. Files on disk (or other storage backends) are not deleted;
+     * only the attachment row is marked archived.
+     */
     @Override
     public void deleteReceipt(@NonNull UUID tenantId, @NonNull UUID userId, UUID jobId, UUID receiptId) {
         tenantAccessService.requireAnyRole(tenantId, userId, Objects.requireNonNull(MUTATION_ROLES),
@@ -268,17 +277,6 @@ public class JobAccountingReceiptServiceImpl implements JobAccountingReceiptServ
     private JobCostEntry loadCostEntry(UUID costEntryId, UUID jobId, Tenant tenant) {
         return jobCostEntryRepository.findByIdAndJobIdAndTenantAndArchivedFalse(costEntryId, jobId, tenant)
                 .orElseThrow(() -> new ResourceNotFoundException("Cost entry not found"));
-    }
-
-    private void validateReceiptFile(MultipartFile file) {
-        String contentType = file.getContentType();
-        if (contentType == null || contentType.isBlank()) {
-            return;
-        }
-        if (contentType.equals("application/pdf") || contentType.startsWith("image/")) {
-            return;
-        }
-        throw new IllegalArgumentException("Receipt must be an image or PDF");
     }
 
     private String normalizeOptionalText(String value) {

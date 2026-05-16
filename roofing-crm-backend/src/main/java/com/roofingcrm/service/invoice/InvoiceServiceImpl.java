@@ -18,6 +18,7 @@ import com.roofingcrm.domain.enums.InvoiceStatus;
 import com.roofingcrm.domain.enums.UserRole;
 import com.roofingcrm.domain.repository.EstimateRepository;
 import com.roofingcrm.domain.repository.InvoiceRepository;
+import com.roofingcrm.security.PublicShareTokenHasher;
 import com.roofingcrm.service.activity.ActivityEventService;
 import com.roofingcrm.service.audit.AuditSupport;
 import com.roofingcrm.service.exception.InvoiceConflictException;
@@ -214,20 +215,22 @@ public class InvoiceServiceImpl implements InvoiceService {
 
         int days = (request != null && request.getExpiresInDays() != null) ? request.getExpiresInDays() : 14;
         Instant now = Instant.now();
-        TokenState tokenState = ensurePublicShare(invoice, userId, now, days);
+        PublicSharePrepareResult prep = ensurePublicShare(invoice, userId, now, days);
         Invoice saved = invoiceRepository.save(invoice);
 
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("invoiceId", saved.getId().toString());
         metadata.put("invoiceNumber", saved.getInvoiceNumber());
-        metadata.put("expiresAt", tokenState.expiresAt().toString());
+        metadata.put("expiresAt", prep.expiresAt().toString());
+        metadata.put("publicLinkSent", Boolean.TRUE);
+        metadata.put("deliveryMethod", "LINK");
         activityEventService.recordEvent(tenant, userId, ActivityEntityType.JOB,
                 Objects.requireNonNull(saved.getJob().getId()),
                 ActivityEventType.INVOICE_SHARED, "Invoice shared via public link", metadata);
 
         ShareInvoiceResponse response = new ShareInvoiceResponse();
-        response.setToken(saved.getPublicToken());
-        response.setExpiresAt(tokenState.expiresAt());
+        response.setToken(prep.plaintextToken());
+        response.setExpiresAt(prep.expiresAt());
         return response;
     }
 
@@ -246,9 +249,10 @@ public class InvoiceServiceImpl implements InvoiceService {
 
         int days = request.getExpiresInDays() != null ? request.getExpiresInDays() : 14;
         Instant now = Instant.now();
-        TokenState tokenState = ensurePublicShare(invoice, userId, now, days);
+        PublicSharePrepareResult prep = ensurePublicShare(invoice, userId, now, days);
+        String tokenForUrl = prep.plaintextToken();
         Invoice saved = invoiceRepository.save(invoice);
-        String publicUrl = buildPublicInvoiceUrl(saved.getPublicToken());
+        String publicUrl = buildPublicInvoiceUrl(tokenForUrl);
 
         emailService.send(invoiceEmailTemplateBuilder.build(
                 tenant,
@@ -264,7 +268,8 @@ public class InvoiceServiceImpl implements InvoiceService {
         metadata.put("invoiceId", saved.getId().toString());
         metadata.put("invoiceNumber", saved.getInvoiceNumber());
         metadata.put("recipientEmail", request.getRecipientEmail());
-        metadata.put("publicUrl", publicUrl);
+        metadata.put("publicLinkSent", Boolean.TRUE);
+        metadata.put("deliveryMethod", "EMAIL");
         activityEventService.recordEvent(tenant, userId, ActivityEntityType.JOB,
                 Objects.requireNonNull(saved.getJob().getId()),
                 ActivityEventType.INVOICE_EMAIL_SENT, "Invoice emailed to " + request.getRecipientEmail(), metadata);
@@ -273,7 +278,6 @@ public class InvoiceServiceImpl implements InvoiceService {
         response.setSuccess(true);
         response.setSentAt(now);
         response.setPublicUrl(publicUrl);
-        response.setReusedExistingToken(tokenState.reusedExistingToken());
         return response;
     }
 
@@ -291,7 +295,8 @@ public class InvoiceServiceImpl implements InvoiceService {
         }
     }
 
-    private TokenState ensurePublicShare(Invoice invoice, UUID userId, Instant now, int days) {
+    /** Always mints a new plaintext token (only its hash is persisted), replacing any prior public link. */
+    private PublicSharePrepareResult ensurePublicShare(Invoice invoice, UUID userId, Instant now, int days) {
         if (invoice.getStatus() == InvoiceStatus.DRAFT) {
             invoice.setStatus(InvoiceStatus.SENT);
             if (invoice.getSentAt() == null) {
@@ -302,20 +307,21 @@ public class InvoiceServiceImpl implements InvoiceService {
         int normalizedDays = Math.min(365, Math.max(1, days));
         Instant expiresAt = now.plusSeconds(normalizedDays * 86400L);
 
-        boolean needNewToken = invoice.getPublicToken() == null || invoice.getPublicToken().isBlank()
-                || (invoice.getPublicExpiresAt() != null && invoice.getPublicExpiresAt().isBefore(now));
-        if (needNewToken) {
-            byte[] bytes = new byte[32];
-            secureRandom.nextBytes(bytes);
-            String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-            invoice.setPublicToken(token);
-        }
+        String plaintextToken = mintPublicShareToken(invoice);
 
         invoice.setPublicEnabled(true);
         invoice.setPublicExpiresAt(expiresAt);
         invoice.setPublicLastSharedAt(now);
         AuditSupport.touchForUpdate(invoice, userId);
-        return new TokenState(expiresAt, !needNewToken);
+        return new PublicSharePrepareResult(expiresAt, plaintextToken);
+    }
+
+    private String mintPublicShareToken(Invoice invoice) {
+        byte[] bytes = new byte[32];
+        secureRandom.nextBytes(bytes);
+        String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        invoice.setPublicTokenHash(PublicShareTokenHasher.sha256HexUtf8(Objects.requireNonNull(token)));
+        return token;
     }
 
     private String buildPublicInvoiceUrl(String token) {
@@ -326,7 +332,7 @@ public class InvoiceServiceImpl implements InvoiceService {
         return baseUrl.replaceAll("/+$", "") + "/invoice/" + token;
     }
 
-    private record TokenState(Instant expiresAt, boolean reusedExistingToken) {
+    private record PublicSharePrepareResult(Instant expiresAt, String plaintextToken) {
     }
 
 }

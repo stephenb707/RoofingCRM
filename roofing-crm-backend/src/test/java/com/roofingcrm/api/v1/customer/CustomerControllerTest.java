@@ -1,7 +1,7 @@
 package com.roofingcrm.api.v1.customer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.roofingcrm.api.GlobalExceptionHandler;
+import com.roofingcrm.api.GlobalExceptionHandlerTestSupport;
 import com.roofingcrm.api.v1.common.AddressDto;
 import com.roofingcrm.security.AuthenticatedUser;
 import com.roofingcrm.service.customer.CustomerService;
@@ -32,7 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(controllers = CustomerController.class)
 @AutoConfigureMockMvc(addFilters = false)
-@Import(GlobalExceptionHandler.class)
+@Import(GlobalExceptionHandlerTestSupport.class)
 @SuppressWarnings("null")
 class CustomerControllerTest {
 

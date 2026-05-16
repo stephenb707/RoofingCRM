@@ -8,8 +8,9 @@ import java.util.Set;
 
 /**
  * MIME-aware allowlist for images that appear in customer photo reports and related UI.
- * Excludes vague {@code image/*} edge cases such as SVG (not embedded as raster in PDF) and HEIC
- * where decode support is unreliable without native codecs.
+ * PDF embedding decodes via ImageIO + PDFBox: PNG, JPEG, GIF, and BMP use the JDK; WebP and TIFF use
+ * TwelveMonkeys ImageIO modules declared in the backend {@code pom.xml} ({@code imageio-webp}, {@code imageio-tiff}).
+ * Excludes SVG (not a safe raster for this pipeline) and HEIC (unreliable decode without native codecs).
  */
 public final class ReportGalleryImageMime {
 
@@ -53,8 +54,8 @@ public final class ReportGalleryImageMime {
         Objects.requireNonNull(attachment, "attachment");
         if (!isSupported(attachment.getContentType())) {
             throw new IllegalArgumentException(
-                    "Report photos must be a supported raster image "
-                            + "(PNG, JPEG, GIF, WebP, BMP, or TIFF).");
+                    "Report photos must be a supported raster image type "
+                            + "(PNG, JPEG, GIF, BMP, WebP, or TIFF).");
         }
     }
 }

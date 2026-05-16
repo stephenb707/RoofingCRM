@@ -29,9 +29,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.lang.NonNull;
 import org.springframework.mock.web.MockMultipartFile;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+
+import static com.roofingcrm.service.attachment.UploadValidationTestFixtures.MINIMAL_PDF_BYTES;
+import static com.roofingcrm.service.attachment.UploadValidationTestFixtures.MINIMAL_PNG_BYTES;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -144,7 +148,7 @@ class AttachmentServiceImplTest extends AbstractIntegrationTest {
                 "file",
                 "test-doc.pdf",
                 "application/pdf",
-                "Test PDF content".getBytes()
+                MINIMAL_PDF_BYTES
         );
 
         AttachmentDto dto = attachmentService.uploadForLead(tenantId, userId, leadId, file, null, null);
@@ -162,16 +166,16 @@ class AttachmentServiceImplTest extends AbstractIntegrationTest {
     void uploadForJob_storesMetadataAndFile() {
         MockMultipartFile file = new MockMultipartFile(
                 "file",
-                "job-photo.jpg",
-                "image/jpeg",
-                "Fake image bytes".getBytes()
+                "job-photo.png",
+                "image/png",
+                MINIMAL_PNG_BYTES
         );
 
         AttachmentDto dto = attachmentService.uploadForJob(tenantId, userId, jobId, file, null, null);
 
         assertNotNull(dto.getId());
-        assertEquals("job-photo.jpg", dto.getFileName());
-        assertEquals("image/jpeg", dto.getContentType());
+        assertEquals("job-photo.png", dto.getFileName());
+        assertEquals("image/png", dto.getContentType());
         assertEquals("LOCAL", dto.getStorageProvider());
         assertEquals(jobId, dto.getJobId());
         assertNull(dto.getLeadId());
@@ -179,8 +183,8 @@ class AttachmentServiceImplTest extends AbstractIntegrationTest {
 
     @Test
     void listForLead_returnsAttachments() {
-        MockMultipartFile file1 = new MockMultipartFile("file", "doc1.pdf", "application/pdf", "content1".getBytes());
-        MockMultipartFile file2 = new MockMultipartFile("file", "doc2.pdf", "application/pdf", "content2".getBytes());
+        MockMultipartFile file1 = new MockMultipartFile("file", "doc1.pdf", "application/pdf", pdfWithTrailingByte((byte) 1));
+        MockMultipartFile file2 = new MockMultipartFile("file", "doc2.pdf", "application/pdf", pdfWithTrailingByte((byte) 2));
 
         attachmentService.uploadForLead(tenantId, userId, leadId, file1, null, null);
         attachmentService.uploadForLead(tenantId, userId, leadId, file2, null, null);
@@ -188,6 +192,12 @@ class AttachmentServiceImplTest extends AbstractIntegrationTest {
         List<AttachmentDto> attachments = attachmentService.listForLead(tenantId, userId, leadId);
 
         assertEquals(2, attachments.size());
+    }
+
+    private static byte[] pdfWithTrailingByte(byte suffix) {
+        byte[] out = Arrays.copyOf(MINIMAL_PDF_BYTES, MINIMAL_PDF_BYTES.length + 1);
+        out[MINIMAL_PDF_BYTES.length] = suffix;
+        return out;
     }
 
     @Test
@@ -201,7 +211,7 @@ class AttachmentServiceImplTest extends AbstractIntegrationTest {
         anotherUser = userRepository.save(anotherUser);
 
         UUID otherUserId = Objects.requireNonNull(anotherUser.getId());
-        MockMultipartFile file = new MockMultipartFile("file", "doc.pdf", "application/pdf", "content".getBytes());
+        MockMultipartFile file = new MockMultipartFile("file", "doc.pdf", "application/pdf", MINIMAL_PDF_BYTES);
 
         assertThrows(TenantAccessDeniedException.class,
                 () -> attachmentService.uploadForLead(tenantId, otherUserId, leadId, file, null, null));

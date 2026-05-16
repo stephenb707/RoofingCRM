@@ -11,6 +11,7 @@ import com.roofingcrm.service.exception.MailDeliveryException;
 import com.roofingcrm.service.exception.NoPaidInvoicesForYearException;
 import com.roofingcrm.service.exception.ResourceNotFoundException;
 import com.roofingcrm.service.auth.AuthSessionException;
+import com.roofingcrm.service.attachment.AttachmentUploadProperties;
 import com.roofingcrm.service.tenant.TenantAccessDeniedException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
@@ -22,10 +23,17 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.time.Instant;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private final AttachmentUploadProperties attachmentUploadProperties;
+
+    public GlobalExceptionHandler(AttachmentUploadProperties attachmentUploadProperties) {
+        this.attachmentUploadProperties = Objects.requireNonNull(attachmentUploadProperties);
+    }
 
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ApiErrorResponse> handleNotFound(ResourceNotFoundException ex,
@@ -220,7 +228,8 @@ public class GlobalExceptionHandler {
                 Instant.now(),
                 HttpStatus.PAYLOAD_TOO_LARGE.value(),
                 HttpStatus.PAYLOAD_TOO_LARGE.getReasonPhrase(),
-                "File is too large. Maximum upload size is 20MB.",
+                "File is too large. Maximum upload size is "
+                        + attachmentUploadProperties.getMaxFileSizeDisplayString() + ".",
                 request.getRequestURI()
         );
         return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(body);

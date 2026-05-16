@@ -81,14 +81,6 @@ export interface UpdateCustomerRequest {
 }
 
 // Lead-related types
-export type LeadStatus =
-  | "NEW"
-  | "CONTACTED"
-  | "INSPECTION_SCHEDULED"
-  | "QUOTE_SENT"
-  | "WON"
-  | "LOST";
-
 export type LeadSource =
   | "REFERRAL"
   | "WEBSITE"
@@ -176,13 +168,6 @@ export interface PageResponse<T> {
 }
 
 // Job-related types
-export type JobStatus =
-  | "UNSCHEDULED"
-  | "SCHEDULED"
-  | "IN_PROGRESS"
-  | "COMPLETED"
-  | "INVOICED";
-
 export type JobType = "REPLACEMENT" | "REPAIR" | "INSPECTION_ONLY";
 
 export interface JobDto {
@@ -307,7 +292,8 @@ export interface UpdateEstimateStatusRequest {
 }
 
 export interface ShareEstimateResponse {
-  token: string;
+  /** Plaintext path segment; backend mints a new value on every share. */
+  token: string | null;
   expiresAt: string;
 }
 
@@ -323,11 +309,10 @@ export interface SendEstimateEmailResponse {
   success: boolean;
   sentAt: string;
   publicUrl: string;
-  reusedExistingToken: boolean;
 }
 
 export interface ShareInvoiceResponse {
-  token: string;
+  token: string | null;
   expiresAt: string;
 }
 
@@ -343,7 +328,6 @@ export interface SendInvoiceEmailResponse {
   success: boolean;
   sentAt: string;
   publicUrl: string;
-  reusedExistingToken: boolean;
 }
 
 export type JobCostCategory =
