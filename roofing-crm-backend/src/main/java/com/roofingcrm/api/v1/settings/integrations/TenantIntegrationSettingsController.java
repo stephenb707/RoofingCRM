@@ -34,7 +34,7 @@ public class TenantIntegrationSettingsController {
 
     @GetMapping("/{provider}")
     public ResponseEntity<IntegrationSettingsDto> get(@RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
-                                                      @PathVariable String provider) {
+                                                      @PathVariable("provider") String provider) {
         UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
         IntegrationProvider p = parseProvider(provider);
         return ResponseEntity.ok(tenantIntegrationSettingsService.getSettings(tenantId, userId, p));
@@ -42,7 +42,7 @@ public class TenantIntegrationSettingsController {
 
     @PutMapping("/{provider}")
     public ResponseEntity<IntegrationSettingsDto> update(@RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
-                                                        @PathVariable String provider,
+                                                        @PathVariable("provider") String provider,
                                                         @Valid @RequestBody UpdateIntegrationSettingsRequest request) {
         UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
         IntegrationProvider p = parseProvider(provider);
@@ -52,7 +52,7 @@ public class TenantIntegrationSettingsController {
 
     @PostMapping("/{provider}/disable")
     public ResponseEntity<IntegrationSettingsDto> disable(@RequestHeader("X-Tenant-Id") @NonNull UUID tenantId,
-                                                         @PathVariable String provider) {
+                                                         @PathVariable("provider") String provider) {
         UUID userId = SecurityUtils.getCurrentUserIdOrThrow();
         IntegrationProvider p = parseProvider(provider);
         return ResponseEntity.ok(tenantIntegrationSettingsService.disableIntegration(tenantId, userId, Objects.requireNonNull(p)));

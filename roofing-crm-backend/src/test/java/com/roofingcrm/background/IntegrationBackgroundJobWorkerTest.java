@@ -1,6 +1,7 @@
 package com.roofingcrm.background;
 
 import com.roofingcrm.domain.entity.IntegrationBackgroundJob;
+import com.roofingcrm.domain.entity.Tenant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -9,7 +10,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Objects;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -22,6 +23,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
+@SuppressWarnings("null")
 class IntegrationBackgroundJobWorkerTest {
 
     @Mock
@@ -49,28 +51,46 @@ class IntegrationBackgroundJobWorkerTest {
     void poll_marksUnsupportedJobDead() {
         when(properties.isEnabled()).thenReturn(true);
         when(properties.getBatchSize()).thenReturn(10);
-        IntegrationBackgroundJob job = new IntegrationBackgroundJob();
-        job.setId(UUID.randomUUID());
-        job.setJobType("NOT_SUPPORTED_HERE");
-        when(jobService.claimDueJobs(Objects.requireNonNull(any(Instant.class)), anyInt(), Objects.requireNonNull(anyString()))).thenReturn(List.of(job));
+        IntegrationBackgroundJob job = claimedJob("NOT_SUPPORTED_HERE");
+        when(jobService.claimDueJobs(any(Instant.class), anyInt(), anyString())).thenReturn(List.of(job));
 
         worker.poll();
 
-        verify(jobService).markDeadUnsupported(Objects.requireNonNull(eq(job.getId())), Objects.requireNonNull(anyString()));
-        verify(jobService, never()).markSucceeded(Objects.requireNonNull(any()));
+        verify(jobService).markDeadUnsupported(
+                eq(job.getId()), eq("Unsupported job type: NOT_SUPPORTED_HERE"));
+        verify(jobService, never()).markSucceeded(any(UUID.class));
     }
 
     @Test
     void poll_runsNoOpHandler() {
         when(properties.isEnabled()).thenReturn(true);
         when(properties.getBatchSize()).thenReturn(10);
-        IntegrationBackgroundJob job = new IntegrationBackgroundJob();
-        job.setId(UUID.randomUUID());
-        job.setJobType(BackgroundJobTypes.NO_OP);
-        when(jobService.claimDueJobs(Objects.requireNonNull(any(Instant.class)), anyInt(), Objects.requireNonNull(anyString()))).thenReturn(List.of(job));
+        IntegrationBackgroundJob job = claimedJob(BackgroundJobTypes.NO_OP);
+        when(jobService.claimDueJobs(any(Instant.class), anyInt(), anyString())).thenReturn(List.of(job));
 
         worker.poll();
 
-        verify(jobService).markSucceeded(Objects.requireNonNull(job.getId()));
+        verify(jobService).markSucceeded(job.getId());
+    }
+
+    private static IntegrationBackgroundJob claimedJob(String jobType) {
+        Instant now = Instant.parse("2026-07-10T12:00:00Z");
+        Tenant tenant = new Tenant();
+        tenant.setId(UUID.randomUUID());
+        tenant.setName("Test Roofing");
+        tenant.setSlug("test-roofing");
+
+        IntegrationBackgroundJob job = new IntegrationBackgroundJob();
+        job.setId(UUID.randomUUID());
+        job.setTenant(tenant);
+        job.setJobType(jobType);
+        job.setStatus(BackgroundJobStatus.RUNNING);
+        job.setPayloadJson(Map.of());
+        job.setAttempts(0);
+        job.setMaxAttempts(5);
+        job.setNextRunAt(now);
+        job.setCreatedAt(now);
+        job.setUpdatedAt(now);
+        return job;
     }
 }
