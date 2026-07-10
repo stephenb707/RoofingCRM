@@ -94,7 +94,10 @@ public class ReceiptExtractionServiceImpl implements ReceiptExtractionService {
             return failed("Receipt file is missing from storage.");
         }
 
-        try (InputStream inputStream = attachmentStorageService.loadAsStream(receipt.getStorageKey())) {
+        try (InputStream inputStream = attachmentStorageService.loadAsStream(
+                receipt.getTenant().getId(),
+                receipt.getTenant().getSlug() != null ? receipt.getTenant().getSlug() : receipt.getTenant().getId().toString(),
+                receipt.getStorageKey())) {
             byte[] bytes = inputStream.readAllBytes();
             ReceiptImagePreprocessor.ProcessedReceiptImage processedImage = toProcessedImage(receipt, bytes);
             List<ReceiptSummaryRegionExtractor.SummaryRegionCrop> summaryCrops =

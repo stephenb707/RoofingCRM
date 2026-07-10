@@ -102,7 +102,7 @@ public class CustomerPhotoReportPdfGenerator {
                 photos.sort((a, b) -> Integer.compare(a.getSortOrder(), b.getSortOrder()));
 
                 for (CustomerPhotoReportSectionPhoto link : photos) {
-                    state.y = drawPhoto(state, link.getAttachment());
+                    state.y = drawPhoto(state, link.getAttachment(), tenant);
                 }
                 state.y -= SECTION_SPACING;
             }
@@ -160,13 +160,16 @@ public class CustomerPhotoReportPdfGenerator {
         return y;
     }
 
-    private float drawPhoto(PageState state, Attachment attachment) throws IOException {
+    private float drawPhoto(PageState state, Attachment attachment, Tenant reportTenant) throws IOException {
         if (attachment == null || attachment.getStorageKey() == null || attachment.getStorageKey().isBlank()) {
             return writeBlock(state, "(Photo unavailable)", PDType1Font.HELVETICA_OBLIQUE, BODY_SIZE, LINE_LEADING + 6f);
         }
 
+        Tenant t = attachment.getTenant() != null ? attachment.getTenant() : reportTenant;
+        String tenantSlug = t.getSlug() != null ? t.getSlug() : t.getId().toString();
+
         byte[] bytes;
-        try (InputStream in = storageService.loadAsStream(attachment.getStorageKey())) {
+        try (InputStream in = storageService.loadAsStream(t.getId(), tenantSlug, attachment.getStorageKey())) {
             bytes = in.readAllBytes();
         } catch (Exception ex) {
             return writeBlock(state, "(Could not load photo file)", PDType1Font.HELVETICA_OBLIQUE, BODY_SIZE, LINE_LEADING + 6f);

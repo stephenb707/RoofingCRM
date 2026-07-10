@@ -1,5 +1,6 @@
 package com.roofingcrm.storage;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -8,13 +9,18 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.Objects;
 import java.util.UUID;
 
 /**
  * Local filesystem implementation of AttachmentStorageService.
  * Stores files under a configurable base directory, organized by tenant.
+ * <p>
+ * Switching to S3 does not migrate existing local files; use S3 in production before collecting
+ * customer uploads, or add a dedicated migration utility later.
  */
 @Service
+@ConditionalOnProperty(name = "app.storage.provider", havingValue = "local", matchIfMissing = true)
 public class LocalAttachmentStorageService implements AttachmentStorageService {
 
     private final LocalStorageProperties properties;
@@ -24,10 +30,11 @@ public class LocalAttachmentStorageService implements AttachmentStorageService {
     }
 
     @Override
-    public String store(String tenantSlug, UUID attachmentId, MultipartFile file) {
+    public String store(UUID tenantId, String tenantSlug, UUID attachmentId, MultipartFile file) {
         try {
             Path baseDir = Path.of(properties.getBaseDir()).toAbsolutePath().normalize();
 
+            Objects.requireNonNull(tenantId, "tenantId");
             String safeTenant = AttachmentFilenameSanitizer.sanitizeTenantSlug(tenantSlug);
             Path tenantDir = resolveStrictlyUnderBase(baseDir, safeTenant);
             Files.createDirectories(tenantDir);
@@ -48,8 +55,10 @@ public class LocalAttachmentStorageService implements AttachmentStorageService {
     }
 
     @Override
-    public InputStream loadAsStream(String storageKey) {
+    public InputStream loadAsStream(UUID tenantId, String tenantSlug, String storageKey) {
         try {
+            Objects.requireNonNull(tenantId, "tenantId");
+            assertLocalKeyForTenant(tenantSlug, storageKey);
             Path baseDir = Path.of(properties.getBaseDir()).toAbsolutePath().normalize();
             Path path = resolveStrictlyUnderBase(baseDir, storageKey);
 
@@ -60,6 +69,22 @@ public class LocalAttachmentStorageService implements AttachmentStorageService {
             return Files.newInputStream(path);
         } catch (IOException ex) {
             throw new RuntimeException("Failed to load attachment", ex);
+        }
+    }
+
+    /**
+     * Local keys are relative paths under ./{slug}/...; the slug segment must match the tenant namespace.
+     */
+    static void assertLocalKeyForTenant(String tenantSlug, String storageKey) {
+        if (storageKey == null || storageKey.isBlank()) {
+            throw new IllegalArgumentException("Invalid storage key");
+        }
+        if (tenantSlug == null || tenantSlug.isBlank()) {
+            throw new IllegalArgumentException("tenantSlug required for local storage key verification");
+        }
+        String expectedFolder = AttachmentFilenameSanitizer.sanitizeTenantSlug(tenantSlug.trim());
+        if (!storageKey.startsWith(expectedFolder + "/")) {
+            throw new IllegalArgumentException("Storage key does not belong to tenant");
         }
     }
 

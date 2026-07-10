@@ -15,6 +15,7 @@ import com.roofingcrm.domain.repository.LeadRepository;
 import com.roofingcrm.service.activity.ActivityEventService;
 import com.roofingcrm.service.exception.ResourceNotFoundException;
 import com.roofingcrm.service.tenant.TenantAccessService;
+import com.roofingcrm.storage.AppStorageProperties;
 import com.roofingcrm.storage.AttachmentFilenameSanitizer;
 import com.roofingcrm.storage.AttachmentStorageService;
 import org.springframework.lang.NonNull;
@@ -42,6 +43,7 @@ public class AttachmentServiceImpl implements AttachmentService {
     private final AttachmentStorageService storageService;
     private final ActivityEventService activityEventService;
     private final AttachmentUploadValidator uploadValidator;
+    private final AppStorageProperties storageKindProperties;
 
     public AttachmentServiceImpl(TenantAccessService tenantAccessService,
                                   AttachmentRepository attachmentRepository,
@@ -50,7 +52,8 @@ public class AttachmentServiceImpl implements AttachmentService {
                                   JobRepository jobRepository,
                                   AttachmentStorageService storageService,
                                   ActivityEventService activityEventService,
-                                  AttachmentUploadValidator uploadValidator) {
+                                  AttachmentUploadValidator uploadValidator,
+                                  AppStorageProperties storageKindProperties) {
         this.tenantAccessService = tenantAccessService;
         this.attachmentRepository = attachmentRepository;
         this.reportSectionPhotoRepository = reportSectionPhotoRepository;
@@ -59,6 +62,7 @@ public class AttachmentServiceImpl implements AttachmentService {
         this.storageService = storageService;
         this.activityEventService = activityEventService;
         this.uploadValidator = uploadValidator;
+        this.storageKindProperties = storageKindProperties;
     }
 
     @Override
@@ -79,7 +83,7 @@ public class AttachmentServiceImpl implements AttachmentService {
 
         // Store file and update storage key
         String tenantSlug = tenant.getSlug() != null ? tenant.getSlug() : tenant.getId().toString();
-        String storageKey = storageService.store(tenantSlug, attachment.getId(), file);
+        String storageKey = storageService.store(tenant.getId(), tenantSlug, attachment.getId(), file);
         attachment.setStorageKey(storageKey);
 
         attachment = attachmentRepository.save(attachment);
@@ -115,7 +119,7 @@ public class AttachmentServiceImpl implements AttachmentService {
 
         // Store file and update storage key
         String tenantSlug = tenant.getSlug() != null ? tenant.getSlug() : tenant.getId().toString();
-        String storageKey = storageService.store(tenantSlug, attachment.getId(), file);
+        String storageKey = storageService.store(tenant.getId(), tenantSlug, attachment.getId(), file);
         attachment.setStorageKey(storageKey);
 
         attachment = attachmentRepository.save(attachment);
@@ -184,7 +188,8 @@ public class AttachmentServiceImpl implements AttachmentService {
             throw new RuntimeException("Attachment has no storage key");
         }
 
-        return storageService.loadAsStream(attachment.getStorageKey());
+        String tenantSlug = tenant.getSlug() != null ? tenant.getSlug() : tenant.getId().toString();
+        return storageService.loadAsStream(tenant.getId(), tenantSlug, attachment.getStorageKey());
     }
 
     /**
@@ -218,7 +223,7 @@ public class AttachmentServiceImpl implements AttachmentService {
         attachment.setFileName(AttachmentFilenameSanitizer.sanitizeUploadedFilename(file.getOriginalFilename()));
         attachment.setContentType(file.getContentType());
         attachment.setFileSize(file.getSize());
-        attachment.setStorageProvider("LOCAL");
+        attachment.setStorageProvider(storageKindProperties.getProvider().name());
         attachment.setTag(tag != null ? tag : AttachmentTag.OTHER);
         attachment.setDescription(description != null && !description.isBlank() ? description.trim() : null);
         return attachment;

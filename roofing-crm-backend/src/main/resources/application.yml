@@ -85,8 +85,23 @@ app:
       same-site: ${APP_SECURITY_REFRESH_COOKIE_SAME_SITE:Lax}
       cookie-path: ${APP_SECURITY_REFRESH_COOKIE_PATH:/api/v1/auth}
   storage:
+    provider: ${APP_STORAGE_PROVIDER:local}
     local:
       base-dir: "./uploads"
+    s3:
+      bucket: ${APP_STORAGE_S3_BUCKET:}
+      region: ${APP_STORAGE_S3_REGION:us-east-1}
+      prefix: ${APP_STORAGE_S3_PREFIX:}
+      access-key: ${APP_STORAGE_S3_ACCESS_KEY:}
+      secret-key: ${APP_STORAGE_S3_SECRET_KEY:}
+      endpoint: ${APP_STORAGE_S3_ENDPOINT:}
+      path-style-access: ${APP_STORAGE_S3_PATH_STYLE_ACCESS:false}
+  background-jobs:
+    enabled: ${APP_BACKGROUND_JOBS_ENABLED:true}
+    poll-interval-seconds: ${APP_BACKGROUND_JOBS_POLL_INTERVAL_SECONDS:30}
+    batch-size: ${APP_BACKGROUND_JOBS_BATCH_SIZE:10}
+  integrations:
+    encryption-key: ${APP_INTEGRATIONS_ENCRYPTION_KEY:}
   # Align max-file-size with spring.servlet.multipart.max-file-size (same APP_MULTIPART_MAX_FILE_SIZE).
   attachments:
     max-file-size: ${APP_MULTIPART_MAX_FILE_SIZE:20MB}

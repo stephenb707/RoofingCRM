@@ -54,7 +54,7 @@ class LocalAttachmentStorageServiceTest {
                 "application/octet-stream",
                 "secret".getBytes(StandardCharsets.UTF_8));
 
-        String key = svc.store("tenant-one", id, file);
+        String key = svc.store(UUID.randomUUID(), "tenant-one", id, file);
 
         assertEquals("tenant-one/" + id + "_passwd", key);
         Path expected = tempDir.resolve("uploads").resolve("tenant-one").resolve(id + "_passwd").normalize();
@@ -70,8 +70,8 @@ class LocalAttachmentStorageServiceTest {
 
         MockMultipartFile file = new MockMultipartFile("file", "a.txt", null, "x".getBytes(StandardCharsets.UTF_8));
 
-        assertThrows(IllegalArgumentException.class, () -> svc.store("..", UUID.randomUUID(), file));
-        assertThrows(IllegalArgumentException.class, () -> svc.store("a/x", UUID.randomUUID(), file));
+        assertThrows(IllegalArgumentException.class, () -> svc.store(UUID.randomUUID(), "..", UUID.randomUUID(), file));
+        assertThrows(IllegalArgumentException.class, () -> svc.store(UUID.randomUUID(), "a/x", UUID.randomUUID(), file));
     }
 
     @Test
@@ -80,7 +80,7 @@ class LocalAttachmentStorageServiceTest {
         props.setBaseDir(tempDir.resolve("uploads").toString());
         LocalAttachmentStorageService svc = new LocalAttachmentStorageService(props);
 
-        assertThrows(IllegalArgumentException.class, () -> svc.loadAsStream("../secrets"));
+        assertThrows(IllegalArgumentException.class, () -> svc.loadAsStream(UUID.randomUUID(), "tenant-one", "../secrets"));
     }
 
     @Test
@@ -93,7 +93,7 @@ class LocalAttachmentStorageServiceTest {
         Path physical = Files.createDirectories(base.resolve("t")).resolve("f.bin");
         Files.writeString(physical, "payload");
 
-        try (var in = svc.loadAsStream("t/f.bin")) {
+        try (var in = svc.loadAsStream(UUID.randomUUID(), "t", "t/f.bin")) {
             assertArrayEquals("payload".getBytes(StandardCharsets.UTF_8), in.readAllBytes());
         }
     }

@@ -28,6 +28,7 @@ import com.roofingcrm.service.attachment.AttachmentUploadValidator;
 import com.roofingcrm.service.audit.AuditSupport;
 import com.roofingcrm.service.exception.ResourceNotFoundException;
 import com.roofingcrm.service.tenant.TenantAccessService;
+import com.roofingcrm.storage.AppStorageProperties;
 import com.roofingcrm.storage.AttachmentStorageService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,6 +66,7 @@ public class JobAccountingReceiptServiceImpl implements JobAccountingReceiptServ
     private final ReceiptExtractionService receiptExtractionService;
     private final ObjectMapper objectMapper;
     private final AttachmentUploadValidator uploadValidator;
+    private final AppStorageProperties storageKindProperties;
 
     @Autowired
     public JobAccountingReceiptServiceImpl(TenantAccessService tenantAccessService,
@@ -76,7 +78,8 @@ public class JobAccountingReceiptServiceImpl implements JobAccountingReceiptServ
                                            JobAccountingService jobAccountingService,
                                            ReceiptExtractionService receiptExtractionService,
                                            ObjectMapper objectMapper,
-                                           AttachmentUploadValidator uploadValidator) {
+                                           AttachmentUploadValidator uploadValidator,
+                                           AppStorageProperties storageKindProperties) {
         this.tenantAccessService = tenantAccessService;
         this.attachmentRepository = attachmentRepository;
         this.jobRepository = jobRepository;
@@ -87,6 +90,7 @@ public class JobAccountingReceiptServiceImpl implements JobAccountingReceiptServ
         this.receiptExtractionService = receiptExtractionService;
         this.objectMapper = objectMapper;
         this.uploadValidator = uploadValidator;
+        this.storageKindProperties = storageKindProperties;
     }
 
     @Override
@@ -114,14 +118,14 @@ public class JobAccountingReceiptServiceImpl implements JobAccountingReceiptServ
         receipt.setFileName(file.getOriginalFilename());
         receipt.setContentType(file.getContentType());
         receipt.setFileSize(file.getSize());
-        receipt.setStorageProvider("LOCAL");
+        receipt.setStorageProvider(storageKindProperties.getProvider().name());
         receipt.setTag(AttachmentTag.RECEIPT);
         receipt.setDescription(normalizeOptionalText(description));
         AuditSupport.touchForCreate(receipt, userId);
 
         receipt = attachmentRepository.save(receipt);
         String tenantSlug = tenant.getSlug() != null ? tenant.getSlug() : tenant.getId().toString();
-        String storageKey = attachmentStorageService.store(tenantSlug, receipt.getId(), file);
+        String storageKey = attachmentStorageService.store(tenant.getId(), tenantSlug, receipt.getId(), file);
         receipt.setStorageKey(storageKey);
         receipt = attachmentRepository.save(receipt);
 

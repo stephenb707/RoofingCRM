@@ -105,6 +105,28 @@ export default function SettingsPage() {
           </div>
         </section>
 
+        {canManageSettings && (
+          <section className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
+                <svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <h2 className="text-lg font-semibold text-slate-800">Integrations</h2>
+                <p className="text-sm text-slate-500 mt-1">
+                  Connect accounting, messaging, measurement, e-signature, and supplier services.
+                </p>
+                <p className="text-xs text-slate-400 mt-2">
+                  Foundation release: configure placeholders securely; live vendor APIs ship in a later phase.
+                </p>
+              </div>
+              <ManageLink href="/app/settings/integrations" />
+            </div>
+          </section>
+        )}
+
         {/* Pipeline Settings */}
         {canManageSettings && (
           <section className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">

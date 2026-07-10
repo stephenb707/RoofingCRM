@@ -104,6 +104,34 @@ describe("SettingsPage (hub)", () => {
     expect(listLink).toBeTruthy();
   });
 
+  it("renders Integrations section with Manage link for ADMIN", async () => {
+    render(<SettingsPage />);
+    await waitFor(() => {
+      expect(
+        screen.getByRole("heading", { name: /Integrations/i })
+      ).toBeInTheDocument();
+    });
+    const manageLinks = screen.getAllByRole("link", { name: /Manage/i });
+    const intLink = manageLinks.find(
+      (el) => el.getAttribute("href") === "/app/settings/integrations"
+    );
+    expect(intLink).toBeTruthy();
+  });
+
+  it("hides Integrations section for SALES role", async () => {
+    mockAuthValue.auth.tenants[0]!.role = "SALES";
+
+    render(<SettingsPage />);
+    await waitFor(() => {
+      expect(
+        screen.getByRole("heading", { name: /^Settings$/i })
+      ).toBeInTheDocument();
+    });
+    expect(
+      screen.queryByRole("heading", { name: /Integrations/i })
+    ).not.toBeInTheDocument();
+  });
+
   it("renders Pipeline Statuses section with Manage link for ADMIN", async () => {
     render(<SettingsPage />);
     await waitFor(() => {

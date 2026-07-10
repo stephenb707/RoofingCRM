@@ -1,6 +1,7 @@
 package com.roofingcrm.service.accounting;
 
 import com.roofingcrm.domain.entity.Attachment;
+import com.roofingcrm.domain.entity.Tenant;
 import com.roofingcrm.domain.enums.ReceiptAmountConfidence;
 import com.roofingcrm.domain.enums.ReceiptFieldConfidence;
 import com.roofingcrm.domain.enums.ReceiptTotalSource;
@@ -71,7 +72,7 @@ class ReceiptExtractionServiceImplTest {
     @Test
     void extractReceipt_fullImageSucceedsWhenSummaryVariantFails() throws Exception {
         Attachment receipt = receipt();
-        when(attachmentStorageService.loadAsStream(anyString())).thenReturn(stream(testImageBytes()));
+        when(attachmentStorageService.loadAsStream(any(UUID.class), anyString(), anyString())).thenReturn(stream(testImageBytes()));
         when(receiptExtractionClient.extract(any())).thenReturn(fullResult());
         when(receiptExtractionClient.extractSummary(any()))
                 .thenThrow(new ReceiptExtractionProviderException("summary failed"));
@@ -90,7 +91,7 @@ class ReceiptExtractionServiceImplTest {
     @Test
     void extractReceipt_highConfidenceAfterStageOneSkipsFallbackVariants() throws Exception {
         Attachment receipt = receipt();
-        when(attachmentStorageService.loadAsStream(anyString())).thenReturn(stream(testImageBytes()));
+        when(attachmentStorageService.loadAsStream(any(UUID.class), anyString(), anyString())).thenReturn(stream(testImageBytes()));
         when(receiptExtractionClient.extract(any())).thenReturn(fullResult());
         when(receiptExtractionClient.extractSummary(any())).thenReturn(summaryResult());
         when(amountCandidateExtractor.extractCandidates(any())).thenReturn(emptyCandidates());
@@ -106,7 +107,7 @@ class ReceiptExtractionServiceImplTest {
     @Test
     void extractReceipt_lowConfidenceAfterStageOneInvokesFallbackVariants() throws Exception {
         Attachment receipt = receipt();
-        when(attachmentStorageService.loadAsStream(anyString())).thenReturn(stream(testImageBytes()));
+        when(attachmentStorageService.loadAsStream(any(UUID.class), anyString(), anyString())).thenReturn(stream(testImageBytes()));
         when(receiptExtractionClient.extract(any())).thenReturn(fullResult());
         when(receiptExtractionClient.extractSummary(any()))
                 .thenReturn(summaryResult())
@@ -129,7 +130,7 @@ class ReceiptExtractionServiceImplTest {
     @Test
     void extractReceipt_allProviderAttemptsFailReturnsProviderFailure() throws Exception {
         Attachment receipt = receipt();
-        when(attachmentStorageService.loadAsStream(anyString())).thenReturn(stream(testImageBytes()));
+        when(attachmentStorageService.loadAsStream(any(UUID.class), anyString(), anyString())).thenReturn(stream(testImageBytes()));
         when(receiptExtractionClient.extract(any()))
                 .thenThrow(new ReceiptExtractionProviderException("full failed"));
         when(receiptExtractionClient.extractSummary(any()))
@@ -144,11 +145,15 @@ class ReceiptExtractionServiceImplTest {
     }
 
     private Attachment receipt() {
+        Tenant tenant = new Tenant();
+        tenant.setId(UUID.randomUUID());
+        tenant.setSlug("acme-roofing");
         Attachment receipt = new Attachment();
         receipt.setId(UUID.randomUUID());
+        receipt.setTenant(tenant);
         receipt.setFileName("receipt.png");
         receipt.setContentType("image/png");
-        receipt.setStorageKey("receipts/test.png");
+        receipt.setStorageKey("acme-roofing/receipt.png");
         return receipt;
     }
 

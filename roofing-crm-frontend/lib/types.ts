@@ -847,3 +847,43 @@ export interface UpdateAppPreferencesRequest {
   estimatesList?: Record<string, unknown>;
   pipeline?: Record<string, unknown>;
 }
+
+/** Third-party integration configuration (foundation phase — no live vendor APIs yet). */
+export type IntegrationProviderKey =
+  | "QUICKBOOKS"
+  | "TWILIO"
+  | "HOVER"
+  | "EAGLEVIEW"
+  | "ROOFR"
+  | "DOCUSIGN"
+  | "GOOGLE_REVIEWS"
+  | "SUPPLIER_SRS"
+  | "SUPPLIER_ABC"
+  | "SUPPLIER_QXO";
+
+export type IntegrationConnectionStatusKey =
+  | "NOT_CONFIGURED"
+  | "CONNECTED"
+  | "ERROR"
+  | "DISABLED";
+
+export interface IntegrationSettingsDto {
+  provider: IntegrationProviderKey;
+  humanLabel: string;
+  category: string;
+  enabled: boolean;
+  status: IntegrationConnectionStatusKey;
+  displayName?: string | null;
+  hasCredentials: boolean;
+  lastConnectedAt?: string | null;
+  lastError?: string | null;
+  config: Record<string, unknown>;
+  updatedAt?: string | null;
+}
+
+export interface UpdateIntegrationSettingsRequest {
+  enabled?: boolean;
+  displayName?: string | null;
+  config?: Record<string, unknown>;
+  secrets?: Record<string, string>;
+}
