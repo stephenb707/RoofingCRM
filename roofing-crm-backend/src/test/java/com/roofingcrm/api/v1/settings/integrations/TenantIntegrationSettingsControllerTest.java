@@ -7,6 +7,7 @@ import com.roofingcrm.security.AuthenticatedUser;
 import com.roofingcrm.service.settings.TenantIntegrationSettingsService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -22,18 +23,24 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.not;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = TenantIntegrationSettingsController.class)
 @AutoConfigureMockMvc(addFilters = false)
+@SuppressWarnings("null")
 class TenantIntegrationSettingsControllerTest {
 
     @Autowired
@@ -82,7 +89,10 @@ class TenantIntegrationSettingsControllerTest {
     void put_updatesAndOmitsSecretsInResponse() throws Exception {
         IntegrationSettingsDto dto = new IntegrationSettingsDto();
         dto.setProvider(IntegrationProvider.QUICKBOOKS);
+        dto.setHumanLabel("QuickBooks");
+        dto.setCategory("Accounting");
         dto.setEnabled(true);
+        dto.setDisplayName("QuickBooks Online");
         dto.setHasCredentials(true);
         dto.setStatus(IntegrationConnectionStatus.NOT_CONFIGURED);
         dto.setUpdatedAt(Instant.parse("2026-05-01T00:00:00Z"));
@@ -92,8 +102,8 @@ class TenantIntegrationSettingsControllerTest {
         req.setEnabled(true);
         req.setSecrets(Map.of("clientSecret", "s3cr3t"));
 
-        when(integrationSettingsService.updateSettings(Objects.requireNonNull(tenantId), Objects.requireNonNull(userId),
-                Objects.requireNonNull(IntegrationProvider.QUICKBOOKS), Objects.requireNonNull(any(UpdateIntegrationSettingsRequest.class))))
+        when(integrationSettingsService.updateSettings(eq(tenantId), eq(userId),
+                eq(IntegrationProvider.QUICKBOOKS), any(UpdateIntegrationSettingsRequest.class)))
                 .thenReturn(dto);
 
         mockMvc.perform(put("/api/v1/settings/integrations/QUICKBOOKS")
@@ -101,10 +111,21 @@ class TenantIntegrationSettingsControllerTest {
                         .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
                         .content(Objects.requireNonNull(objectMapper.writeValueAsString(req))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.hasCredentials").value(true));
+                .andExpect(jsonPath("$.provider").value("QUICKBOOKS"))
+                .andExpect(jsonPath("$.enabled").value(true))
+                .andExpect(jsonPath("$.status").value("NOT_CONFIGURED"))
+                .andExpect(jsonPath("$.displayName").value("QuickBooks Online"))
+                .andExpect(jsonPath("$.hasCredentials").value(true))
+                .andExpect(jsonPath("$.config.realmId").value("123"))
+                .andExpect(jsonPath("$.secrets").doesNotExist())
+                .andExpect(jsonPath("$.clientSecret").doesNotExist())
+                .andExpect(content().string(not(containsString("s3cr3t"))));
 
-        verify(integrationSettingsService).updateSettings(Objects.requireNonNull(tenantId), Objects.requireNonNull(userId),
-                Objects.requireNonNull(IntegrationProvider.QUICKBOOKS), Objects.requireNonNull(any(UpdateIntegrationSettingsRequest.class)));
+        ArgumentCaptor<UpdateIntegrationSettingsRequest> requestCaptor =
+                ArgumentCaptor.forClass(UpdateIntegrationSettingsRequest.class);
+        verify(integrationSettingsService).updateSettings(eq(tenantId), eq(userId),
+                eq(IntegrationProvider.QUICKBOOKS), requestCaptor.capture());
+        assertEquals("s3cr3t", requestCaptor.getValue().getSecrets().get("clientSecret"));
     }
 
     @Test
