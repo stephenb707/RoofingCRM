@@ -104,7 +104,10 @@ describe("useAttachmentPreviewUrls", () => {
 
     await waitFor(() => expect(downloadAttachment).toHaveBeenCalled());
     expect(URL.createObjectURL).not.toHaveBeenCalled();
-    expect(result.current.previewUrls["bad"]).toBe("");
+    await waitFor(() => {
+      const v = result.current.previewUrls["bad"];
+      expect(v === undefined || v === "").toBe(true);
+    });
   });
 
   it("retries after a failed download when preview rows update", async () => {

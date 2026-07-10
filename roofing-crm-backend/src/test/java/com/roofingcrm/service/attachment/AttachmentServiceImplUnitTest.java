@@ -14,6 +14,7 @@ import com.roofingcrm.domain.repository.JobRepository;
 import com.roofingcrm.domain.repository.LeadRepository;
 import com.roofingcrm.service.activity.ActivityEventService;
 import com.roofingcrm.service.tenant.TenantAccessService;
+import com.roofingcrm.storage.AppStorageProperties;
 import com.roofingcrm.storage.AttachmentStorageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -53,6 +54,8 @@ class AttachmentServiceImplUnitTest {
     private AttachmentStorageService storageService;
     @Mock
     private ActivityEventService activityEventService;
+    @Mock
+    private AppStorageProperties storageKindProperties;
 
     private AttachmentServiceImpl service;
 
@@ -67,9 +70,10 @@ class AttachmentServiceImplUnitTest {
     @BeforeEach
     void setUp() {
         AttachmentUploadValidator uploadValidator = new AttachmentUploadValidator(new AttachmentUploadProperties());
+        lenient().when(storageKindProperties.getProvider()).thenReturn(AppStorageProperties.StorageProvider.LOCAL);
         service = new AttachmentServiceImpl(
                 tenantAccessService, attachmentRepository, reportSectionPhotoRepository, leadRepository, jobRepository,
-                storageService, activityEventService, uploadValidator);
+                storageService, activityEventService, uploadValidator, storageKindProperties);
 
         tenant = new Tenant();
         tenant.setId(UUID.randomUUID());
@@ -109,7 +113,7 @@ class AttachmentServiceImplUnitTest {
             a.setTag(savedAttachment.getTag());
             return a;
         });
-        when(storageService.store(anyString(), any(UUID.class), any())).thenReturn("storage/key/damage.png");
+        when(storageService.store(any(UUID.class), anyString(), any(UUID.class), any())).thenReturn("storage/key/damage.png");
 
         MockMultipartFile file = new MockMultipartFile("file", "damage.png", "image/png", MINIMAL_PNG_BYTES);
 
@@ -144,7 +148,7 @@ class AttachmentServiceImplUnitTest {
             }
             return a;
         });
-        when(storageService.store(anyString(), any(UUID.class), any())).thenReturn("test-tenant/" + attachmentUuid + "_evil.dll");
+        when(storageService.store(any(UUID.class), anyString(), any(UUID.class), any())).thenReturn("test-tenant/" + attachmentUuid + "_evil.dll");
 
         MockMultipartFile file = new MockMultipartFile(
                 "file", "..\\..\\windows\\evil.dll", "image/png", MINIMAL_PNG_BYTES);
@@ -174,7 +178,7 @@ class AttachmentServiceImplUnitTest {
             a.setTag(savedAttachment.getTag());
             return a;
         });
-        when(storageService.store(anyString(), any(UUID.class), any())).thenReturn("storage/key/after.jpg");
+        when(storageService.store(any(UUID.class), anyString(), any(UUID.class), any())).thenReturn("storage/key/after.jpg");
 
         MockMultipartFile file = new MockMultipartFile("file", "after.jpg", "image/jpeg", MINIMAL_JPEG_BYTES);
 
@@ -257,7 +261,7 @@ class AttachmentServiceImplUnitTest {
         AttachmentUploadValidator strictValidator = new AttachmentUploadValidator(props);
         AttachmentServiceImpl strictService = new AttachmentServiceImpl(
                 tenantAccessService, attachmentRepository, reportSectionPhotoRepository, leadRepository, jobRepository,
-                storageService, activityEventService, strictValidator);
+                storageService, activityEventService, strictValidator, storageKindProperties);
 
         when(tenantAccessService.loadTenantForUserOrThrow(tenantId, userId)).thenReturn(tenant);
         when(leadRepository.findByIdAndTenantAndArchivedFalse(leadId, tenant)).thenReturn(Optional.of(lead));

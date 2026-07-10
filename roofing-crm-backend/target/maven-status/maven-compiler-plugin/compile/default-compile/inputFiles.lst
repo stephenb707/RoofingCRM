@@ -8,8 +8,11 @@ C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\c
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\entity\TenantInvite.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\job\UpdateJobRequest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\enums\ReceiptTotalSource.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\enums\IntegrationProvider.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\entity\CustomerPhotoReportSection.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\settings\TenantIntegrationSettingsService.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\settings\PipelineStatusDefinitionDto.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\integrations\DevelopmentIntegrationSecretProtector.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\team\TenantInviteDto.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\customer\UpdateCustomerRequest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\accounting\ConfirmReceiptCostRequest.java
@@ -18,6 +21,7 @@ C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\c
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\settings\AppPreferencesService.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\invoice\SendInvoiceEmailResponse.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\accounting\ReceiptExtractionProviderException.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\enums\IntegrationConnectionStatus.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\invoice\InvoiceDto.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\tenant\TenantAccessDeniedException.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\estimate\EstimateSummaryDto.java
@@ -26,11 +30,16 @@ C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\c
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\accounting\ReceiptSummaryTextParser.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\auth\RegisterRequest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\entity\Attachment.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\background\BackgroundJobBackoff.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\repository\IntegrationBackgroundJobRepository.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\background\NoOpBackgroundJobHandler.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\repository\TaskRepository.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\RoofingCrmApplication.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\accounting\ReceiptExtractionService.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\entity\IntegrationBackgroundJob.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\realtime\ActivityEventCreatedMessage.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\storage\LocalStorageProperties.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\storage\AppStorageProperties.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\report\AccountingJobsExcelExporter.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\security\JwtAuthenticationFilter.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\accounting\JobReceiptDto.java
@@ -39,10 +48,12 @@ C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\c
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\enums\InvoiceStatus.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\tenant\TenantAccessServiceImpl.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\customerreport\CustomerPhotoReportPdfExport.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\storage\S3ObjectKeyBuilder.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\report\ReportService.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\auth\LoginRequest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\mail\NoopEmailService.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\estimate\UpdateEstimateRequest.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\repository\TenantIntegrationConnectionRepository.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\lead\NewLeadCustomerRequest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\entity\InvoiceItem.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\job\JobServiceImpl.java
@@ -63,6 +74,7 @@ C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\c
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\dashboard\DashboardController.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\accounting\ReceiptExtractionResultDto.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\estimate\ShareEstimateRequest.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\background\BackgroundJobStatus.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\mail\MailProperties.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\value\Address.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\entity\Invoice.java
@@ -71,6 +83,7 @@ C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\c
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\customerreport\UpsertCustomerPhotoReportRequest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\estimate\EstimateItemRequest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\task\TaskServiceImpl.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\settings\TenantIntegrationSettingsServiceImpl.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\enums\PreferredContactMethod.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\repository\EstimateRepository.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\estimate\ShareEstimateResponse.java
@@ -79,9 +92,12 @@ C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\c
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\publicapi\estimate\PublicEstimateItemDto.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\entity\BaseEntity.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\attachment\AttachmentUploadContext.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\settings\integrations\UpdateIntegrationSettingsRequest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\enums\LeadSource.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\realtime\ActivityEventCreatedAppEvent.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\dashboard\DashboardTaskSnippetDto.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\integrations\IntegrationSecretProtector.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\integrations\IntegrationSecretProtectorStartupChecker.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\storage\AttachmentFilenameSanitizer.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\repository\TenantUserMembershipRepository.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\customer\CustomerDto.java
@@ -96,6 +112,7 @@ C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\c
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\customerreport\SendCustomerPhotoReportEmailRequest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\security\SecurityUtils.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\enums\JobType.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\integrations\IntegrationEncryptionProperties.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\job\CreateJobRequest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\customerreport\CustomerPhotoReportPresentationHelper.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\repository\UserRepository.java
@@ -125,6 +142,7 @@ C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\c
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\auth\RegisterWithInviteRequest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\accounting\OpenAiReceiptExtractionClient.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\mail\InvoiceEmailTemplateBuilder.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\background\IntegrationBackgroundJobService.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\dashboard\DashboardJobSnippetDto.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\auth\AuthService.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\report\PaidInvoicesPdfGenerator.java
@@ -149,6 +167,7 @@ C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\c
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\pipeline\PipelineStatusAdminServiceImpl.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\config\SecurityConfig.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\customer\CustomerService.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\settings\integrations\TenantIntegrationSettingsController.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\ApiErrorResponse.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\report\ReportController.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\mail\CustomerPhotoReportEmailTemplateBuilder.java
@@ -162,7 +181,9 @@ C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\c
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\activity\ActivityEventServiceImpl.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\accounting\JobAccountingService.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\attachment\AttachmentService.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\settings\integrations\IntegrationSettingsDto.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\lead\UpdateLeadStatusRequest.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\background\BackgroundJobHandler.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\invoice\InvoiceMapper.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\entity\CustomerPhotoReportSectionPhoto.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\enums\ReceiptFieldConfidence.java
@@ -170,6 +191,7 @@ C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\c
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\report\AccountingReportController.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\estimate\SendEstimateEmailRequest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\accounting\JobAccountingServiceImpl.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\background\BackgroundJobProperties.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\security\RefreshCookieConfigSafetyChecker.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\repository\CustomerRepository.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\team\AcceptInviteResponse.java
@@ -192,6 +214,7 @@ C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\c
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\task\TaskService.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\customerreport\CustomerPhotoReportController.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\pipeline\PipelineStatusAdminService.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\background\BackgroundJobTypes.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\entity\TenantAuditedEntity.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\accounting\JobAccountingReceiptService.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\exception\InviteConflictException.java
@@ -200,6 +223,7 @@ C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\c
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\util\CsvUtils.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\entity\Tenant.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\audit\AuditSupport.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\storage\S3ClientConfiguration.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\repository\TenantInviteRepository.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\invoice\InvoiceItemDto.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\enums\JobCostCategory.java
@@ -228,11 +252,13 @@ C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\c
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\settings\AppPreferencesDto.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\customer\CreateCustomerRequest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\enums\PipelineType.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\integrations\AesGcmIntegrationSecretProtector.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\job\JobController.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\entity\Estimate.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\customerreport\ReportGalleryImageMime.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\report\CustomerPhotoReportPdfGenerator.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\mail\EmailService.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\background\IntegrationBackgroundJobWorker.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\attachment\AttachmentUploadValidator.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\exception\InvoiceLinkExpiredException.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\team\CreateInviteRequest.java
@@ -248,6 +274,7 @@ C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\c
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\settings\AppPreferencesSanitizer.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\lead\UpdateLeadRequest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\accounting\SummaryFieldConsensusService.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\storage\S3AttachmentStorageService.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\enums\EstimateStatus.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\repository\JobCostEntryRepository.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\accounting\ReceiptImagePreprocessor.java
@@ -255,6 +282,7 @@ C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\c
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\job\JobDto.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\estimate\EstimateServiceImpl.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\user\UserServiceImpl.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\storage\S3AttachmentStorageProperties.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\dashboard\DashboardSummaryDto.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\exception\InvoiceConflictException.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\entity\Lead.java
@@ -268,6 +296,7 @@ C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\c
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\accounting\PdfReceiptTextExtractor.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\mail\EstimateEmailTemplateBuilder.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\invoice\UpdateInvoiceStatusRequest.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\integrations\IntegrationCryptoConfiguration.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\estimate\SendEstimateEmailResponse.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\team\UpdateMemberRoleRequest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\repository\CustomerPhotoReportSectionPhotoRepository.java
@@ -304,6 +333,7 @@ C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\c
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\enums\ActivityEntityType.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\enums\UserRole.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\accounting\JobCostEntryDto.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\domain\entity\TenantIntegrationConnection.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\settings\AppPreferencesDefaults.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\service\estimate\EstimateMapper.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\main\java\com\roofingcrm\api\v1\customerreport\CustomerPhotoReportSummaryDto.java

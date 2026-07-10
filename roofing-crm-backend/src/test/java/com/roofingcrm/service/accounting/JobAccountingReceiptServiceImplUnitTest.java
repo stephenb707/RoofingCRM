@@ -21,6 +21,7 @@ import com.roofingcrm.service.activity.ActivityEventService;
 import com.roofingcrm.service.attachment.AttachmentUploadProperties;
 import com.roofingcrm.service.attachment.AttachmentUploadValidator;
 import com.roofingcrm.service.tenant.TenantAccessService;
+import com.roofingcrm.storage.AppStorageProperties;
 import com.roofingcrm.storage.AttachmentStorageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -44,6 +45,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -70,6 +72,8 @@ class JobAccountingReceiptServiceImplUnitTest {
     private JobAccountingService jobAccountingService;
     @Mock
     private ReceiptExtractionService receiptExtractionService;
+    @Mock
+    private AppStorageProperties storageKindProperties;
 
     private JobAccountingReceiptServiceImpl service;
     private UUID tenantId;
@@ -82,6 +86,7 @@ class JobAccountingReceiptServiceImplUnitTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(storageKindProperties.getProvider()).thenReturn(AppStorageProperties.StorageProvider.LOCAL);
         service = new JobAccountingReceiptServiceImpl(
                 tenantAccessService,
                 attachmentRepository,
@@ -92,7 +97,8 @@ class JobAccountingReceiptServiceImplUnitTest {
                 jobAccountingService,
                 receiptExtractionService,
                 new ObjectMapper(),
-                new AttachmentUploadValidator(new AttachmentUploadProperties()));
+                new AttachmentUploadValidator(new AttachmentUploadProperties()),
+                storageKindProperties);
 
         tenantId = UUID.randomUUID();
         userId = UUID.randomUUID();
@@ -148,7 +154,7 @@ class JobAccountingReceiptServiceImplUnitTest {
             }
             return attachment;
         });
-        when(attachmentStorageService.store(anyString(), eq(receiptId), any())).thenReturn("tenant-slug/receipt.pdf");
+        when(attachmentStorageService.store(eq(tenantId), anyString(), eq(receiptId), any())).thenReturn("tenant-slug/receipt.pdf");
 
         var result = service.uploadReceiptForJob(tenantId, userId, jobId, file, "Materials receipt");
 
@@ -451,7 +457,8 @@ class JobAccountingReceiptServiceImplUnitTest {
                 jobAccountingService,
                 receiptExtractionService,
                 new ObjectMapper(),
-                new AttachmentUploadValidator(props));
+                new AttachmentUploadValidator(props),
+                storageKindProperties);
 
         when(tenantAccessService.requireAnyRole(eq(tenantId), eq(userId), any(), anyString()))
                 .thenReturn(mock(com.roofingcrm.domain.entity.TenantUserMembership.class));

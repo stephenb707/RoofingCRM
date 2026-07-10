@@ -22,10 +22,13 @@ import java.io.ByteArrayOutputStream;
 import java.util.Arrays;
 import java.util.Objects;
 import java.util.TimeZone;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -354,7 +357,9 @@ class CustomerPhotoReportPdfGeneratorTest {
                                                      String fileName,
                                                      String storageKey,
                                                      byte[] imageBytes) {
-        when(storageService.loadAsStream(storageKey)).thenReturn(new java.io.ByteArrayInputStream(imageBytes));
+        int slash = storageKey.indexOf('/');
+        String slug = slash > 0 ? storageKey.substring(0, slash) : "tenant";
+        when(storageService.loadAsStream(any(UUID.class), eq(slug), eq(storageKey))).thenReturn(new java.io.ByteArrayInputStream(imageBytes));
 
         Customer customer = new Customer();
         customer.setFirstName("Jane");
@@ -365,6 +370,10 @@ class CustomerPhotoReportPdfGeneratorTest {
         job.setPropertyAddress(new Address("123 Main St", null, "Denver", "CO", "80202", "US"));
 
         Attachment attachment = new Attachment();
+        Tenant photoTenant = new Tenant();
+        photoTenant.setId(UUID.randomUUID());
+        photoTenant.setSlug(slug);
+        attachment.setTenant(photoTenant);
         attachment.setFileName(fileName);
         attachment.setContentType("image/png");
         attachment.setStorageKey(storageKey);

@@ -137,6 +137,9 @@ export const queryKeys = {
   appPreferences: (tenantId: string | null) =>
     ["appPreferences", tenantId] as const,
 
+  integrationSettings: (tenantId: string | null) =>
+    ["integrationSettings", tenantId] as const,
+
   customerPhotoReports: (tenantId: string | null) =>
     ["customerPhotoReports", tenantId] as const,
   customerPhotoReport: (tenantId: string | null, reportId: string) =>
