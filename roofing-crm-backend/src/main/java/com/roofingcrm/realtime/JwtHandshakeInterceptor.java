@@ -1,5 +1,6 @@
 package com.roofingcrm.realtime;
 
+import com.roofingcrm.security.AuthenticatedUser;
 import com.roofingcrm.security.JwtService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,6 +42,7 @@ public class JwtHandshakeInterceptor implements HandshakeInterceptor {
     private static final Logger log = LoggerFactory.getLogger(JwtHandshakeInterceptor.class);
 
     private static final String TOKEN_PARAM = "token";
+    static final String AUTH_USER_ATTRIBUTE = "authUser";
 
     private final JwtService jwtService;
 
@@ -57,7 +59,8 @@ public class JwtHandshakeInterceptor implements HandshakeInterceptor {
             return false;
         }
         try {
-            jwtService.parseToken(token);
+            AuthenticatedUser authUser = jwtService.parseToken(token);
+            attributes.put(AUTH_USER_ATTRIBUTE, authUser);
             return true;
         } catch (Exception e) {
             // Never include the URI/query here — it carries the (now-invalid) token.

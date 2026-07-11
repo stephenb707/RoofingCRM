@@ -295,9 +295,12 @@ public class EstimateServiceImpl implements EstimateService {
     }
 
     private BigDecimal computeSubtotal(List<EstimateItem> items) {
-        return items.stream()
-                .map(EstimateItem::getLineTotal)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal subtotal = BigDecimal.ZERO;
+        for (EstimateItem item : items) {
+            subtotal = subtotal.add(
+                    Objects.requireNonNull(item, "Estimate items must not contain null").getLineTotal());
+        }
+        return subtotal;
     }
 
     /**

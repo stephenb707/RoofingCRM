@@ -141,7 +141,7 @@ public class LeadServiceImpl implements LeadService {
                 .orElseThrow(() -> new ResourceNotFoundException("Lead not found"));
 
         UUID convertedJobId = jobRepository.findByTenantAndLeadIdAndArchivedFalse(tenant, leadId)
-                .map(Job::getId)
+                .map(job -> job.getId())
                 .orElse(null);
         return toDto(lead, convertedJobId);
     }

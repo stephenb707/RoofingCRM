@@ -67,7 +67,7 @@ public class PipelineStatusAdminServiceImpl implements PipelineStatusAdminServic
         int nextOrder = definitionRepository
                 .findByTenantAndPipelineTypeAndArchivedFalseOrderBySortOrderAsc(tenant, type)
                 .stream()
-                .mapToInt(PipelineStatusDefinition::getSortOrder)
+                .mapToInt(definition -> Objects.requireNonNull(definition).getSortOrder())
                 .max()
                 .orElse(-1) + 1;
 
@@ -141,8 +141,10 @@ public class PipelineStatusAdminServiceImpl implements PipelineStatusAdminServic
         Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
         List<PipelineStatusDefinition> all =
                 definitionRepository.findByTenantAndPipelineTypeAndArchivedFalseOrderBySortOrderAsc(tenant, type);
-        all.sort(Comparator.comparingInt(PipelineStatusDefinition::getSortOrder)
-                .thenComparing(PipelineStatusDefinition::getId));
+        all.sort(Comparator.comparingInt(
+                        (@NonNull PipelineStatusDefinition definition) -> definition.getSortOrder())
+                .thenComparing(
+                        (@NonNull PipelineStatusDefinition definition) -> definition.getId()));
         List<PipelineStatusDefinition> fetchOrder = new ArrayList<>(all);
         List<String> required = PipelineStatusDefaults.requiredBuiltInKeys(type);
         for (PipelineStatusDefinition def : all) {

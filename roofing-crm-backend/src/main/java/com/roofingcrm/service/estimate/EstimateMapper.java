@@ -6,6 +6,7 @@ import com.roofingcrm.api.v1.estimate.EstimateSummaryDto;
 import com.roofingcrm.domain.entity.Estimate;
 import com.roofingcrm.domain.entity.EstimateItem;
 import org.hibernate.Hibernate;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -91,8 +92,9 @@ public class EstimateMapper {
 
     private BigDecimal computeSubtotal(List<EstimateItem> items) {
         return items.stream()
-                .map(EstimateItem::getLineTotal)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+                .map((@NonNull EstimateItem item) -> item.getLineTotal())
+                .reduce(BigDecimal.ZERO,
+                        (@NonNull BigDecimal subtotal, @NonNull BigDecimal lineTotal) -> subtotal.add(lineTotal));
     }
 
     private String customerName(String firstName, String lastName) {

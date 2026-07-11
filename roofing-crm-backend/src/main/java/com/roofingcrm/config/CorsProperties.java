@@ -47,7 +47,7 @@ public class CorsProperties {
         }
         if (list.size() == 1 && list.get(0).contains(",")) {
             return Arrays.stream(list.get(0).split("\\s*,\\s*"))
-                    .map(String::trim)
+                    .map(value -> value == null ? "" : value.trim())
                     .filter(s -> !s.isEmpty())
                     .collect(Collectors.toList());
         }

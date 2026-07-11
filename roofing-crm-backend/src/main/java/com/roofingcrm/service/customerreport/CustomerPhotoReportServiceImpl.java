@@ -104,7 +104,7 @@ public class CustomerPhotoReportServiceImpl implements CustomerPhotoReportServic
             return;
         }
         List<UUID> sectionIds = report.getSections().stream()
-                .map(CustomerPhotoReportSection::getId)
+                .map(section -> Objects.requireNonNull(section).getId())
                 .filter(Objects::nonNull)
                 .toList();
         if (sectionIds.isEmpty()) {
@@ -385,7 +385,8 @@ public class CustomerPhotoReportServiceImpl implements CustomerPhotoReportServic
         List<CustomerPhotoReportSection> secs = r.getSections() != null
                 ? new ArrayList<>(r.getSections())
                 : new ArrayList<>();
-        secs.sort(Comparator.comparingInt(CustomerPhotoReportSection::getSortOrder));
+        secs.sort(Comparator.comparingInt(
+                (CustomerPhotoReportSection section) -> section.getSortOrder()));
         for (CustomerPhotoReportSection sec : secs) {
             CustomerPhotoReportSectionDto sd = new CustomerPhotoReportSectionDto();
             sd.setId(sec.getId());
@@ -395,7 +396,8 @@ public class CustomerPhotoReportServiceImpl implements CustomerPhotoReportServic
             List<CustomerPhotoReportSectionPhoto> photos = sec.getPhotos() != null
                     ? new ArrayList<>(sec.getPhotos())
                     : new ArrayList<>();
-            photos.sort(Comparator.comparingInt(CustomerPhotoReportSectionPhoto::getSortOrder));
+            photos.sort(Comparator.comparingInt(
+                    (CustomerPhotoReportSectionPhoto photo) -> photo.getSortOrder()));
             for (CustomerPhotoReportSectionPhoto ph : photos) {
                 CustomerPhotoReportSectionPhotoDto pd = new CustomerPhotoReportSectionPhotoDto();
                 pd.setAttachmentId(ph.getAttachment().getId());

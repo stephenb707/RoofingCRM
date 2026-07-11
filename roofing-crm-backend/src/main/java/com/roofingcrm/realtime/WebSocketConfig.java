@@ -1,6 +1,8 @@
 package com.roofingcrm.realtime;
 
+import com.roofingcrm.config.CorsProperties;
 import com.roofingcrm.security.JwtService;
+import com.roofingcrm.service.tenant.TenantAccessService;
 
 import java.util.Objects;
 
@@ -9,6 +11,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.lang.NonNull;
+import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
@@ -35,10 +38,17 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     private final JwtHandshakeInterceptor jwtHandshakeInterceptor;
+    private final TenantSubscriptionAuthorizationInterceptor tenantSubscriptionAuthorizationInterceptor;
+    private final CorsProperties corsProperties;
 
     @Autowired
-    public WebSocketConfig(JwtService jwtService) {
+    public WebSocketConfig(JwtService jwtService,
+                           TenantAccessService tenantAccessService,
+                           CorsProperties corsProperties) {
         this.jwtHandshakeInterceptor = new JwtHandshakeInterceptor(jwtService);
+        this.tenantSubscriptionAuthorizationInterceptor =
+                new TenantSubscriptionAuthorizationInterceptor(tenantAccessService);
+        this.corsProperties = corsProperties;
     }
 
     @Override
@@ -50,9 +60,15 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     }
 
     @Override
+    public void configureClientInboundChannel(@NonNull ChannelRegistration registration) {
+        registration.interceptors(tenantSubscriptionAuthorizationInterceptor);
+    }
+
+    @Override
     public void registerStompEndpoints(@NonNull StompEndpointRegistry registry) {
         registry.addEndpoint("/ws")
-                .setAllowedOriginPatterns("*")
+                .setAllowedOrigins(Objects.requireNonNull(
+                        corsProperties.getAllowedOrigins().toArray(String[]::new)))
                 .addInterceptors(jwtHandshakeInterceptor)
                 .withSockJS();
     }
