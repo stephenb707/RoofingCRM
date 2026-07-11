@@ -155,8 +155,8 @@ public class SummaryFieldConsensusService {
             return new FieldConsensus(null, ReceiptFieldConfidence.UNKNOWN);
         }
 
-        groups.sort(Comparator.comparingInt(ValueGroup::support).reversed()
-                .thenComparing(Comparator.comparingInt(ValueGroup::occurrences).reversed()));
+        groups.sort(Comparator.comparingInt((ValueGroup group) -> group.support()).reversed()
+                .thenComparing(Comparator.comparingInt((ValueGroup group) -> group.occurrences()).reversed()));
 
         ValueGroup best = groups.getFirst();
         int nextSupport = groups.size() > 1 ? groups.get(1).support() : 0;

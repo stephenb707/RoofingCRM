@@ -73,8 +73,8 @@ public class ReceiptDateCandidateRanker {
         }
 
         return bestScore.entrySet().stream()
-                .max(Comparator.comparing(Map.Entry<LocalDate, Integer>::getValue)
-                        .thenComparing(Map.Entry::getKey))
+                .max(Comparator.<Map.Entry<LocalDate, Integer>>comparingInt(entry -> entry.getValue())
+                        .thenComparing(entry -> entry.getKey()))
                 .map(e -> e.getKey().atTime(12, 0).toInstant(ZoneOffset.UTC))
                 .orElse(null);
     }

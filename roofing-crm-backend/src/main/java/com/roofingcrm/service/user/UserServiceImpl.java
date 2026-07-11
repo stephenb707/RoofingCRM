@@ -39,7 +39,7 @@ public class UserServiceImpl implements UserService {
                 tenant, qNorm, PageRequest.of(0, capped));
 
         return members.stream()
-                .map(TenantUserMembership::getUser)
+                .map(member -> member == null ? null : member.getUser())
                 .filter(u -> u != null)
                 .map(this::toPickerDto)
                 .collect(Collectors.toList());

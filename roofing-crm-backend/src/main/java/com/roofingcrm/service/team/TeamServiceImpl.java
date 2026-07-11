@@ -83,7 +83,9 @@ public class TeamServiceImpl implements TeamService {
         List<TenantUserMembership> memberships = membershipRepository.findByTenantAndArchivedFalse(tenant);
 
         return memberships.stream()
-                .sorted(Comparator.comparing(TenantUserMembership::getRole, ROLE_ORDER)
+                .sorted(Comparator.comparing(
+                                (TenantUserMembership membership) -> membership.getRole(),
+                                ROLE_ORDER)
                         .thenComparing(m -> nullToEmpty(m.getUser().getFullName()))
                         .thenComparing(m -> m.getUser().getEmail()))
                 .map(this::toTeamMemberDto)

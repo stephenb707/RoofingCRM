@@ -104,17 +104,19 @@ public class ReceiptAmountCandidateExtractor {
 
         Map<BigDecimal, RankedAmountCandidate> merged = new LinkedHashMap<>();
         extracted.stream()
-                .sorted(Comparator.comparingInt(LineAmountCandidate::score).reversed()
-                        .thenComparing(Comparator.comparingInt(LineAmountCandidate::lineIndex).reversed()))
+                .sorted(Comparator.comparingInt((LineAmountCandidate candidate) -> candidate.score()).reversed()
+                        .thenComparing(Comparator.comparingInt(
+                                (LineAmountCandidate candidate) -> candidate.lineIndex()).reversed()))
                 .forEach(candidate -> merged.merge(
                         candidate.amount(),
                         new RankedAmountCandidate(candidate.amount(), candidate.score(), candidate.lineText(), candidate.lineIndex()),
-                        RankedAmountCandidate::merge
+                        (existing, incoming) -> existing.merge(incoming)
                 ));
 
         List<RankedAmountCandidate> ranked = merged.values().stream()
-                .sorted(Comparator.comparingInt(RankedAmountCandidate::score).reversed()
-                        .thenComparing(Comparator.comparingInt(RankedAmountCandidate::lineIndex).reversed()))
+                .sorted(Comparator.comparingInt((RankedAmountCandidate candidate) -> candidate.score()).reversed()
+                        .thenComparing(Comparator.comparingInt(
+                                (RankedAmountCandidate candidate) -> candidate.lineIndex()).reversed()))
                 .toList();
 
         List<String> warnings = new ArrayList<>();

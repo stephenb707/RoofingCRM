@@ -56,7 +56,10 @@ public class TenantIntegrationSettingsServiceImpl implements TenantIntegrationSe
         requireAdmin(tenantId, userId);
         Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
         Map<IntegrationProvider, TenantIntegrationConnection> existing = connectionRepository.findByTenant(tenant).stream()
-                .collect(Collectors.toMap(TenantIntegrationConnection::getProvider, c -> c, (a, b) -> a));
+                .collect(Collectors.toMap(
+                        (@NonNull TenantIntegrationConnection connection) -> connection.getProvider(),
+                        connection -> connection,
+                        (first, duplicate) -> first));
         return Stream.of(IntegrationProvider.values())
                 .map(p -> toDto(p, existing.get(p)))
                 .toList();
