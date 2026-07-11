@@ -14,10 +14,12 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.json.Jackson2ObjectMapperBuilder;
 import org.springframework.lang.NonNull;
+import org.springframework.security.web.util.matcher.IpAddressMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -37,7 +39,9 @@ public class HighRiskEndpointRateLimitFilter extends OncePerRequestFilter {
     private final RateLimitProperties properties;
     private final MinuteWindowRateLimiter limiter;
     private final RefreshTokenProperties refreshTokenProperties;
+    private final List<IpAddressMatcher> trustedProxyMatchers;
 
+    @SuppressWarnings("null")
     public HighRiskEndpointRateLimitFilter(
             RateLimitProperties properties,
             MinuteWindowRateLimiter limiter,
@@ -45,6 +49,11 @@ public class HighRiskEndpointRateLimitFilter extends OncePerRequestFilter {
         this.properties = Objects.requireNonNull(properties);
         this.limiter = Objects.requireNonNull(limiter);
         this.refreshTokenProperties = Objects.requireNonNull(refreshTokenProperties);
+        this.trustedProxyMatchers = properties.getTrustedProxies().stream()
+                .filter(proxy -> proxy != null && !proxy.isBlank())
+                .map(String::trim)
+                .map(IpAddressMatcher::new)
+                .toList();
     }
 
     @Override
@@ -207,12 +216,34 @@ public class HighRiskEndpointRateLimitFilter extends OncePerRequestFilter {
         return null;
     }
 
-    private static String clientIp(HttpServletRequest request) {
+    String clientIp(HttpServletRequest request) {
+        String directPeer = request.getRemoteAddr();
+        if (!isTrustedProxy(directPeer)) {
+            return directPeer;
+        }
+
         String forwardedFor = request.getHeader("X-Forwarded-For");
         if (forwardedFor != null && !forwardedFor.isBlank()) {
-            return forwardedFor.split(",")[0].trim();
+            String[] forwardedAddresses = forwardedFor.split(",");
+            for (int i = forwardedAddresses.length - 1; i >= 0; i--) {
+                String address = forwardedAddresses[i].trim();
+                if (!address.isBlank() && !isTrustedProxy(address)) {
+                    return address;
+                }
+            }
         }
-        return request.getRemoteAddr();
+        return directPeer;
+    }
+
+    private boolean isTrustedProxy(String address) {
+        if (address == null || address.isBlank()) {
+            return false;
+        }
+        try {
+            return trustedProxyMatchers.stream().anyMatch(matcher -> matcher.matches(address));
+        } catch (IllegalArgumentException ignored) {
+            return false;
+        }
     }
 
     private void writeTooManyRequests(HttpServletResponse response, HttpServletRequest request) throws IOException {

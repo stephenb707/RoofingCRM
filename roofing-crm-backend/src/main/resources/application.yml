@@ -59,6 +59,8 @@ app:
   # or an API gateway for distributed rate limits; per-instance counters under-count abuse volume.
   rate-limit:
     enabled: ${APP_RATE_LIMIT_ENABLED:true}
+    # Comma-separated exact IPs/CIDRs for load balancers allowed to supply X-Forwarded-For. Empty trusts none.
+    trusted-proxies: ${APP_RATE_LIMIT_TRUSTED_PROXIES:}
     login-per-minute: ${APP_RATE_LIMIT_LOGIN_PER_MINUTE:20}
     register-per-minute: ${APP_RATE_LIMIT_REGISTER_PER_MINUTE:10}
     register-invite-per-minute: ${APP_RATE_LIMIT_REGISTER_INVITE_PER_MINUTE:10}
