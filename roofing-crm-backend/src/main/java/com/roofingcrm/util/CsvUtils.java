@@ -18,10 +18,17 @@ public final class CsvUtils {
             return "";
         }
         String s = value.toString();
+        if (!s.isEmpty() && isFormulaTrigger(s.charAt(0))) {
+            s = "'" + s;
+        }
         if (needsQuoting(s)) {
             return "\"" + s.replace("\"", "\"\"") + "\"";
         }
         return s;
+    }
+
+    private static boolean isFormulaTrigger(char c) {
+        return c == '=' || c == '+' || c == '-' || c == '@' || c == '\t' || c == '\r';
     }
 
     private static boolean needsQuoting(String s) {
