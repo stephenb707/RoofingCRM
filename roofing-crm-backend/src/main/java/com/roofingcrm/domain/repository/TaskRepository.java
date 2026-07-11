@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.lang.NonNull;
+import org.springframework.lang.Nullable;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -27,7 +28,7 @@ public interface TaskRepository extends JpaRepository<Task, UUID>, JpaSpecificat
 
     @EntityGraph(attributePaths = {"assignedTo", "lead", "job", "customer"})
     @NonNull
-    Page<Task> findAll(@NonNull Specification<Task> spec, @NonNull Pageable pageable);
+    Page<Task> findAll(@Nullable Specification<Task> spec, @NonNull Pageable pageable);
 
     @EntityGraph(attributePaths = {"assignedTo", "lead", "job", "customer"})
     Optional<Task> findByIdAndTenantAndArchivedFalse(UUID id, Tenant tenant);
