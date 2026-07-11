@@ -13,6 +13,7 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.lang.NonNull;
+import org.springframework.lang.Nullable;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -47,7 +48,7 @@ public interface JobRepository extends JpaRepository<Job, UUID>, JpaSpecificatio
             @Param("rangeEnd") LocalDate rangeEnd);
 
     @EntityGraph(attributePaths = {"customer", "lead", "statusDefinition"})
-    @NonNull List<Job> findAll(@NonNull Specification<Job> spec, @NonNull Sort sort);
+    @NonNull List<Job> findAll(@Nullable Specification<Job> spec, @NonNull Sort sort);
 
     @EntityGraph(attributePaths = {"customer", "statusDefinition"})
     Page<Job> findByTenantAndArchivedFalse(Tenant tenant, Pageable pageable);
