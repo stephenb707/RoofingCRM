@@ -1,5 +1,6 @@
 package com.roofingcrm.api.v1.auth;
 
+import com.roofingcrm.validation.StrongPassword;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Getter;
@@ -14,6 +15,7 @@ public class RegisterRequest {
     private String email;
 
     @NotBlank
+    @StrongPassword
     private String password;
 
     @NotBlank

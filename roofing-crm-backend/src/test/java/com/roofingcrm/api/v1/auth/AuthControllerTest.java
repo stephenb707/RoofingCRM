@@ -60,7 +60,7 @@ class AuthControllerTest {
     void register_returnsCreatedAndExposesCsrfTokenButNotRefreshToken() throws Exception {
         RegisterRequest request = new RegisterRequest();
         request.setEmail("test@example.com");
-        request.setPassword("password123");
+        request.setPassword("secure-password-123");
         request.setFullName("Test User");
         request.setTenantName("Test Company");
 
@@ -133,7 +133,7 @@ class AuthControllerTest {
     void registerWithInvite_returnsCreated() throws Exception {
         RegisterWithInviteRequest request = new RegisterWithInviteRequest();
         request.setEmail("invitee@example.com");
-        request.setPassword("password123");
+        request.setPassword("secure-password-123");
         request.setFullName("Invited User");
         request.setToken(UUID.randomUUID());
 
@@ -158,6 +158,36 @@ class AuthControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.email", is("invitee@example.com")))
                 .andExpect(jsonPath("$.tenants[0].role", is("SALES")));
+    }
+
+    @Test
+    void register_withEightCharacterPassword_returnsBadRequest() throws Exception {
+        RegisterRequest request = new RegisterRequest();
+        request.setEmail("test@example.com");
+        request.setPassword("12345678");
+        request.setFullName("Test User");
+        request.setTenantName("Test Company");
+
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                        .content(Objects.requireNonNull(objectMapper.writeValueAsString(request))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("password must be at least 12 characters")));
+    }
+
+    @Test
+    void registerWithInvite_withEightCharacterPassword_returnsBadRequest() throws Exception {
+        RegisterWithInviteRequest request = new RegisterWithInviteRequest();
+        request.setEmail("invitee@example.com");
+        request.setPassword("12345678");
+        request.setFullName("Invited User");
+        request.setToken(UUID.randomUUID());
+
+        mockMvc.perform(post("/api/v1/auth/register-with-invite")
+                        .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                        .content(Objects.requireNonNull(objectMapper.writeValueAsString(request))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("password must be at least 12 characters")));
     }
 
     @Test

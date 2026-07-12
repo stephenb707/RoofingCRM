@@ -33,6 +33,9 @@ server:
   port: ${PORT:8080}
 
 management:
+  # Non-health actuator endpoints are denied on the application port by SecurityConfig.
+  # To scrape metrics, run management endpoints on a dedicated internal-only port and
+  # update the management security configuration for that isolated listener.
   endpoints:
     web:
       exposure:
