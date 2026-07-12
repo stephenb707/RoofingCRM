@@ -41,7 +41,7 @@ public class TenantAccessServiceImpl implements TenantAccessService {
 
         // Check active (non-archived) membership exists - throws if not found
         membershipRepository.findByTenantAndUserAndArchivedFalse(tenant, user)
-                .orElseThrow(() -> new TenantAccessDeniedException("User does not have access to this tenant"));
+                .orElseThrow(() -> new ResourceNotFoundException("Tenant not found"));
 
         if (!user.isEnabled()) {
             throw new TenantAccessDeniedException("User account is disabled");
@@ -59,7 +59,7 @@ public class TenantAccessServiceImpl implements TenantAccessService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         return membershipRepository.findByTenantAndUserAndArchivedFalse(tenant, user)
-                .orElseThrow(() -> new TenantAccessDeniedException("User does not have access to this tenant"));
+                .orElseThrow(() -> new ResourceNotFoundException("Tenant not found"));
     }
 
     @Override

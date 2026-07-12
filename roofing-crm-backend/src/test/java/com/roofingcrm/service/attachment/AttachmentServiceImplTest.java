@@ -21,8 +21,8 @@ import com.roofingcrm.domain.repository.PipelineStatusDefinitionRepository;
 import com.roofingcrm.domain.repository.TenantRepository;
 import com.roofingcrm.domain.repository.TenantUserMembershipRepository;
 import com.roofingcrm.domain.repository.UserRepository;
+import com.roofingcrm.service.exception.ResourceNotFoundException;
 import com.roofingcrm.service.pipeline.PipelineStatusAdminService;
-import com.roofingcrm.service.tenant.TenantAccessDeniedException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -201,7 +201,7 @@ class AttachmentServiceImplTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void uploadForLead_withoutMembership_throwsAccessDenied() {
+    void uploadForLead_withoutMembership_returnsTenantNotFound() {
         // Create a new user without membership
         User anotherUser = new User();
         anotherUser.setEmail("another@example.com");
@@ -213,7 +213,7 @@ class AttachmentServiceImplTest extends AbstractIntegrationTest {
         UUID otherUserId = Objects.requireNonNull(anotherUser.getId());
         MockMultipartFile file = new MockMultipartFile("file", "doc.pdf", "application/pdf", MINIMAL_PDF_BYTES);
 
-        assertThrows(TenantAccessDeniedException.class,
+        assertThrows(ResourceNotFoundException.class,
                 () -> attachmentService.uploadForLead(tenantId, otherUserId, leadId, file, null, null));
     }
 }

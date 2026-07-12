@@ -22,8 +22,8 @@ import com.roofingcrm.domain.repository.PipelineStatusDefinitionRepository;
 import com.roofingcrm.domain.repository.TenantRepository;
 import com.roofingcrm.domain.repository.TenantUserMembershipRepository;
 import com.roofingcrm.domain.repository.UserRepository;
+import com.roofingcrm.service.exception.ResourceNotFoundException;
 import com.roofingcrm.service.pipeline.PipelineStatusAdminService;
-import com.roofingcrm.service.tenant.TenantAccessDeniedException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -214,7 +214,7 @@ class CommunicationLogServiceImplTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void addForLead_withoutMembership_throwsAccessDenied() {
+    void addForLead_withoutMembership_returnsTenantNotFound() {
         // Create a new user without membership
         User anotherUser = new User();
         anotherUser.setEmail("another@example.com");
@@ -229,7 +229,7 @@ class CommunicationLogServiceImplTest extends AbstractIntegrationTest {
         request.setChannel("CALL");
         request.setSubject("Test");
 
-        assertThrows(TenantAccessDeniedException.class,
+        assertThrows(ResourceNotFoundException.class,
                 () -> communicationLogService.addForLead(tenantId, otherUserId, leadId, request));
     }
 }

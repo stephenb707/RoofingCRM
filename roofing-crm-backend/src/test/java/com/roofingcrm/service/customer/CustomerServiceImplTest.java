@@ -16,7 +16,6 @@ import com.roofingcrm.domain.repository.TenantRepository;
 import com.roofingcrm.domain.repository.TenantUserMembershipRepository;
 import com.roofingcrm.domain.repository.UserRepository;
 import com.roofingcrm.service.exception.ResourceNotFoundException;
-import com.roofingcrm.service.tenant.TenantAccessDeniedException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -256,7 +255,7 @@ class CustomerServiceImplTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void createCustomer_withoutTenantMembership_throwsAccessDenied() {
+    void createCustomer_withoutTenantMembership_returnsTenantNotFound() {
         // Arrange: create a different user with no membership in tenant
         User otherUser = new User();
         otherUser.setEmail("other@example.com");
@@ -273,7 +272,7 @@ class CustomerServiceImplTest extends AbstractIntegrationTest {
         UUID otherUserId = Objects.requireNonNull(otherUser.getId());
 
         // Act & Assert
-        assertThrows(TenantAccessDeniedException.class,
+        assertThrows(ResourceNotFoundException.class,
                 () -> customerService.createCustomer(tenantId, otherUserId, request));
     }
 }

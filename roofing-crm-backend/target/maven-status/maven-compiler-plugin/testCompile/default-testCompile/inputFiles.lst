@@ -24,6 +24,7 @@ C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\c
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\com\roofingcrm\background\BackgroundJobBackoffTest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\com\roofingcrm\background\IntegrationBackgroundJobServiceIntegrationTest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\com\roofingcrm\background\IntegrationBackgroundJobWorkerTest.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\com\roofingcrm\config\ActuatorSecurityTest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\com\roofingcrm\customerreport\CustomerPhotoReportFetchIntegrationTest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\com\roofingcrm\InvoiceMigrationFileTest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\com\roofingcrm\InvoiceSchemaIntegrationTest.java
@@ -78,6 +79,7 @@ C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\c
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\com\roofingcrm\service\settings\AppPreferencesSanitizerTest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\com\roofingcrm\service\settings\AppPreferencesServiceImplTest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\com\roofingcrm\service\team\TeamServiceImplUnitTest.java
+C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\com\roofingcrm\service\tenant\TenantAccessServiceImplTest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\com\roofingcrm\storage\AttachmentFilenameSanitizerTest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\com\roofingcrm\storage\LocalAttachmentStorageServiceTest.java
 C:\Users\steph\OneDrive\Documents\RoofingCRM\roofing-crm-backend\src\test\java\com\roofingcrm\storage\S3AttachmentStorageServiceTest.java
