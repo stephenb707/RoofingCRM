@@ -96,10 +96,11 @@ public class CustomerServiceImpl implements CustomerService {
             return customerRepository.findByTenantAndArchivedFalse(tenant, pageable)
                     .map(this::toDto);
         }
+        // The native search query expects "" (not null) to disable a match branch,
+        // so the driver never binds an untyped null parameter.
         String digitsOnly = qNormalized.replaceAll("\\D", "");
-        String digitsOnlyParam = digitsOnly.isEmpty() ? null : digitsOnly;
         String qNoSpaces = qNormalized.replace(" ", "");
-        return customerRepository.search(tenant, qNormalized, digitsOnlyParam, qNoSpaces, pageable)
+        return customerRepository.search(tenant.getId(), qNormalized, digitsOnly, qNoSpaces, pageable)
                 .map(this::toDto);
     }
 

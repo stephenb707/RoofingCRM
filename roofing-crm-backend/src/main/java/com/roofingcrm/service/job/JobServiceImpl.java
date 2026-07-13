@@ -310,8 +310,10 @@ public class JobServiceImpl implements JobService {
         }
         Tenant tenant = tenantAccessService.loadTenantForUserOrThrow(tenantId, userId);
         var spec = JobSpecifications.forSchedule(tenant, from, to, statusDefinitionId, crewName, includeUnscheduled);
+        // No explicit nullsLast() here: Spring Data 3.4 rejects null precedence on
+        // Specification (Criteria) queries, and PostgreSQL sorts nulls last for ASC anyway.
         Sort sort = Sort.by(
-                Sort.Order.asc("scheduledStartDate").nullsLast(),
+                Sort.Order.asc("scheduledStartDate"),
                 Sort.Order.desc("createdAt")
         );
         List<Job> jobs = jobRepository.findAll(spec, sort);
