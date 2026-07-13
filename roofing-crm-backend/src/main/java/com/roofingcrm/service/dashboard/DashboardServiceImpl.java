@@ -126,13 +126,15 @@ public class DashboardServiceImpl implements DashboardService {
                         .map(this::toJobSnippet)
                         .getContent());
 
+        // No explicit nullsLast() here: Spring Data 3.4 rejects null precedence on
+        // Specification (Criteria) queries, and PostgreSQL sorts nulls last for ASC anyway.
         dto.setOpenTasks(
                 taskRepository
                         .findAll(
                                 TaskSpecifications.openTasksForTenant(Objects.requireNonNull(tenant)),
                                 PageRequest.of(0, 5,
                                         Sort.by(
-                                                Sort.Order.asc("dueAt").nullsLast(),
+                                                Sort.Order.asc("dueAt"),
                                                 Sort.Order.asc("createdAt"))))
                         .map(this::toTaskSnippet)
                         .getContent());

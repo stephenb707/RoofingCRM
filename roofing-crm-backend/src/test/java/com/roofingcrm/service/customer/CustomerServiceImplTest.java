@@ -184,6 +184,21 @@ class CustomerServiceImplTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void listCustomers_withFormattedPhoneQuery_matchesStoredPhone() {
+        CreateCustomerRequest request = new CreateCustomerRequest();
+        request.setFirstName("John");
+        request.setLastName("Smith");
+        request.setPrimaryPhone("312-111-2222");
+        request.setEmail("john.smith@example.com");
+        CustomerDto smith = customerService.createCustomer(tenantId, userId, request);
+
+        // Query digits are extracted, so a formatted query matches a dash-formatted stored phone
+        Page<CustomerDto> results = customerService.listCustomers(tenantId, userId, "(312) 111-2222", PageRequest.of(0, 10));
+        assertEquals(1, results.getTotalElements());
+        assertEquals(smith.getId(), results.getContent().get(0).getId());
+    }
+
+    @Test
     void listCustomers_withFullNameSearch_matchesJohnD() {
         CreateCustomerRequest request = new CreateCustomerRequest();
         request.setFirstName("John");

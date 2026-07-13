@@ -23,5 +23,13 @@ FROM eclipse-temurin:21-jre-jammy
 WORKDIR /app
 COPY --from=build /app/target/*.jar /app/app.jar
 
+# Default heap sizing: without an explicit setting the JVM only claims ~25% of
+# container RAM (MaxRAMPercentage default), which is too little on small
+# instances (e.g. 512MB Render service -> ~128MB heap) and caused startup
+# OutOfMemoryError while Hibernate parsed repository @Query methods.
+# 75% of a 512MB container is ~384MB heap, which starts comfortably.
+# Deployments can still override JAVA_OPTS via environment.
+ENV JAVA_OPTS="-XX:MaxRAMPercentage=75.0"
+
 EXPOSE 8080
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /app/app.jar"]
